@@ -1,0 +1,1 @@
+heroku logs --tail --app=bondage-club-server --source=app -n 1500
