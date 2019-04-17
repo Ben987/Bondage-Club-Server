@@ -173,6 +173,7 @@ function AccountUpdate(data, socket) {
 				delete data.Pose;
 				delete data.ActivePose;
 				if (data.Appearance != null) Account[P].Appearance = data.Appearance;
+				if (data.Reputation != null) Account[P].Reputation = data.Reputation;
 				console.log("Updating account: " + Account[P].AccountName + " ID: " + socket.id.toString());
 				Database.collection("Accounts").updateOne({ AccountName : Account[P].AccountName }, { $set: data }, function(err, res) { if (err) throw err; });
 			}
@@ -375,6 +376,7 @@ function ChatRoomSync(CR) {
 		A.Name = CR.Account[C].Name;
 		A.Appearance = CR.Account[C].Appearance;
 		A.ActivePose = CR.Account[C].ActivePose;
+		A.Reputation = CR.Account[C].Reputation;
 		R.Character.push(A);
 	}
 
