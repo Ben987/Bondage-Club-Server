@@ -377,6 +377,8 @@ function ChatRoomSync(CR) {
 		A.Appearance = CR.Account[C].Appearance;
 		A.ActivePose = CR.Account[C].ActivePose;
 		A.Reputation = CR.Account[C].Reputation;
+		A.Lover = CR.Account[C].Lover;
+		A.Owner = CR.Account[C].Owner;
 		R.Character.push(A);
 	}
 
