@@ -174,7 +174,7 @@ function AccountUpdate(data, socket) {
 				delete data.ActivePose;
 				if (data.Appearance != null) Account[P].Appearance = data.Appearance;
 				if (data.Reputation != null) Account[P].Reputation = data.Reputation;
-				console.log("Updating account: " + Account[P].AccountName + " ID: " + socket.id.toString());
+				//console.log("Updating account: " + Account[P].AccountName + " ID: " + socket.id.toString());
 				Database.collection("Accounts").updateOne({ AccountName : Account[P].AccountName }, { $set: data }, function(err, res) { if (err) throw err; });
 			}
 }
@@ -357,6 +357,7 @@ function ChatRoomChat(data, socket) {
 		if (Acc != null) {
 			if (data.Type == "Chat") ChatRoomMessage(Acc.ChatRoom, Acc.Name + ": " + data.Content.trim());
 			if (data.Type == "Action") ChatRoomMessage(Acc.ChatRoom, "(" + data.Content.trim() + ")");
+			if (data.Type == "Emote") ChatRoomMessage(Acc.ChatRoom, "*" + data.Content.trim() + "*");
 		}
 	}
 }
@@ -397,7 +398,7 @@ function ChatRoomCharacterUpdate(data, socket) {
 			for (var A = 0; A < Acc.ChatRoom.Account.length; A++)
 				if (Acc.ChatRoom.Account[A].ID == data.ID) {
 					Database.collection("Accounts").updateOne({ AccountName : Acc.ChatRoom.Account[A].AccountName }, { $set: { Appearance: data.Appearance } }, function(err, res) { if (err) throw err; });
-					console.log("Updating account: " + Acc.ChatRoom.Account[A].AccountName + " from ID: " + socket.id.toString());
+					//console.log("Updating account: " + Acc.ChatRoom.Account[A].AccountName + " from ID: " + socket.id.toString());
 					Acc.ChatRoom.Account[A].Appearance = data.Appearance;
 					Acc.ChatRoom.Account[A].ActivePose = data.ActivePose;
 					ChatRoomSync(Acc.ChatRoom);
