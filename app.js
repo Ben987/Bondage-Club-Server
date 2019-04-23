@@ -345,8 +345,9 @@ function ChatRoomLeave(socket) {
 
 // Sends a text message to everyone in the room
 function ChatRoomMessage(CR, Msg) {
-	for (var A = 0; A < CR.Account.length; A++)
-		CR.Account[A].Socket.emit("ChatRoomMessage", Msg);
+	if (CR != null)
+		for (var A = 0; A < CR.Account.length; A++)
+			CR.Account[A].Socket.emit("ChatRoomMessage", Msg);
 }
 
 // When a user sends a chat message, we propagate it to everyone in the room
