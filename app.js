@@ -394,7 +394,7 @@ function ChatRoomSync(CR) {
 function ChatRoomCharacterUpdate(data, socket) {
 	if ((typeof data === "object") && (data.ID != null) && (typeof data.ID === "string") && (data.ID != "") && (data.Appearance != null)) {
 		var Acc = AccountGet(socket.id);
-		if (Acc != null)
+		if ((Acc != null) && (Acc.ChatRoom != null))
 			for (var A = 0; A < Acc.ChatRoom.Account.length; A++)
 				if (Acc.ChatRoom.Account[A].ID == data.ID) {
 					Database.collection("Accounts").updateOne({ AccountName : Acc.ChatRoom.Account[A].AccountName }, { $set: { Appearance: data.Appearance } }, function(err, res) { if (err) throw err; });
