@@ -18,10 +18,11 @@ var DatabaseName = process.env.DATABASE_NAME || "BondageClubDatabase";
 var PasswordResetProgress = [];
 var NodeMailer = require("nodemailer");
 var MailTransporter = NodeMailer.createTransport({
-	service: "gmail",
-	host: "smtp.gmail.com",
+	host: "mail.bondageprojects.com",
+	Port: 465,
+	secure: true,
 	auth: {
-		user: process.env.EMAIL_ADDRESS || "",
+		user: "donotreply@bondageprojects.com",
 		pass: process.env.EMAIL_PASSWORD || ""
     }
 });
@@ -450,7 +451,7 @@ function PasswordReset(data, socket) {
 
 				// Prepares the email to be sent
 				var mailOptions = {
-					from: "bondageprojects@gmail.com",
+					from: "donotreply@bondageprojects.com",
 					to: result[0].Email,
 					subject: "Bondage Club Password Reset",
 					html: EmailBody
