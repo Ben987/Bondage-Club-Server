@@ -1,27 +1,13 @@
 {
-  "name": "nodejs-getting-started",
-  "description": "End to end sample for running Node.js applications on Google Cloud Platform",
+  "name": "Bondage Club Server",
   "version": "1.0.0",
-  "license": "Apache-2.0",
-  "author": "Google Inc.",
+  "author": "Ben987",
   "engines": {
-      "node": "10.15.1" 
+    "node": "10.15.1"
   },
   "repository": "https://github.com/GoogleCloudPlatform/nodejs-getting-started",
   "main": "app.js",
   "private": true,
-  "cloud-repo-tools": {
-    "requiresKeyFile": true,
-    "requiresProjectId": true,
-    "test": {
-      "app": {
-        "args": [
-          "app.js"
-        ],
-        "msg": "Hello, world!"
-      }
-    }
-  },
   "scripts": {
     "start": "node app.js",
     "e2e": "repo-tools test deploy",
@@ -29,16 +15,10 @@
     "cover": "nyc --cache npm test; nyc report --reporter=html"
   },
   "dependencies": {
-    "@google-cloud/storage": "^2.4.2",
     "bcrypt": "^3.0.4",
-    "express": "^4.16.4",
     "heroku": "^7.22.2",
     "mongodb": "^3.1.13",
+    "nodemailer": "^6.1.1",
     "socket.io": "^2.2.0"
-  },
-  "devDependencies": {
-    "@google-cloud/nodejs-repo-tools": "^3.0.0",
-    "ava": "^0.25.0",
-    "supertest": "^3.3.0"
   }
 }

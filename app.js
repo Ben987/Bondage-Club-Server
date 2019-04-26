@@ -1,16 +1,30 @@
 "use strict";
 
 // Main game objects
-var App = require('http').createServer()
-var IO = require('socket.io')(App);
-var BCrypt = require('bcrypt');
+var App = require("http").createServer()
+var IO = require("socket.io")(App);
+var BCrypt = require("bcrypt");
 var Account = [];
 var ChatRoom = [];
+
+// DB Access
 var Database;
 var DatabaseClient = require('mongodb').MongoClient;
 var DatabaseURL = process.env.DATABASE_URL || "mongodb://localhost:27017/BondageClubDatabase";
 var DatabasePort = process.env.PORT || 4288;
 var DatabaseName = process.env.DATABASE_NAME || "BondageClubDatabase";
+
+// Email password reset
+var PasswordResetProgress = [];
+var NodeMailer = require("nodemailer");
+var MailTransporter = NodeMailer.createTransport({
+	service: "gmail",
+	host: "smtp.gmail.com",
+	auth: {
+		user: process.env.EMAIL_ADDRESS || "",
+		pass: process.env.EMAIL_PASSWORD || ""
+    }
+});
 
 // Connects to the Mongo Database
 DatabaseClient.connect(DatabaseURL, { useNewUrlParser: true }, function(err, db) {
@@ -20,8 +34,6 @@ DatabaseClient.connect(DatabaseURL, { useNewUrlParser: true }, function(err, db)
 	Database = db.db(DatabaseName);
 	console.log("****************************************");
 	console.log("Database: " + DatabaseName + " connected");
-	//Database.collection("Accounts").findOne({}, function(err, result) { console.log(result); });
-	//Database.collection("Accounts").deleteMany({}, function(err, result) { console.log("All accounts deleted"); });
 	
 	// Listens for clients on port 4288 if local or a random port if online
 	App.listen(DatabasePort, function () {
@@ -43,6 +55,8 @@ DatabaseClient.connect(DatabaseURL, { useNewUrlParser: true }, function(err, db)
 			socket.on("ChatRoomLeave", function() { ChatRoomLeave(socket) });
 			socket.on("ChatRoomChat", function(data) { ChatRoomChat(data, socket) });
 			socket.on("ChatRoomCharacterUpdate", function(data) { ChatRoomCharacterUpdate(data, socket) });
+			socket.on("PasswordReset", function(data) { PasswordReset(data, socket) });
+			socket.on("PasswordResetProcess", function(data) { PasswordResetProcess(data, socket) });
 			AccountSendServerInfo(socket);
 		});
 		
@@ -174,7 +188,6 @@ function AccountUpdate(data, socket) {
 				delete data.ActivePose;
 				if (data.Appearance != null) Account[P].Appearance = data.Appearance;
 				if (data.Reputation != null) Account[P].Reputation = data.Reputation;
-				//console.log("Updating account: " + Account[P].AccountName + " ID: " + socket.id.toString());
 				Database.collection("Accounts").updateOne({ AccountName : Account[P].AccountName }, { $set: data }, function(err, res) { if (err) throw err; });
 			}
 }
@@ -251,7 +264,7 @@ function ChatRoomCreate(data, socket) {
 					Name: data.Name,
 					Description: data.Description,
 					Background: data.Background,
-					Limit: ((data.Limit == null) || (typeof data.Limit !== "string") || Number.isNaN(data.Limit) || (parseInt(data.Limit) < 2) || (parseInt(data.Limit) > 10)) ? 10 : parseInt(data.Limit),
+					Limit: ((data.Limit == null) || (typeof data.Limit !== "string") || isNaN(parseInt(data.Limit)) || (parseInt(data.Limit) < 2) || (parseInt(data.Limit) > 10)) ? 10 : parseInt(data.Limit),
 					Private: data.Private,
 					Creator: Acc.Name,
 					CreatorAccount: Acc.AccountName,
@@ -398,10 +411,96 @@ function ChatRoomCharacterUpdate(data, socket) {
 			for (var A = 0; A < Acc.ChatRoom.Account.length; A++)
 				if (Acc.ChatRoom.Account[A].ID == data.ID) {
 					Database.collection("Accounts").updateOne({ AccountName : Acc.ChatRoom.Account[A].AccountName }, { $set: { Appearance: data.Appearance } }, function(err, res) { if (err) throw err; });
-					//console.log("Updating account: " + Acc.ChatRoom.Account[A].AccountName + " from ID: " + socket.id.toString());
 					Acc.ChatRoom.Account[A].Appearance = data.Appearance;
 					Acc.ChatRoom.Account[A].ActivePose = data.ActivePose;
 					ChatRoomSync(Acc.ChatRoom);
 				}
 	}
+}
+
+// Updates the reset password entry number or creates a new one, this number will have to be entered by the user later
+function PasswordResetSetNumber(AccountName, ResetNumber) {
+	for (var R = 0; R < PasswordResetProgress.length; R++)
+		if (PasswordResetProgress[R].AccountName.trim() == AccountName.trim()) {
+			PasswordResetProgress[R].ResetNumber = ResetNumber;
+			return;
+		}
+	PasswordResetProgress.push({ AccountName: AccountName, ResetNumber: ResetNumber });
+}
+
+// Generates a password reset number and sends it to the user
+function PasswordReset(data, socket) {
+	if ((data != null) && (typeof data === "string") && (data != "") && data.match(/^[a-zA-Z0-9@.]+$/) && (data.length >= 5) && (data.length <= 100) && (data.indexOf("@") > 0) && (data.indexOf(".") > 0)) {
+
+		// Gets all accounts that matches the email
+		Database.collection("Accounts").find({ Email : data }).toArray(function(err, result) {
+
+			// If we found accounts with that email
+			if (err) throw err;
+			if ((result != null) && (typeof result === "object") && (result.length > 0)) {
+								
+				// Builds a reset number for each account found and creates the email body
+				var EmailBody = "To reset your account password, enter your account name and the reset number included in this email.  You need to put these in the Bondage Club password reset screen, with your new password.<br /><br />";
+				for (var R = 0; R < result.length; R++) {
+					var ResetNumber = (Math.round(Math.random() * 1000000000000)).toString();
+					PasswordResetSetNumber(result[R].AccountName, ResetNumber);
+					EmailBody = EmailBody + "Account Name: " + result[R].AccountName + "<br />";
+					EmailBody = EmailBody + "Reset Number: " + ResetNumber + "<br /><br />";
+				}
+
+				// Prepares the email to be sent
+				var mailOptions = {
+					from: "bondageprojects@gmail.com",
+					to: result[0].Email,
+					subject: "Bondage Club Password Reset",
+					html: EmailBody
+				};
+
+				// Sends the email and logs the result
+				MailTransporter.sendMail(mailOptions, function (err, info) {
+					if (err) {
+						console.log("Error while sending password reset email: " + err);
+						socket.emit("PasswordResetResponse", "EmailSentError");
+					}
+					else {
+						console.log("Password reset email send to: " + result[0].Email);
+						socket.emit("PasswordResetResponse", "EmailSent");
+					}
+				});
+
+			} else socket.emit("PasswordResetResponse", "NoAccountOnEmail");
+
+		});
+
+	}
+}
+
+// Generates a password reset number and sends it to the user
+function PasswordResetProcess(data, socket) {
+	if ((typeof data === "object") && (data.AccountName != null) && (typeof data.AccountName === "string") && (data.ResetNumber != null) && (typeof data.ResetNumber === "string") && (data.NewPassword != null) && (typeof data.NewPassword === "string")) {
+		
+		// Makes sure the data is valid
+		var LN = /^[a-zA-Z0-9 ]+$/;
+		if (data.AccountName.match(LN) && data.NewPassword.match(LN) && (data.AccountName.length > 0) && (data.AccountName.length <= 20) && (data.NewPassword.length > 0) && (data.NewPassword.length <= 20)) {
+			
+			// Checks if the reset number matches
+			for (var R = 0; R < PasswordResetProgress.length; R++)
+				if ((PasswordResetProgress[R].AccountName == data.AccountName) && (PasswordResetProgress[R].ResetNumber == data.ResetNumber)) {					
+
+					// Creates a hashed password and updates the account with it
+					BCrypt.hash(data.NewPassword.toUpperCase(), 10, function( err, hash ) {
+						if (err) throw err;
+						console.log("Updating password for account: " + data.AccountName);
+						Database.collection("Accounts").updateOne({ AccountName : data.AccountName }, { $set: { Password: hash } }, function(err, res) { if (err) throw err; });
+						socket.emit("PasswordResetResponse", "PasswordResetSuccessful");
+					});
+					return;
+				}
+
+			// Sends a fail message to the client
+			socket.emit("PasswordResetResponse", "InvalidPasswordResetInfo");
+
+		} else socket.emit("PasswordResetResponse", "InvalidPasswordResetInfo");
+
+	} else socket.emit("PasswordResetResponse", "InvalidPasswordResetInfo");
 }
