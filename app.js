@@ -56,6 +56,7 @@ DatabaseClient.connect(DatabaseURL, { useNewUrlParser: true }, function(err, db)
 			socket.on("ChatRoomLeave", function() { ChatRoomLeave(socket) });
 			socket.on("ChatRoomChat", function(data) { ChatRoomChat(data, socket) });
 			socket.on("ChatRoomCharacterUpdate", function(data) { ChatRoomCharacterUpdate(data, socket) });
+			socket.on("ChatRoomBan", function(data) { ChatRoomBan(data, socket) });
 			socket.on("PasswordReset", function(data) { PasswordReset(data, socket) });
 			socket.on("PasswordResetProcess", function(data) { PasswordResetProcess(data, socket) });
 			AccountSendServerInfo(socket);
@@ -198,7 +199,7 @@ function AccountRemove(ID) {
 	if (ID != null)
 		for (var P = 0; P < Account.length; P++)
 			if (Account[P].ID == ID) {
-				ChatRoomRemove(Account[P]);
+				ChatRoomRemove(Account[P], "disconnected");
 				console.log("Disconnecting account: " + Account[P].AccountName + " ID: " + ID.toString());
 				Account.splice(P, 1);
 				break;
@@ -217,24 +218,31 @@ function AccountGet(ID) {
 function ChatRoomSearch(data, socket) {
 	if ((typeof data === "object") && (data.Query != null) && (typeof data.Query === "string") && (data.Query.length <= 20)) {
 		
-		// Builds a list of up to 24 possible rooms, the last rooms created are shown first
-		var CR = [];
-		var C = 0;
-		for (var C = ChatRoom.length - 1; ((C >= 0) && (CR.length <= 24)); C--)
-			if (ChatRoom[C].Account.length < ChatRoom[C].Limit)
-				if ((data.Query == "") || (ChatRoom[C].Name.toUpperCase().indexOf(data.Query) >= 0))
-					if (!ChatRoom[C].Private || (ChatRoom[C].Name.toUpperCase() == data.Query)) {
-						CR.push({
-							Name: ChatRoom[C].Name,
-							Creator: ChatRoom[C].Creator,
-							MemberCount: ChatRoom[C].Account.length,
-							MemberLimit: ChatRoom[C].Limit,
-							Description: ChatRoom[C].Description
-						});
-					}
-			
-		// Sends the list to the client
-		socket.emit("ChatRoomSearchResult", CR);
+		// Finds the current account
+		var Acc = AccountGet(socket.id);
+		if (Acc != null) {
+
+			// Builds a list of up to 24 possible rooms, the last rooms created are shown first
+			var CR = [];
+			var C = 0;
+			for (var C = ChatRoom.length - 1; ((C >= 0) && (CR.length <= 24)); C--)
+				if (ChatRoom[C].Account.length < ChatRoom[C].Limit)
+					if (ChatRoom[C].Ban.indexOf(Acc.AccountName) < 0)
+						if ((data.Query == "") || (ChatRoom[C].Name.toUpperCase().indexOf(data.Query) >= 0))
+							if (!ChatRoom[C].Private || (ChatRoom[C].Name.toUpperCase() == data.Query)) {
+								CR.push({
+									Name: ChatRoom[C].Name,
+									Creator: ChatRoom[C].Creator,
+									MemberCount: ChatRoom[C].Account.length,
+									MemberLimit: ChatRoom[C].Limit,
+									Description: ChatRoom[C].Description
+								});
+							}
+
+			// Sends the list to the client
+			socket.emit("ChatRoomSearchResult", CR);
+
+		}
 
 	}
 }
@@ -260,7 +268,7 @@ function ChatRoomCreate(data, socket) {
 			// Finds the account and links it to the new room
 			var Acc = AccountGet(socket.id);
 			if (Acc != null) {
-				ChatRoomRemove(Acc);
+				ChatRoomRemove(Acc, "left");
 				var NewRoom = {
 					Name: data.Name,
 					Description: data.Description,
@@ -268,9 +276,11 @@ function ChatRoomCreate(data, socket) {
 					Limit: ((data.Limit == null) || (typeof data.Limit !== "string") || isNaN(parseInt(data.Limit)) || (parseInt(data.Limit) < 2) || (parseInt(data.Limit) > 10)) ? 10 : parseInt(data.Limit),
 					Private: data.Private,
 					Creator: Acc.Name,
+					CreatorID: Acc.ID,
 					CreatorAccount: Acc.AccountName,
 					Creation: CommonTime(),
-					Account: []
+					Account: [],
+					Ban: []
 				}
 				ChatRoom.push(NewRoom);
 				Acc.ChatRoom = NewRoom;
@@ -295,20 +305,25 @@ function ChatRoomJoin(data, socket) {
 		// Finds the current account
 		var Acc = AccountGet(socket.id);
 		if (Acc != null) {
-			
+
 			// Removes it from it's current room if needed
-			ChatRoomRemove(Acc);
+			ChatRoomRemove(Acc, "left");
 
 			// Finds the room and join it
 			for (var C = 0; C < ChatRoom.length; C++)
 				if (ChatRoom[C].Name.toUpperCase().trim() == data.Name.toUpperCase().trim())
 					if (ChatRoom[C].Account.length < ChatRoom[C].Limit) {
-						ChatRoomMessage(ChatRoom[C], "(" + Acc.Name + " entered.)");
-						Acc.ChatRoom = ChatRoom[C];
-						ChatRoom[C].Account.push(Acc);
-						socket.emit("ChatRoomSearchResponse", "JoinedRoom");
-						ChatRoomSync(ChatRoom[C]);
-						return;
+						if (ChatRoom[C].Ban.indexOf(Acc.AccountName) < 0) {
+							ChatRoomMessage(ChatRoom[C], "(" + Acc.Name + " entered.)");
+							Acc.ChatRoom = ChatRoom[C];
+							ChatRoom[C].Account.push(Acc);
+							socket.emit("ChatRoomSearchResponse", "JoinedRoom");
+							ChatRoomSync(ChatRoom[C]);
+							return;
+						} else {
+							socket.emit("ChatRoomSearchResponse", "RoomBanned");
+							return;
+						}
 					} else {
 						socket.emit("ChatRoomSearchResponse", "RoomFull");
 						return;
@@ -324,7 +339,7 @@ function ChatRoomJoin(data, socket) {
 }
 
 // Removes a player from a room
-function ChatRoomRemove(Acc) {
+function ChatRoomRemove(Acc, Reason) {
 	if (Acc.ChatRoom != null) {
 
 		// Removes it from the chat room array
@@ -343,7 +358,7 @@ function ChatRoomRemove(Acc) {
 					break;
 				}
 		} else {
-			ChatRoomMessage(Acc.ChatRoom, "(" + Acc.Name + " left.)");
+			ChatRoomMessage(Acc.ChatRoom, "(" + Acc.Name + " " + Reason + ".)");
 			ChatRoomSync(Acc.ChatRoom);
 		}
 		Acc.ChatRoom = null;
@@ -354,7 +369,7 @@ function ChatRoomRemove(Acc) {
 // Finds the current account and removes it from it's chat room, nothing is returned to the client
 function ChatRoomLeave(socket) {
 	var Acc = AccountGet(socket.id);
-	if (Acc != null) ChatRoomRemove(Acc);
+	if (Acc != null) ChatRoomRemove(Acc, "left");
 }
 
 // Sends a text message to everyone in the room
@@ -383,6 +398,7 @@ function ChatRoomSync(CR) {
 	var R = {};
 	R.Name = CR.Name;
 	R.Background = CR.Background;
+	R.CreatorID = CR.CreatorID;
 
 	// Adds the characters from the room
 	R.Character = [];
@@ -416,6 +432,27 @@ function ChatRoomCharacterUpdate(data, socket) {
 					Acc.ChatRoom.Account[A].ActivePose = data.ActivePose;
 					ChatRoomSync(Acc.ChatRoom);
 				}
+	}
+}
+
+// When the accounts that created the chatroom wants to ban another account from it
+function ChatRoomBan(data, socket) {
+	if ((data != null) && (typeof data === "string") && (data != "") && (data != socket.id.toString())) {
+
+		// Validates that the account is the room creator and finds the account from the ID to ban
+		var Acc = AccountGet(socket.id);
+		if ((Acc != null) && (Acc.ChatRoom != null) && (Acc.ChatRoom.CreatorAccount == Acc.AccountName))
+			for (var A = 0; A < Acc.ChatRoom.Account.length; A++)
+				if (Acc.ChatRoom.Account[A].ID == data) {
+
+					// Adds to the ban list and kicks out
+					Acc.ChatRoom.Ban.push(Acc.ChatRoom.Account[A].AccountName);
+					Acc.ChatRoom.Account[A].Socket.emit("ChatRoomSearchResponse", "RoomBanned");
+					ChatRoomRemove(Acc.ChatRoom.Account[A], "was banned");
+					break;
+
+				}
+		
 	}
 }
 
