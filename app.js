@@ -176,6 +176,14 @@ function AccountLogin(data, socket) {
 	} else socket.emit("LoginResponse", "InvalidNamePassword");
 }
 
+// Returns TRUE if the object is empty
+function ObjectEmpty(obj) {
+    for(var key in obj)
+        if (obj.hasOwnProperty(key))
+            return false;
+    return true;
+}
+
 // Updates any account data except the basic ones that cannot change
 function AccountUpdate(data, socket) {
 	if (typeof data === "object")
@@ -188,9 +196,11 @@ function AccountUpdate(data, socket) {
 				delete data.Creation;
 				delete data.Pose;
 				delete data.ActivePose;
+				delete data.ChatRoom;
+				delete data.ID;
 				if (data.Appearance != null) Account[P].Appearance = data.Appearance;
 				if (data.Reputation != null) Account[P].Reputation = data.Reputation;
-				Database.collection("Accounts").updateOne({ AccountName : Account[P].AccountName }, { $set: data }, function(err, res) { if (err) throw err; });
+				if (!ObjectEmpty(data)) Database.collection("Accounts").updateOne({ AccountName : Account[P].AccountName }, { $set: data }, function(err, res) { if (err) throw err; });
 			}
 }
 
@@ -425,13 +435,14 @@ function ChatRoomCharacterUpdate(data, socket) {
 	if ((typeof data === "object") && (data.ID != null) && (typeof data.ID === "string") && (data.ID != "") && (data.Appearance != null)) {
 		var Acc = AccountGet(socket.id);
 		if ((Acc != null) && (Acc.ChatRoom != null))
-			for (var A = 0; A < Acc.ChatRoom.Account.length; A++)
-				if (Acc.ChatRoom.Account[A].ID == data.ID) {
-					Database.collection("Accounts").updateOne({ AccountName : Acc.ChatRoom.Account[A].AccountName }, { $set: { Appearance: data.Appearance } }, function(err, res) { if (err) throw err; });
-					Acc.ChatRoom.Account[A].Appearance = data.Appearance;
-					Acc.ChatRoom.Account[A].ActivePose = data.ActivePose;
-					ChatRoomSync(Acc.ChatRoom);
-				}
+			if (Acc.ChatRoom.Ban.indexOf(Acc.AccountName) < 0)
+				for (var A = 0; A < Acc.ChatRoom.Account.length; A++)
+					if (Acc.ChatRoom.Account[A].ID == data.ID) {
+						Database.collection("Accounts").updateOne({ AccountName : Acc.ChatRoom.Account[A].AccountName }, { $set: { Appearance: data.Appearance } }, function(err, res) { if (err) throw err; });
+						Acc.ChatRoom.Account[A].Appearance = data.Appearance;
+						Acc.ChatRoom.Account[A].ActivePose = data.ActivePose;
+						ChatRoomSync(Acc.ChatRoom);
+					}
 	}
 }
 
