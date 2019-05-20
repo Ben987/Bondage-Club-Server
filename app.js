@@ -6,6 +6,7 @@ var IO = require("socket.io")(App);
 var BCrypt = require("bcrypt");
 var Account = [];
 var ChatRoom = [];
+var NextMemberNumber = 1;
 
 // DB Access
 var Database;
@@ -35,36 +36,45 @@ DatabaseClient.connect(DatabaseURL, { useNewUrlParser: true }, function(err, db)
 	Database = db.db(DatabaseName);
 	console.log("****************************************");
 	console.log("Database: " + DatabaseName + " connected");
+
+	// Gets the next unique member number
+	Database.collection("Accounts").find({ MemberNumber : { $exists: true, $ne: null }}).sort({MemberNumber: -1}).limit(1).toArray(function(err, result) {
 	
-	// Listens for clients on port 4288 if local or a random port if online
-	App.listen(DatabasePort, function () {
+		// Shows the next member number
+		if (result[0].MemberNumber != null) NextMemberNumber = result[0].MemberNumber + 1;
+		console.log("Next Member Number: " + NextMemberNumber);
 		
-		// Sets up the Client/Server events
-		console.log("Bondage Club server is listening on " + (DatabasePort).toString());
-		console.log("****************************************");
-		IO.on("connection", function (socket) {
-			socket.id = Math.round(Math.random() * 1000000000000);
-			socket.emit("ServerMessage", "Connected to the Bondage Club Server");
-			socket.on("AccountCreate", function (data) { AccountCreate(data, socket) });
-			socket.on("AccountLogin", function (data) { AccountLogin(data, socket) });
-			socket.on("AccountUpdate", function (data) { AccountUpdate(data, socket) });
-			socket.on("AccountDisconnect", function () { AccountRemove(socket.id) });
-			socket.on("disconnect", function() { AccountRemove(socket.id) });
-			socket.on("ChatRoomSearch", function(data) { ChatRoomSearch(data, socket) });
-			socket.on("ChatRoomCreate", function(data) { ChatRoomCreate(data, socket) });
-			socket.on("ChatRoomJoin", function(data) { ChatRoomJoin(data, socket) });
-			socket.on("ChatRoomLeave", function() { ChatRoomLeave(socket) });
-			socket.on("ChatRoomChat", function(data) { ChatRoomChat(data, socket) });
-			socket.on("ChatRoomCharacterUpdate", function(data) { ChatRoomCharacterUpdate(data, socket) });
-			socket.on("ChatRoomBan", function(data) { ChatRoomBan(data, socket) });
-			socket.on("PasswordReset", function(data) { PasswordReset(data, socket) });
-			socket.on("PasswordResetProcess", function(data) { PasswordResetProcess(data, socket) });
-			AccountSendServerInfo(socket);
+		// Listens for clients on port 4288 if local or a random port if online
+		App.listen(DatabasePort, function () {
+			
+			// Sets up the Client/Server events
+			console.log("Bondage Club server is listening on " + (DatabasePort).toString());
+			console.log("****************************************");
+			IO.on("connection", function (socket) {
+				socket.id = Math.round(Math.random() * 1000000000000);
+				socket.emit("ServerMessage", "Connected to the Bondage Club Server");
+				socket.on("AccountCreate", function (data) { AccountCreate(data, socket) });
+				socket.on("AccountLogin", function (data) { AccountLogin(data, socket) });
+				socket.on("AccountUpdate", function (data) { AccountUpdate(data, socket) });
+				socket.on("AccountDisconnect", function () { AccountRemove(socket.id) });
+				socket.on("disconnect", function() { AccountRemove(socket.id) });
+				socket.on("ChatRoomSearch", function(data) { ChatRoomSearch(data, socket) });
+				socket.on("ChatRoomCreate", function(data) { ChatRoomCreate(data, socket) });
+				socket.on("ChatRoomJoin", function(data) { ChatRoomJoin(data, socket) });
+				socket.on("ChatRoomLeave", function() { ChatRoomLeave(socket) });
+				socket.on("ChatRoomChat", function(data) { ChatRoomChat(data, socket) });
+				socket.on("ChatRoomCharacterUpdate", function(data) { ChatRoomCharacterUpdate(data, socket) });
+				socket.on("ChatRoomBan", function(data) { ChatRoomBan(data, socket) });
+				socket.on("PasswordReset", function(data) { PasswordReset(data, socket) });
+				socket.on("PasswordResetProcess", function(data) { PasswordResetProcess(data, socket) });
+				AccountSendServerInfo(socket);
+			});
+			
+			// Refreshes the server information to clients each 30 seconds
+			setInterval(AccountSendServerInfo, 30000);
+			
 		});
-		
-		// Refreshes the server information to clients each 30 seconds
-		setInterval(AccountSendServerInfo, 30000);
-		
+	
 	});
 	
 });
@@ -113,22 +123,24 @@ function AccountCreate(data, socket) {
 						data.Password = hash;
 						data.Money = 100;
 						data.Creation = CommonTime();
+						data.MemberNumber = NextMemberNumber;
+						NextMemberNumber++;
 						Database.collection("Accounts").insertOne(data, function(err, res) { if (err) throw err; });
 						data.ID = socket.id;
 						data.Socket = socket;
 						Account.push(data);
-						socket.emit("CreationResponse", "AccountCreated" + data.ID.toString());
+						socket.emit("CreationResponse", { ServerAnswer: "AccountCreated", OnlineID: data.ID.toString(), MemberNumber: data.MemberNumber } );
 						AccountSendServerInfo(socket);
 					});
-					
+
 				}
-				
+
 			});
-			
+
 		}
 
 	} else socket.emit("CreationResponse", "Invalid account information");
-	
+
 }
 
 // Load a single account file
@@ -157,6 +169,14 @@ function AccountLogin(data, socket) {
 								AccountRemove(Account[A].ID);
 								break;
 							}
+							
+						// Assigns a member number if there's none
+						if (result.MemberNumber == null) {
+							result.MemberNumber = NextMemberNumber;
+							NextMemberNumber++;
+							console.log("Assigning missing member number: " + result.MemberNumber + " for account: " + result.AccountName);
+							Database.collection("Accounts").updateOne({ AccountName : result.AccountName }, { $set: { MemberNumber: result.MemberNumber } }, function(err, res) { if (err) throw err; });
+						}
 
 						// Logs the account
 						console.log("Login account: " + result.AccountName + " ID: " + socket.id.toString());
@@ -198,6 +218,7 @@ function AccountUpdate(data, socket) {
 				delete data.ActivePose;
 				delete data.ChatRoom;
 				delete data.ID;
+				delete data.MemberNumber;
 				if (data.Appearance != null) Account[P].Appearance = data.Appearance;
 				if (data.Reputation != null) Account[P].Reputation = data.Reputation;
 				if (!ObjectEmpty(data)) Database.collection("Accounts").updateOne({ AccountName : Account[P].AccountName }, { $set: data }, function(err, res) { if (err) throw err; });
@@ -421,6 +442,7 @@ function ChatRoomSync(CR) {
 		A.Reputation = CR.Account[C].Reputation;
 		A.Lover = CR.Account[C].Lover;
 		A.Owner = CR.Account[C].Owner;
+		A.MemberNumber = CR.Account[C].MemberNumber;
 		R.Character.push(A);
 	}
 
