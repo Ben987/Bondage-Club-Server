@@ -219,6 +219,8 @@ function AccountUpdate(data, socket) {
 				delete data.ChatRoom;
 				delete data.ID;
 				delete data.MemberNumber;
+				if (data.RestrainPermission != null) Account[P].RestrainPermission = data.RestrainPermission;
+				if (data.LabelColor != null) Account[P].LabelColor = data.LabelColor;
 				if (data.Appearance != null) Account[P].Appearance = data.Appearance;
 				if (data.Reputation != null) Account[P].Reputation = data.Reputation;
 				if (!ObjectEmpty(data)) Database.collection("Accounts").updateOne({ AccountName : Account[P].AccountName }, { $set: data }, function(err, res) { if (err) throw err; });
@@ -443,6 +445,7 @@ function ChatRoomSync(CR) {
 		A.Lover = CR.Account[C].Lover;
 		A.Owner = CR.Account[C].Owner;
 		A.MemberNumber = CR.Account[C].MemberNumber;
+		A.LabelColor = CR.Account[C].LabelColor;
 		R.Character.push(A);
 	}
 
