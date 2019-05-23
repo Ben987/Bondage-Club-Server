@@ -7,6 +7,7 @@ var BCrypt = require("bcrypt");
 var Account = [];
 var ChatRoom = [];
 var NextMemberNumber = 1;
+var ChatMessageType = ["Chat", "Action", "Emote"];
 
 // DB Access
 var Database;
@@ -98,7 +99,7 @@ function CommonTime() {
 function AccountCreate(data, socket) {
 
 	// Makes sure the account comes with a name and a password
-	if ((typeof data === "object") && (data.Name != null) && (data.AccountName != null) && (data.Password != null) && (data.Email != null)) {		
+	if ((data != null) && (typeof data === "object") && (data.Name != null) && (data.AccountName != null) && (data.Password != null) && (data.Email != null)) {		
 	
 		// Makes sure the data is valid
 		var LN = /^[a-zA-Z0-9 ]+$/;
@@ -147,7 +148,7 @@ function AccountCreate(data, socket) {
 function AccountLogin(data, socket) {
 
 	// Makes sure the login comes with a name and a password
-	if ((typeof data === "object") && (data.AccountName != null) && (data.Password != null)) {
+	if ((data != null) && (typeof data === "object") && (data.AccountName != null) && (data.Password != null)) {
 
 		// Checks if there's an account that matches the name 
 		data.AccountName = data.AccountName.toUpperCase();
@@ -206,7 +207,7 @@ function ObjectEmpty(obj) {
 
 // Updates any account data except the basic ones that cannot change
 function AccountUpdate(data, socket) {
-	if (typeof data === "object")
+	if ((data != null) && (typeof data === "object"))
 		for (var P = 0; P < Account.length; P++)
 			if (Account[P].ID == socket.id) {
 				delete data.Name;
@@ -224,6 +225,7 @@ function AccountUpdate(data, socket) {
 				if (data.Appearance != null) Account[P].Appearance = data.Appearance;
 				if (data.Reputation != null) Account[P].Reputation = data.Reputation;
 				if (!ObjectEmpty(data)) Database.collection("Accounts").updateOne({ AccountName : Account[P].AccountName }, { $set: data }, function(err, res) { if (err) throw err; });
+				break;
 			}
 }
 
@@ -249,7 +251,7 @@ function AccountGet(ID) {
 
 // When a user searches for a chat room
 function ChatRoomSearch(data, socket) {
-	if ((typeof data === "object") && (data.Query != null) && (typeof data.Query === "string") && (data.Query.length <= 20)) {
+	if ((data != null) && (typeof data === "object") && (data.Query != null) && (typeof data.Query === "string") && (data.Query.length <= 20)) {
 		
 		// Finds the current account
 		var Acc = AccountGet(socket.id);
@@ -284,7 +286,7 @@ function ChatRoomSearch(data, socket) {
 function ChatRoomCreate(data, socket) {
 
 	// Make sure we have everything to create it
-	if ((typeof data === "object") && (data.Name != null) && (data.Description != null) && (data.Background != null) && (data.Private != null) && (typeof data.Name === "string") && (typeof data.Description === "string") && (typeof data.Background === "string") && (typeof data.Private === "boolean")) {
+	if ((data != null) && (typeof data === "object") && (data.Name != null) && (data.Description != null) && (data.Background != null) && (data.Private != null) && (typeof data.Name === "string") && (typeof data.Description === "string") && (typeof data.Background === "string") && (typeof data.Private === "boolean")) {
 
 		// Validates the room name
 		data.Name = data.Name.trim();
@@ -333,7 +335,7 @@ function ChatRoomCreate(data, socket) {
 function ChatRoomJoin(data, socket) {
 
 	// Make sure we have everything to join it
-	if ((typeof data === "object") && (data.Name != null) && (typeof data.Name === "string") && (data.Name != "")) {
+	if ((data != null) && (typeof data === "object") && (data.Name != null) && (typeof data.Name === "string") && (data.Name != "")) {
 		
 		// Finds the current account
 		var Acc = AccountGet(socket.id);
@@ -347,7 +349,7 @@ function ChatRoomJoin(data, socket) {
 				if (ChatRoom[C].Name.toUpperCase().trim() == data.Name.toUpperCase().trim())
 					if (ChatRoom[C].Account.length < ChatRoom[C].Limit) {
 						if (ChatRoom[C].Ban.indexOf(Acc.AccountName) < 0) {
-							ChatRoomMessage(ChatRoom[C], "(" + Acc.Name + " entered.)");
+							ChatRoomMessage(ChatRoom[C], Acc.MemberNumber, Acc.Name + " entered.", "Action");
 							Acc.ChatRoom = ChatRoom[C];
 							ChatRoom[C].Account.push(Acc);
 							socket.emit("ChatRoomSearchResponse", "JoinedRoom");
@@ -391,7 +393,7 @@ function ChatRoomRemove(Acc, Reason) {
 					break;
 				}
 		} else {
-			ChatRoomMessage(Acc.ChatRoom, "(" + Acc.Name + " " + Reason + ".)");
+			ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, Acc.Name + " " + Reason + ".", "Action");
 			ChatRoomSync(Acc.ChatRoom);
 		}
 		Acc.ChatRoom = null;
@@ -406,21 +408,17 @@ function ChatRoomLeave(socket) {
 }
 
 // Sends a text message to everyone in the room
-function ChatRoomMessage(CR, Msg) {
+function ChatRoomMessage(CR, Sender, Content, Type) {
 	if (CR != null)
 		for (var A = 0; A < CR.Account.length; A++)
-			CR.Account[A].Socket.emit("ChatRoomMessage", Msg);
+			CR.Account[A].Socket.emit("ChatRoomMessage", { Sender: Sender, Content: Content, Type: Type } );
 }
 
 // When a user sends a chat message, we propagate it to everyone in the room
 function ChatRoomChat(data, socket) {
-	if ((typeof data === "object") && (data.Content != null) && (data.Type != null) && (typeof data.Content === "string") && (typeof data.Type === "string") && (data.Content.length <= 1000)) {
+	if ((data != null) && (typeof data === "object") && (data.Content != null) && (data.Type != null) && (typeof data.Content === "string") && (typeof data.Type === "string") && (ChatMessageType.indexOf(data.Type) >= 0) && (data.Content.length <= 1000)) {
 		var Acc = AccountGet(socket.id);
-		if (Acc != null) {
-			if (data.Type == "Chat") ChatRoomMessage(Acc.ChatRoom, Acc.Name + ": " + data.Content.trim());
-			if (data.Type == "Action") ChatRoomMessage(Acc.ChatRoom, "(" + data.Content.trim() + ")");
-			if (data.Type == "Emote") ChatRoomMessage(Acc.ChatRoom, "*" + data.Content.trim() + "*");
-		}
+		if (Acc != null) ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, data.Content.trim(), data.Type);
 	}
 }
 
@@ -457,7 +455,7 @@ function ChatRoomSync(CR) {
 
 // Updates a character from the chat room
 function ChatRoomCharacterUpdate(data, socket) {
-	if ((typeof data === "object") && (data.ID != null) && (typeof data.ID === "string") && (data.ID != "") && (data.Appearance != null)) {
+	if ((data != null) && (typeof data === "object") && (data.ID != null) && (typeof data.ID === "string") && (data.ID != "") && (data.Appearance != null)) {
 		var Acc = AccountGet(socket.id);
 		if ((Acc != null) && (Acc.ChatRoom != null))
 			if (Acc.ChatRoom.Ban.indexOf(Acc.AccountName) < 0)
@@ -551,7 +549,7 @@ function PasswordReset(data, socket) {
 
 // Generates a password reset number and sends it to the user
 function PasswordResetProcess(data, socket) {
-	if ((typeof data === "object") && (data.AccountName != null) && (typeof data.AccountName === "string") && (data.ResetNumber != null) && (typeof data.ResetNumber === "string") && (data.NewPassword != null) && (typeof data.NewPassword === "string")) {
+	if ((data != null) && (typeof data === "object") && (data.AccountName != null) && (typeof data.AccountName === "string") && (data.ResetNumber != null) && (typeof data.ResetNumber === "string") && (data.NewPassword != null) && (typeof data.NewPassword === "string")) {
 		
 		// Makes sure the data is valid
 		var LN = /^[a-zA-Z0-9 ]+$/;
