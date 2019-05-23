@@ -54,7 +54,7 @@ DatabaseClient.connect(DatabaseURL, { useNewUrlParser: true }, function(err, db)
 	Database.collection("Accounts").find({ MemberNumber : { $exists: true, $ne: null }}).sort({MemberNumber: -1}).limit(1).toArray(function(err, result) {
 	
 		// Shows the next member number
-		if (result[0].MemberNumber != null) NextMemberNumber = result[0].MemberNumber + 1;
+		if ((result.length > 0) && (result[0].MemberNumber != null)) NextMemberNumber = result[0].MemberNumber + 1;
 		console.log("Next Member Number: " + NextMemberNumber);
 		
 		// Listens for clients on port 4288 if local or a random port if online
