@@ -6,8 +6,20 @@ var IO = require("socket.io")(App);
 var BCrypt = require("bcrypt");
 var Account = [];
 var ChatRoom = [];
+var ChatRoomMessageType = ["Chat", "Action", "Emote"];
+var ChatRoomProduction = [
+	process.env.PRODUCTION0 || "",
+	process.env.PRODUCTION1 || "",
+	process.env.PRODUCTION2 || "",
+	process.env.PRODUCTION3 || "",
+	process.env.PRODUCTION4 || "",
+	process.env.PRODUCTION5 || "",
+	process.env.PRODUCTION6 || "",
+	process.env.PRODUCTION7 || "",
+	process.env.PRODUCTION8 || "",
+	process.env.PRODUCTION9 || "" 
+];
 var NextMemberNumber = 1;
-var ChatMessageType = ["Chat", "Action", "Emote"];
 
 // DB Access
 var Database;
@@ -120,13 +132,14 @@ function AccountCreate(data, socket) {
 					// Creates a hashed password and saves it with the account info
 					BCrypt.hash(data.Password.toUpperCase(), 10, function( err, hash ) {
 						if (err) throw err;
-						console.log("Creating new account: " + data.AccountName + " ID: " + socket.id.toString());
 						data.Password = hash;
 						data.Money = 100;
 						data.Creation = CommonTime();
 						data.MemberNumber = NextMemberNumber;
 						NextMemberNumber++;
 						Database.collection("Accounts").insertOne(data, function(err, res) { if (err) throw err; });
+						data.Environment = AccountGetEnvironment(socket);
+						console.log("Creating new account: " + data.AccountName + " ID: " + socket.id.toString() + " " + data.Environment);
 						data.ID = socket.id;
 						data.Socket = socket;
 						Account.push(data);
@@ -144,12 +157,20 @@ function AccountCreate(data, socket) {
 
 }
 
+// Gets the current environment for online play (www.bondageprojects.com is considered production)
+function AccountGetEnvironment(socket) {
+	if ((socket != null) && (socket.request != null) && (socket.request.headers != null) && (socket.request.headers.origin != null) && (socket.request.headers.origin != "")) {
+		if (ChatRoomProduction.indexOf(socket.request.headers.origin.toLowerCase()) >= 0) return "PROD";
+		else return "DEV";
+	} else return (Math.round(Math.random() * 1000000000000)).toString();
+}
+
 // Load a single account file
 function AccountLogin(data, socket) {
 
 	// Makes sure the login comes with a name and a password
 	if ((data != null) && (typeof data === "object") && (data.AccountName != null) && (data.Password != null)) {
-
+	
 		// Checks if there's an account that matches the name 
 		data.AccountName = data.AccountName.toUpperCase();
 		Database.collection("Accounts").findOne({ AccountName : data.AccountName}, function(err, result) {	
@@ -180,8 +201,9 @@ function AccountLogin(data, socket) {
 						}
 
 						// Logs the account
-						console.log("Login account: " + result.AccountName + " ID: " + socket.id.toString());
 						result.ID = socket.id;
+						result.Environment = AccountGetEnvironment(socket);
+						console.log("Login account: " + result.AccountName + " ID: " + socket.id.toString() + " " + result.Environment);
 						Account.push(result);
 						result.Password = null; 
 						socket.emit("LoginResponse", result);
@@ -220,6 +242,7 @@ function AccountUpdate(data, socket) {
 				delete data.ChatRoom;
 				delete data.ID;
 				delete data.MemberNumber;
+				delete data.Environment;
 				if (data.RestrainPermission != null) Account[P].RestrainPermission = data.RestrainPermission;
 				if (data.LabelColor != null) Account[P].LabelColor = data.LabelColor;
 				if (data.Appearance != null) Account[P].Appearance = data.Appearance;
@@ -262,17 +285,18 @@ function ChatRoomSearch(data, socket) {
 			var C = 0;
 			for (var C = ChatRoom.length - 1; ((C >= 0) && (CR.length <= 24)); C--)
 				if (ChatRoom[C].Account.length < ChatRoom[C].Limit)
-					if (ChatRoom[C].Ban.indexOf(Acc.AccountName) < 0)
-						if ((data.Query == "") || (ChatRoom[C].Name.toUpperCase().indexOf(data.Query) >= 0))
-							if (!ChatRoom[C].Private || (ChatRoom[C].Name.toUpperCase() == data.Query)) {
-								CR.push({
-									Name: ChatRoom[C].Name,
-									Creator: ChatRoom[C].Creator,
-									MemberCount: ChatRoom[C].Account.length,
-									MemberLimit: ChatRoom[C].Limit,
-									Description: ChatRoom[C].Description
-								});
-							}
+					if (Acc.Environment == ChatRoom[C].Environment)
+						if (ChatRoom[C].Ban.indexOf(Acc.AccountName) < 0)
+							if ((data.Query == "") || (ChatRoom[C].Name.toUpperCase().indexOf(data.Query) >= 0))
+								if (!ChatRoom[C].Private || (ChatRoom[C].Name.toUpperCase() == data.Query)) {
+									CR.push({
+										Name: ChatRoom[C].Name,
+										Creator: ChatRoom[C].Creator,
+										MemberCount: ChatRoom[C].Account.length,
+										MemberLimit: ChatRoom[C].Limit,
+										Description: ChatRoom[C].Description
+									});
+								}
 
 			// Sends the list to the client
 			socket.emit("ChatRoomSearchResult", CR);
@@ -310,6 +334,7 @@ function ChatRoomCreate(data, socket) {
 					Background: data.Background,
 					Limit: ((data.Limit == null) || (typeof data.Limit !== "string") || isNaN(parseInt(data.Limit)) || (parseInt(data.Limit) < 2) || (parseInt(data.Limit) > 10)) ? 10 : parseInt(data.Limit),
 					Private: data.Private,
+					Environment: Acc.Environment,
 					Creator: Acc.Name,
 					CreatorID: Acc.ID,
 					CreatorAccount: Acc.AccountName,
@@ -347,22 +372,23 @@ function ChatRoomJoin(data, socket) {
 			// Finds the room and join it
 			for (var C = 0; C < ChatRoom.length; C++)
 				if (ChatRoom[C].Name.toUpperCase().trim() == data.Name.toUpperCase().trim())
-					if (ChatRoom[C].Account.length < ChatRoom[C].Limit) {
-						if (ChatRoom[C].Ban.indexOf(Acc.AccountName) < 0) {
-							ChatRoomMessage(ChatRoom[C], Acc.MemberNumber, Acc.Name + " entered.", "Action");
-							Acc.ChatRoom = ChatRoom[C];
-							ChatRoom[C].Account.push(Acc);
-							socket.emit("ChatRoomSearchResponse", "JoinedRoom");
-							ChatRoomSync(ChatRoom[C]);
-							return;
+					if (Acc.Environment == ChatRoom[C].Environment)
+						if (ChatRoom[C].Account.length < ChatRoom[C].Limit) {
+							if (ChatRoom[C].Ban.indexOf(Acc.AccountName) < 0) {
+								ChatRoomMessage(ChatRoom[C], Acc.MemberNumber, Acc.Name + " entered.", "Action");
+								Acc.ChatRoom = ChatRoom[C];
+								ChatRoom[C].Account.push(Acc);
+								socket.emit("ChatRoomSearchResponse", "JoinedRoom");
+								ChatRoomSync(ChatRoom[C]);
+								return;
+							} else {
+								socket.emit("ChatRoomSearchResponse", "RoomBanned");
+								return;
+							}
 						} else {
-							socket.emit("ChatRoomSearchResponse", "RoomBanned");
+							socket.emit("ChatRoomSearchResponse", "RoomFull");
 							return;
 						}
-					} else {
-						socket.emit("ChatRoomSearchResponse", "RoomFull");
-						return;
-					}
 
 			// If we didn't found the room
 			socket.emit("ChatRoomSearchResponse", "CannotFindRoom");
@@ -416,7 +442,7 @@ function ChatRoomMessage(CR, Sender, Content, Type) {
 
 // When a user sends a chat message, we propagate it to everyone in the room
 function ChatRoomChat(data, socket) {
-	if ((data != null) && (typeof data === "object") && (data.Content != null) && (data.Type != null) && (typeof data.Content === "string") && (typeof data.Type === "string") && (ChatMessageType.indexOf(data.Type) >= 0) && (data.Content.length <= 1000)) {
+	if ((data != null) && (typeof data === "object") && (data.Content != null) && (data.Type != null) && (typeof data.Content === "string") && (typeof data.Type === "string") && (ChatRoomMessageType.indexOf(data.Type) >= 0) && (data.Content.length <= 1000)) {
 		var Acc = AccountGet(socket.id);
 		if (Acc != null) ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, data.Content.trim(), data.Type);
 	}
