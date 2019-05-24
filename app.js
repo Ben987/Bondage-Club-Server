@@ -78,6 +78,7 @@ DatabaseClient.connect(DatabaseURL, { useNewUrlParser: true }, function(err, db)
 				socket.on("ChatRoomChat", function(data) { ChatRoomChat(data, socket) });
 				socket.on("ChatRoomCharacterUpdate", function(data) { ChatRoomCharacterUpdate(data, socket) });
 				socket.on("ChatRoomBan", function(data) { ChatRoomBan(data, socket) });
+				socket.on("ChatRoomAllowItem", function(data) { ChatRoomAllowItem(data, socket) });
 				socket.on("PasswordReset", function(data) { PasswordReset(data, socket) });
 				socket.on("PasswordResetProcess", function(data) { PasswordResetProcess(data, socket) });
 				AccountSendServerInfo(socket);
@@ -142,6 +143,7 @@ function AccountCreate(data, socket) {
 						console.log("Creating new account: " + data.AccountName + " ID: " + socket.id.toString() + " " + data.Environment);
 						data.ID = socket.id;
 						data.Socket = socket;
+						AccountValidData(data);
 						Account.push(data);
 						socket.emit("CreationResponse", { ServerAnswer: "AccountCreated", OnlineID: data.ID.toString(), MemberNumber: data.MemberNumber } );
 						AccountSendServerInfo(socket);
@@ -163,6 +165,16 @@ function AccountGetEnvironment(socket) {
 		if (ChatRoomProduction.indexOf(socket.request.headers.origin.toLowerCase()) >= 0) return "PROD";
 		else return "DEV";
 	} else return (Math.round(Math.random() * 1000000000000)).toString();
+}
+
+// Makes sure the account data is valid, creates the missing fields if we need to
+function AccountValidData(Account) {
+	if (Account != null) {
+		if ((Account.ItemPermission == null) || (typeof Account.ItemPermission !== "number")) Account.ItemPermission = 2;
+		if ((Account.WhiteList == null) || !Array.isArray(Account.WhiteList)) Account.WhiteList = [];
+		if ((Account.BlackList == null) || !Array.isArray(Account.BlackList)) Account.BlackList = [];
+		if ((Account.FriendList == null) || !Array.isArray(Account.FriendList)) Account.FriendList = [];
+	}
 }
 
 // Load a single account file
@@ -204,6 +216,7 @@ function AccountLogin(data, socket) {
 						result.ID = socket.id;
 						result.Environment = AccountGetEnvironment(socket);
 						console.log("Login account: " + result.AccountName + " ID: " + socket.id.toString() + " " + result.Environment);
+						AccountValidData(result);
 						Account.push(result);
 						result.Password = null; 
 						socket.emit("LoginResponse", result);
@@ -232,6 +245,8 @@ function AccountUpdate(data, socket) {
 	if ((data != null) && (typeof data === "object"))
 		for (var P = 0; P < Account.length; P++)
 			if (Account[P].ID == socket.id) {
+				
+				// Some data is never saved or updated from the client
 				delete data.Name;
 				delete data.AccountName;
 				delete data.Password;
@@ -243,12 +258,20 @@ function AccountUpdate(data, socket) {
 				delete data.ID;
 				delete data.MemberNumber;
 				delete data.Environment;
-				if (data.RestrainPermission != null) Account[P].RestrainPermission = data.RestrainPermission;
+				
+				// Some data is kept for future use
+				if (data.ItemPermission != null) Account[P].ItemPermission = data.ItemPermission;
 				if (data.LabelColor != null) Account[P].LabelColor = data.LabelColor;
 				if (data.Appearance != null) Account[P].Appearance = data.Appearance;
 				if (data.Reputation != null) Account[P].Reputation = data.Reputation;
+				if ((data.WhiteList != null) && Array.isArray(data.WhiteList)) Account[P].WhiteList = data.WhiteList;
+				if ((data.BlackList != null) && Array.isArray(data.BlackList)) Account[P].BlackList = data.BlackList;
+				if ((data.FriendList != null) && Array.isArray(data.FriendList)) Account[P].FriendList = data.FriendList;
+				
+				// If we have data to push
 				if (!ObjectEmpty(data)) Database.collection("Accounts").updateOne({ AccountName : Account[P].AccountName }, { $set: data }, function(err, res) { if (err) throw err; });
 				break;
+
 			}
 }
 
@@ -470,6 +493,7 @@ function ChatRoomSync(CR) {
 		A.Owner = CR.Account[C].Owner;
 		A.MemberNumber = CR.Account[C].MemberNumber;
 		A.LabelColor = CR.Account[C].LabelColor;
+		A.ItemPermission = CR.Account[C].ItemPermission;
 		R.Character.push(A);
 	}
 
@@ -486,12 +510,13 @@ function ChatRoomCharacterUpdate(data, socket) {
 		if ((Acc != null) && (Acc.ChatRoom != null))
 			if (Acc.ChatRoom.Ban.indexOf(Acc.AccountName) < 0)
 				for (var A = 0; A < Acc.ChatRoom.Account.length; A++)
-					if (Acc.ChatRoom.Account[A].ID == data.ID) {
-						Database.collection("Accounts").updateOne({ AccountName : Acc.ChatRoom.Account[A].AccountName }, { $set: { Appearance: data.Appearance } }, function(err, res) { if (err) throw err; });
-						Acc.ChatRoom.Account[A].Appearance = data.Appearance;
-						Acc.ChatRoom.Account[A].ActivePose = data.ActivePose;
-						ChatRoomSync(Acc.ChatRoom);
-					}
+					if (Acc.ChatRoom.Account[A].ID == data.ID) 
+						if (ChatRoomGetAllowItem(Acc, Acc.ChatRoom.Account[A])) {
+							Database.collection("Accounts").updateOne({ AccountName : Acc.ChatRoom.Account[A].AccountName }, { $set: { Appearance: data.Appearance } }, function(err, res) { if (err) throw err; });
+							Acc.ChatRoom.Account[A].Appearance = data.Appearance;
+							Acc.ChatRoom.Account[A].ActivePose = data.ActivePose;
+							ChatRoomSync(Acc.ChatRoom);
+						}
 	}
 }
 
@@ -513,6 +538,54 @@ function ChatRoomBan(data, socket) {
 
 				}
 		
+	}
+}
+
+// Returns a specific reputation value for the player
+function ChatRoomDominantValue(Account) {
+	if ((Account.Reputation != null) && (Array.isArray(Account.Reputation)))
+		for (var R = 0; R < Account.Reputation.length; R++)
+			if ((Account.Reputation[R].Type != null) && (Account.Reputation[R].Value != null) && (typeof Account.Reputation[R].Type === "string") && (typeof Account.Reputation[R].Value === "number") && (Account.Reputation[R].Type == "Dominant"))
+				return parseInt(Account.Reputation[R].Value);
+	return 0;
+}
+
+// Compares the source account and target account to check if we allow using an item
+function ChatRoomGetAllowItem(Source, Target) {
+
+	// Make sure we have the required data
+	if ((Source == null) || (Target == null)) return false;
+	AccountValidData(Source);
+	AccountValidData(Target);
+
+	// At zero permission level or if owner, we always allow it
+	if ((Target.ItemPermission <= 0) || ((Target.OwnerNumber != null) && (Target.OwnerNumber == Source.MemberNumber))) return true;
+
+	// At one, we allow if the source isn't on the blacklist
+	if ((Target.ItemPermission == 1) && (Target.BlackList.indexOf(Source.MemberNumber) < 0)) return true;
+
+	// At two, we allow if the source is Dominant compared to the Target (25 points allowed) or on whitelist
+	if ((Target.ItemPermission == 2) && (Target.BlackList.indexOf(Source.MemberNumber) < 0) && ((ChatRoomDominantValue(Source) + 25 >= ChatRoomDominantValue(Target)) || (Target.WhiteList.indexOf(Source.MemberNumber) >= 0))) return true;
+
+	// At three, we allow if the source is Dominant compared to the Target (25 points allowed)
+	if ((Target.ItemPermission == 3) && (Target.WhiteList.indexOf(Source.MemberNumber) >= 0)) return true;
+
+	// No valid combo, we don't allow the item
+	return false;
+
+}
+
+// Returns TRUE if we allow applying an item from a character to another
+function ChatRoomAllowItem(data, socket) {
+	if ((data != null) && (typeof data === "object") && (data.MemberNumber != null) && (typeof data.MemberNumber === "number") && (data.MemberNumber > 0)) {
+		
+		// Gets the source account and target account to check if we allow or not
+		var Acc = AccountGet(socket.id);
+		if ((Acc != null) && (Acc.ChatRoom != null))
+			for (var A = 0; A < Acc.ChatRoom.Account.length; A++)
+				if (Acc.ChatRoom.Account[A].MemberNumber == data.MemberNumber)
+					socket.emit("ChatRoomAllowItem", { MemberNumber: data.MemberNumber, AllowItem: ChatRoomGetAllowItem(Acc, Acc.ChatRoom.Account[A]) });
+
 	}
 }
 
