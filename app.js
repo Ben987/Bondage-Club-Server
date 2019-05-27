@@ -398,11 +398,11 @@ function ChatRoomJoin(data, socket) {
 					if (Acc.Environment == ChatRoom[C].Environment)
 						if (ChatRoom[C].Account.length < ChatRoom[C].Limit) {
 							if (ChatRoom[C].Ban.indexOf(Acc.AccountName) < 0) {
-								ChatRoomMessage(ChatRoom[C], Acc.MemberNumber, Acc.Name + " entered.", "Action");
 								Acc.ChatRoom = ChatRoom[C];
 								ChatRoom[C].Account.push(Acc);
 								socket.emit("ChatRoomSearchResponse", "JoinedRoom");
 								ChatRoomSync(ChatRoom[C]);
+								ChatRoomMessage(ChatRoom[C], Acc.MemberNumber, Acc.Name + " entered.", "Action");
 								return;
 							} else {
 								socket.emit("ChatRoomSearchResponse", "RoomBanned");
