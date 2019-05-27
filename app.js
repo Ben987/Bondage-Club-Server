@@ -467,7 +467,7 @@ function ChatRoomMessage(CR, Sender, Content, Type) {
 function ChatRoomWhisper(CR, Sender, Addressee, Content, Type) {
 	if (CR != null)
 		for (var A = 0; A < CR.Account.length; A++)
-			if (CR.Account.MemberNumber == Addressee) CR.Account[A].Socket.emit("ChatRoomMessage", { Sender: Sender, Content: Content, Type: Type } );
+			if (CR.Account.MemberNumber == Addressee || CR.Account.MemberNumber == Sender) CR.Account[A].Socket.emit("ChatRoomMessage", { Sender: Sender, Content: Content, Type: Type } );
 }
 
 // When a user sends a chat message, we propagate it to everyone in the room
