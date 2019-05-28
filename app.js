@@ -558,8 +558,8 @@ function ChatRoomGetAllowItem(Source, Target) {
 	AccountValidData(Source);
 	AccountValidData(Target);
 
-	// At zero permission level or if owner, we always allow it
-	if ((Target.ItemPermission <= 0) || ((Target.OwnerNumber != null) && (Target.OwnerNumber == Source.MemberNumber))) return true;
+	// At zero permission level or if target is source or if owner, we allow it
+	if ((Target.ItemPermission <= 0) || (Source.MemberNumber == Target.MemberNumber) || ((Target.OwnerNumber != null) && (Target.OwnerNumber == Source.MemberNumber))) return true;
 
 	// At one, we allow if the source isn't on the blacklist
 	if ((Target.ItemPermission == 1) && (Target.BlackList.indexOf(Source.MemberNumber) < 0)) return true;
