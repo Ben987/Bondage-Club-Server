@@ -509,8 +509,8 @@ function ChatRoomCharacterUpdate(data, socket) {
 		var Acc = AccountGet(socket.id);
 		if ((Acc != null) && (Acc.ChatRoom != null))
 			if (Acc.ChatRoom.Ban.indexOf(Acc.AccountName) < 0)
-				for (var A = 0; A < Acc.ChatRoom.Account.length; A++)
-					if (Acc.ChatRoom.Account[A].ID == data.ID) 
+				for (var A = 0; ((Acc.ChatRoom != null) && (A < Acc.ChatRoom.Account.length)); A++)
+					if (Acc.ChatRoom.Account[A].ID == data.ID)
 						if (ChatRoomGetAllowItem(Acc, Acc.ChatRoom.Account[A])) {
 							Database.collection("Accounts").updateOne({ AccountName : Acc.ChatRoom.Account[A].AccountName }, { $set: { Appearance: data.Appearance } }, function(err, res) { if (err) throw err; });
 							Acc.ChatRoom.Account[A].Appearance = data.Appearance;
@@ -582,7 +582,7 @@ function ChatRoomAllowItem(data, socket) {
 		// Gets the source account and target account to check if we allow or not
 		var Acc = AccountGet(socket.id);
 		if ((Acc != null) && (Acc.ChatRoom != null))
-			for (var A = 0; A < Acc.ChatRoom.Account.length; A++)
+			for (var A = 0; ((Acc.ChatRoom != null) && (A < Acc.ChatRoom.Account.length)); A++)
 				if (Acc.ChatRoom.Account[A].MemberNumber == data.MemberNumber)
 					socket.emit("ChatRoomAllowItem", { MemberNumber: data.MemberNumber, AllowItem: ChatRoomGetAllowItem(Acc, Acc.ChatRoom.Account[A]) });
 
