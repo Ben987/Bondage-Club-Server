@@ -242,7 +242,7 @@ function ObjectEmpty(obj) {
 
 // Updates any account data except the basic ones that cannot change
 function AccountUpdate(data, socket) {
-	if ((data != null) && (typeof data === "object"))
+	if ((data != null) && (typeof data === "object") && !Array.isArray(data))
 		for (var P = 0; P < Account.length; P++)
 			if (Account[P].ID == socket.id) {
 				
