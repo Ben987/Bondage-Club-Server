@@ -6,7 +6,7 @@ var IO = require("socket.io")(App);
 var BCrypt = require("bcrypt");
 var Account = [];
 var ChatRoom = [];
-var ChatRoomMessageType = ["Chat", "Action", "Emote"];
+var ChatRoomMessageType = ["Chat", "Action", "Emote", "Whisper"];
 var ChatRoomProduction = [
 	process.env.PRODUCTION0 || "",
 	process.env.PRODUCTION1 || "",
@@ -457,17 +457,18 @@ function ChatRoomLeave(socket) {
 }
 
 // Sends a text message to everyone in the room
-function ChatRoomMessage(CR, Sender, Content, Type) {
+function ChatRoomMessage(CR, Sender, Content, Type, Target) {
 	if (CR != null)
 		for (var A = 0; A < CR.Account.length; A++)
-			CR.Account[A].Socket.emit("ChatRoomMessage", { Sender: Sender, Content: Content, Type: Type } );
+			if ((Target == null) || (Target == CR.Account[A].MemberNumber))
+				CR.Account[A].Socket.emit("ChatRoomMessage", { Sender: Sender, Content: Content, Type: Type } );
 }
 
 // When a user sends a chat message, we propagate it to everyone in the room
 function ChatRoomChat(data, socket) {
 	if ((data != null) && (typeof data === "object") && (data.Content != null) && (data.Type != null) && (typeof data.Content === "string") && (typeof data.Type === "string") && (ChatRoomMessageType.indexOf(data.Type) >= 0) && (data.Content.length <= 1000)) {
 		var Acc = AccountGet(socket.id);
-		if (Acc != null) ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, data.Content.trim(), data.Type);
+		if (Acc != null) ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, data.Content.trim(), data.Type, data.Target);
 	}
 }
 
