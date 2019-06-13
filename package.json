@@ -17,6 +17,7 @@
   "dependencies": {
     "bcrypt": "^3.0.4",
     "heroku": "^7.22.2",
+    "js-yaml": "^3.13.1",
     "mongodb": "^3.1.13",
     "nodemailer": "^6.1.1",
     "socket.io": "^2.2.0"
