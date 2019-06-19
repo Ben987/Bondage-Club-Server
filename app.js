@@ -69,6 +69,7 @@ DatabaseClient.connect(DatabaseURL, { useNewUrlParser: true }, function(err, db)
 				socket.on("AccountCreate", function (data) { AccountCreate(data, socket) });
 				socket.on("AccountLogin", function (data) { AccountLogin(data, socket) });
 				socket.on("AccountUpdate", function (data) { AccountUpdate(data, socket) });
+				socket.on("AccountQuery", function (data) { AccountQuery(data, socket) });
 				socket.on("AccountDisconnect", function () { AccountRemove(socket.id) });
 				socket.on("disconnect", function() { AccountRemove(socket.id) });
 				socket.on("ChatRoomSearch", function(data) { ChatRoomSearch(data, socket) });
@@ -273,6 +274,38 @@ function AccountUpdate(data, socket) {
 				break;
 
 			}
+}
+
+// When the client account sends a query to the server
+function AccountQuery(data, socket) {
+	if ((data != null) && (typeof data === "object") && !Array.isArray(data) && (data.Query != null) && (typeof data.Query === "string")) {
+
+		// Finds the current account
+		var Acc = AccountGet(socket.id);
+		if (Acc != null) {
+
+			// OnlineFriends query - returns all friends that are online and the room name they are in
+			if ((data.Query == "OnlineFriends") && (Acc.FriendList != null)) {
+
+				// Builds the online friend list, both players must be friends to find each other
+				var Friends = [];
+				for (var F = 0; F < Acc.FriendList.length; F++)
+					if ((Acc.FriendList[F] != null) && (typeof Acc.FriendList[F] === "number"))
+						for (var A = 0; A < Account.length; A++)
+							if (Account[A].MemberNumber == Acc.FriendList[F]) {
+								if ((Account[A].Environment == Acc.Environment) && (Account[A].FriendList != null) && (Account[A].FriendList.indexOf(Acc.MemberNumber) >= 0))
+									Friends.push( { MemberNumber: Account[A].MemberNumber, MemberName: Account[A].Name, ChatRoomName: (Account[A].ChatRoom == null) ? null : Account[A].ChatRoom.Name } );
+								A = Account.length;
+							}
+
+				// Sends the query result to the client
+				socket.emit("AccountQueryResult", { Query: data.Query, Result: Friends });
+
+			}
+
+		}
+
+	}
 }
 
 // Removes the account from the buffer
