@@ -70,6 +70,7 @@ DatabaseClient.connect(DatabaseURL, { useNewUrlParser: true }, function(err, db)
 				socket.on("AccountLogin", function (data) { AccountLogin(data, socket) });
 				socket.on("AccountUpdate", function (data) { AccountUpdate(data, socket) });
 				socket.on("AccountQuery", function (data) { AccountQuery(data, socket) });
+				socket.on("AccountBeep", function (data) { AccountBeep(data, socket) });
 				socket.on("AccountDisconnect", function () { AccountRemove(socket.id) });
 				socket.on("disconnect", function() { AccountRemove(socket.id) });
 				socket.on("ChatRoomSearch", function(data) { ChatRoomSearch(data, socket) });
@@ -182,7 +183,7 @@ function AccountValidData(Account) {
 function AccountLogin(data, socket) {
 
 	// Makes sure the login comes with a name and a password
-	if ((data != null) && (typeof data === "object") && (data.AccountName != null) && (data.Password != null)) {
+	if ((data != null) && (typeof data === "object") && (data.AccountName != null) && (typeof data.AccountName === "string") && (data.Password != null) && (typeof data.Password === "string")) {
 	
 		// Checks if there's an account that matches the name 
 		data.AccountName = data.AccountName.toUpperCase();
@@ -294,7 +295,7 @@ function AccountQuery(data, socket) {
 						for (var A = 0; A < Account.length; A++)
 							if (Account[A].MemberNumber == Acc.FriendList[F]) {
 								if ((Account[A].Environment == Acc.Environment) && (Account[A].FriendList != null) && (Account[A].FriendList.indexOf(Acc.MemberNumber) >= 0))
-									Friends.push( { MemberNumber: Account[A].MemberNumber, MemberName: Account[A].Name, ChatRoomName: (Account[A].ChatRoom == null) ? null : Account[A].ChatRoom.Name } );
+									Friends.push( { MemberNumber: Account[A].MemberNumber, MemberName: Account[A].Name, ChatRoomName: (Account[A].ChatRoom == null) ? null : (Account[A].ChatRoom.Private) ? "-Private-" : Account[A].ChatRoom.Name } );
 								A = Account.length;
 							}
 
@@ -304,6 +305,21 @@ function AccountQuery(data, socket) {
 			}
 
 		}
+
+	}
+}
+
+// When a player wants to beep another player
+function AccountBeep(data, socket) {
+	if ((data != null) && (typeof data === "object") && !Array.isArray(data) && (data.MemberNumber != null) && (typeof data.MemberNumber === "number")) {
+
+		// Make sure both accounts are online, friends and sends the beep to the friend
+		var Acc = AccountGet(socket.id);
+		if (Acc != null)
+			for (var A = 0; A < Account.length; A++)
+				if (Account[A].MemberNumber == data.MemberNumber)
+					if ((Account[A].Environment == Acc.Environment) && (Account[A].FriendList != null) && (Account[A].FriendList.indexOf(Acc.MemberNumber) >= 0))
+						Account[A].Socket.emit("AccountBeep", {MemberNumber: Acc.MemberNumber, MemberName: Acc.Name, ChatRoomName: (Acc.ChatRoom == null) ? null : Acc.ChatRoom.Name});
 
 	}
 }
