@@ -20,6 +20,7 @@ var ChatRoomProduction = [
 	process.env.PRODUCTION9 || "" 
 ];
 var NextMemberNumber = 1;
+var OwnershipDelay = 259200000; // 3 days delay for ownership events
 
 // DB Access
 var Database;
@@ -71,6 +72,7 @@ DatabaseClient.connect(DatabaseURL, { useNewUrlParser: true }, function(err, db)
 				socket.on("AccountUpdate", function (data) { AccountUpdate(data, socket) });
 				socket.on("AccountQuery", function (data) { AccountQuery(data, socket) });
 				socket.on("AccountBeep", function (data) { AccountBeep(data, socket) });
+				socket.on("AccountOwnership", function(data) { OwnershipQuery(data, socket) });
 				socket.on("AccountDisconnect", function () { AccountRemove(socket.id) });
 				socket.on("disconnect", function() { AccountRemove(socket.id) });
 				socket.on("ChatRoomSearch", function(data) { ChatRoomSearch(data, socket) });
@@ -260,6 +262,7 @@ function AccountUpdate(data, socket) {
 				delete data.ID;
 				delete data.MemberNumber;
 				delete data.Environment;
+				delete data.Ownership;
 				
 				// Some data is kept for future use
 				if (data.ItemPermission != null) Account[P].ItemPermission = data.ItemPermission;
@@ -609,7 +612,7 @@ function ChatRoomGetAllowItem(Source, Target) {
 	AccountValidData(Target);
 
 	// At zero permission level or if target is source or if owner, we allow it
-	if ((Target.ItemPermission <= 0) || (Source.MemberNumber == Target.MemberNumber) || ((Target.OwnerNumber != null) && (Target.OwnerNumber == Source.MemberNumber))) return true;
+	if ((Target.ItemPermission <= 0) || (Source.MemberNumber == Target.MemberNumber) || ((Target.OwnerShip != null) && (Target.Ownership.MemberNumber != null) && (Target.Ownership.MemberNumber == Source.MemberNumber))) return true;
 
 	// At one, we allow if the source isn't on the blacklist
 	if ((Target.ItemPermission == 1) && (Target.BlackList.indexOf(Source.MemberNumber) < 0)) return true;
@@ -724,4 +727,83 @@ function PasswordResetProcess(data, socket) {
 		} else socket.emit("PasswordResetResponse", "InvalidPasswordResetInfo");
 
 	} else socket.emit("PasswordResetResponse", "InvalidPasswordResetInfo");
+}
+
+// Gets the current ownership status between two players in the same chatroom
+function AccountOwnership(data, socket) {
+	if ((data != null) && (typeof data === "object") && (data.MemberNumber != null) && (typeof data.MemberNumber === "number") && (data.MemberNumber > 0)) {
+
+		// The submissive can flush it's owner at any time in the trial, or after a delay if collared
+		var Acc = AccountGet(socket.id);
+		if ((Acc != null) && (Acc.Ownership.Stage != null) && (Acc.Ownership.Start != null) && ((Acc.Ownership.Stage == 0) || (Acc.Ownership.Start + OwnershipDelay <= CommonTime())) && (data.Action != null) && (typeof data.Action === "string") && (data.Action == "Break")) {
+			Acc.Owner = "";
+			Acc.Ownership = null;
+			var O = { Ownership: Acc.Ownership, Owner: Acc.Owner };
+			Database.collection("Accounts").updateOne({ AccountName : Acc.AccountName }, { $set: O }, function(err, res) { if (err) throw err; });
+			socket.emit("AccountOwnership", O);
+			return;
+		}
+
+		// In a chatroom, the dominant and submissive can enter in a BDSM relationship (4 steps to complete)
+		if ((Acc != null) && (Acc.ChatRoom != null)) {
+
+			// The dominant player proposes to the submissive player
+			if ((Acc.Ownership == null) || (Acc.Ownership.MemberNumber == null) || (Acc.Ownership.MemberNumber != data.MemberNumber)) // Cannot propose if target player is already owner
+				for (var A = 0; ((Acc.ChatRoom != null) && (A < Acc.ChatRoom.Account.length)); A++)
+					if ((Acc.ChatRoom.Account[A].MemberNumber == data.MemberNumber) && (Acc.ChatRoom.Account[A].BlackList.indexOf(Acc.MemberNumber) < 0)) // Cannot propose if on blacklist
+						if ((Acc.ChatRoom.Account[A].Owner == null) || (Acc.ChatRoom.Account[A].Owner == "")) { // Cannot propose if owned by a NPC
+
+							// If there's no ownership, the dominant can propose to start a trial (Step 1 / 4)
+							if ((Acc.ChatRoom.Account[A].Ownership == null) || (Acc.ChatRoom.Account[A].Ownership.MemberNumber == null)) {
+								if ((data.Action != null) && (typeof data.Action === "string") && (data.Action == "Propose")) {
+									Acc.ChatRoom.Account[A].Owner = "";
+									Acc.ChatRoom.Account[A].Ownership = { StartTrialOfferedByMemberNumber: Acc.MemberNumber };
+									ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "OfferStartTrial", "ServerMessage", Acc.ChatRoom.Account[A].MemberNumber);
+								} else socket.emit("AccountOwnership", { MemberNumber: data.MemberNumber, Result: "CanOfferStartTrial" });
+							}
+
+							// If trial has started, the dominant can offer to end it after the delay (Step 3 / 4)
+							if ((Acc.ChatRoom.Account[A].Ownership.MemberNumber == Acc.MemberNumber) && (Acc.ChatRoom.Account[A].Ownership.EndTrialOfferedByMemberNumber == null) && (Acc.Ownership.Stage != null) && (Acc.Ownership.Start != null) && (Acc.Ownership.Stage == 0) && (Acc.Ownership.Start + OwnershipDelay <= CommonTime())) {
+								if ((data.Action != null) && (typeof data.Action === "string") && (data.Action == "Propose")) {
+									Acc.ChatRoom.Account[A].Ownership.EndTrialOfferedByMemberNumber = Acc.MemberNumber;
+									ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "OfferEndTrial", "ServerMessage");
+								} else socket.emit("AccountOwnership", { MemberNumber: data.MemberNumber, Result: "CanOfferEndTrial" });
+							}
+
+						}
+
+			// The submissive player can accept a proposal from the dominant
+			if ((Acc.Ownership != null) && ((Acc.Ownership.MemberNumber == null) || (Acc.Ownership.MemberNumber == data.MemberNumber))) // No possible interaction if the player is owned by someone else
+				for (var A = 0; ((Acc.ChatRoom != null) && (A < Acc.ChatRoom.Account.length)); A++)
+					if ((Acc.ChatRoom.Account[A].MemberNumber == data.MemberNumber) && (Acc.ChatRoom.Account[A].BlackList.indexOf(Acc.MemberNumber) < 0)) { // Cannot accept if on blacklist
+
+						// If the submissive wants to accept to start the trial period (Step 2 / 4)
+						if ((Acc.Ownership.StartTrialOfferedByMemberNumber != null) && (Acc.Ownership.StartTrialOfferedByMemberNumber == data.MemberNumber)) {
+							if ((data.Action != null) && (typeof data.Action === "string") && (data.Action == "Accept")) {
+								Acc.Owner = "";
+								Acc.Ownership = { MemberNumber: data.MemberNumber, Name: Acc.ChatRoom.Account[A].Name, Start: CommonTime(), Stage: 0 };
+								var O = { Ownership: Acc.Ownership, Owner: Acc.Owner };
+								Database.collection("Accounts").updateOne({ AccountName : Acc.AccountName }, { $set: O }, function(err, res) { if (err) throw err; });
+								socket.emit("AccountOwnership", O);
+								ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "StartTrial", "ServerMessage");
+							} else socket.emit("AccountOwnership", { MemberNumber: data.MemberNumber, Result: "CanStartTrial" });
+						}
+
+						// If the submissive wants to accept the full collar (Step 4 /4)
+						if ((Acc.Ownership.Stage != null) && (Acc.Ownership.Stage == 0) && (Acc.Ownership.EndTrialOfferedByMemberNumber != null) && (Acc.Ownership.EndTrialOfferedByMemberNumber == data.MemberNumber)) {
+							if ((data.Action != null) && (typeof data.Action === "string") && (data.Action == "Accept")) {
+								Acc.Owner = Acc.ChatRoom.Account[A].Name;
+								Acc.Ownership = { MemberNumber: data.MemberNumber, Name: Acc.ChatRoom.Account[A].Name, Start: CommonTime(), Stage: 1 };
+								var O = { Ownership: Acc.Ownership, Owner: Acc.Owner };
+								Database.collection("Accounts").updateOne({ AccountName : Acc.AccountName }, { $set: O }, function(err, res) { if (err) throw err; });
+								socket.emit("AccountOwnership", O);
+								ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "EndTrial", "ServerMessage");
+							} else socket.emit("AccountOwnership", { MemberNumber: data.MemberNumber, Result: "CanEndTrial" });
+						}
+
+					}
+
+		}
+
+	}
 }
