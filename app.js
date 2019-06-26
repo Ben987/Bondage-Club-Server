@@ -292,16 +292,25 @@ function AccountQuery(data, socket) {
 			// OnlineFriends query - returns all friends that are online and the room name they are in
 			if ((data.Query == "OnlineFriends") && (Acc.FriendList != null)) {
 
-				// Builds the online friend list, both players must be friends to find each other
+				// Add all submissives owned by the player to the list
 				var Friends = [];
+				var Index = [];
+				for (var A = 0; A < Account.length; A++)
+					if ((Account[A].Environment == Acc.Environment) && (Account[A].Ownership != null) && (Account[A].Ownership.MemberNumber != null) && (Account[A].Ownership.MemberNumber == Acc.MemberNumber)) {
+						Friends.push( { MemberNumber: Account[A].MemberNumber, MemberName: Account[A].Name, ChatRoomName: (Account[A].ChatRoom == null) ? null : Account[A].ChatRoom.Name } );
+						Index.push(Account[A].MemberNumber);
+					}
+
+				// Builds the online friend list, both players must be friends to find each other
 				for (var F = 0; F < Acc.FriendList.length; F++)
 					if ((Acc.FriendList[F] != null) && (typeof Acc.FriendList[F] === "number"))
-						for (var A = 0; A < Account.length; A++)
-							if (Account[A].MemberNumber == Acc.FriendList[F]) {
-								if ((Account[A].Environment == Acc.Environment) && (Account[A].FriendList != null) && (Account[A].FriendList.indexOf(Acc.MemberNumber) >= 0))
-									Friends.push( { MemberNumber: Account[A].MemberNumber, MemberName: Account[A].Name, ChatRoomName: (Account[A].ChatRoom == null) ? null : (Account[A].ChatRoom.Private) ? "-Private-" : Account[A].ChatRoom.Name } );
-								A = Account.length;
-							}
+						if (Index.indexOf(Acc.FriendList[F]) < 0) // No need to search for the friend if she's owned
+							for (var A = 0; A < Account.length; A++)
+								if (Account[A].MemberNumber == Acc.FriendList[F]) {
+									if ((Account[A].Environment == Acc.Environment) && (Account[A].FriendList != null) && (Account[A].FriendList.indexOf(Acc.MemberNumber) >= 0))
+										Friends.push( { MemberNumber: Account[A].MemberNumber, MemberName: Account[A].Name, ChatRoomName: (Account[A].ChatRoom == null) ? null : (Account[A].ChatRoom.Private) ? "-Private-" : Account[A].ChatRoom.Name } );
+									A = Account.length;
+								}
 
 				// Sends the query result to the client
 				socket.emit("AccountQueryResult", { Query: data.Query, Result: Friends });
