@@ -20,7 +20,8 @@ var ChatRoomProduction = [
 	process.env.PRODUCTION9 || "" 
 ];
 var NextMemberNumber = 1;
-var OwnershipDelay = 259200000; // 3 days delay for ownership events
+//var OwnershipDelay = 259200000; // 3 days delay for ownership events
+var OwnershipDelay = 2000; // 3 days delay for ownership events
 
 // DB Access
 var Database;
@@ -72,7 +73,7 @@ DatabaseClient.connect(DatabaseURL, { useNewUrlParser: true }, function(err, db)
 				socket.on("AccountUpdate", function (data) { AccountUpdate(data, socket) });
 				socket.on("AccountQuery", function (data) { AccountQuery(data, socket) });
 				socket.on("AccountBeep", function (data) { AccountBeep(data, socket) });
-				socket.on("AccountOwnership", function(data) { OwnershipQuery(data, socket) });
+				socket.on("AccountOwnership", function(data) { AccountOwnership(data, socket) });
 				socket.on("AccountDisconnect", function () { AccountRemove(socket.id) });
 				socket.on("disconnect", function() { AccountRemove(socket.id) });
 				socket.on("ChatRoomSearch", function(data) { ChatRoomSearch(data, socket) });
@@ -732,10 +733,12 @@ function PasswordResetProcess(data, socket) {
 // Gets the current ownership status between two players in the same chatroom
 function AccountOwnership(data, socket) {
 	if ((data != null) && (typeof data === "object") && (data.MemberNumber != null) && (typeof data.MemberNumber === "number") && (data.MemberNumber > 0)) {
-
+	
 		// The submissive can flush it's owner at any time in the trial, or after a delay if collared
 		var Acc = AccountGet(socket.id);
-		if ((Acc != null) && (Acc.Ownership.Stage != null) && (Acc.Ownership.Start != null) && ((Acc.Ownership.Stage == 0) || (Acc.Ownership.Start + OwnershipDelay <= CommonTime())) && (data.Action != null) && (typeof data.Action === "string") && (data.Action == "Break")) {
+					console.log(Acc.Name);
+					console.log(Acc.Ownership);
+		if ((Acc != null) && (Acc.Ownership != null) && (Acc.Ownership.Stage != null) && (Acc.Ownership.Start != null) && ((Acc.Ownership.Stage == 0) || (Acc.Ownership.Start + OwnershipDelay <= CommonTime())) && (data.Action != null) && (typeof data.Action === "string") && (data.Action == "Break")) {
 			Acc.Owner = "";
 			Acc.Ownership = null;
 			var O = { Ownership: Acc.Ownership, Owner: Acc.Owner };
@@ -763,7 +766,7 @@ function AccountOwnership(data, socket) {
 							}
 
 							// If trial has started, the dominant can offer to end it after the delay (Step 3 / 4)
-							if ((Acc.ChatRoom.Account[A].Ownership.MemberNumber == Acc.MemberNumber) && (Acc.ChatRoom.Account[A].Ownership.EndTrialOfferedByMemberNumber == null) && (Acc.Ownership.Stage != null) && (Acc.Ownership.Start != null) && (Acc.Ownership.Stage == 0) && (Acc.Ownership.Start + OwnershipDelay <= CommonTime())) {
+							if ((Acc.ChatRoom.Account[A].Ownership != null) && (Acc.ChatRoom.Account[A].Ownership.MemberNumber == Acc.MemberNumber) && (Acc.ChatRoom.Account[A].Ownership.EndTrialOfferedByMemberNumber == null) && (Acc.ChatRoom.Account[A].Ownership.Stage != null) && (Acc.ChatRoom.Account[A].Ownership.Start != null) && (Acc.ChatRoom.Account[A].Ownership.Stage == 0) && (Acc.ChatRoom.Account[A].Ownership.Start + OwnershipDelay <= CommonTime())) {
 								if ((data.Action != null) && (typeof data.Action === "string") && (data.Action == "Propose")) {
 									Acc.ChatRoom.Account[A].Ownership.EndTrialOfferedByMemberNumber = Acc.MemberNumber;
 									ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "OfferEndTrial", "ServerMessage");
@@ -776,7 +779,7 @@ function AccountOwnership(data, socket) {
 			if ((Acc.Ownership != null) && ((Acc.Ownership.MemberNumber == null) || (Acc.Ownership.MemberNumber == data.MemberNumber))) // No possible interaction if the player is owned by someone else
 				for (var A = 0; ((Acc.ChatRoom != null) && (A < Acc.ChatRoom.Account.length)); A++)
 					if ((Acc.ChatRoom.Account[A].MemberNumber == data.MemberNumber) && (Acc.ChatRoom.Account[A].BlackList.indexOf(Acc.MemberNumber) < 0)) { // Cannot accept if on blacklist
-
+				
 						// If the submissive wants to accept to start the trial period (Step 2 / 4)
 						if ((Acc.Ownership.StartTrialOfferedByMemberNumber != null) && (Acc.Ownership.StartTrialOfferedByMemberNumber == data.MemberNumber)) {
 							if ((data.Action != null) && (typeof data.Action === "string") && (data.Action == "Accept")) {
