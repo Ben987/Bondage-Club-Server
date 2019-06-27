@@ -297,7 +297,7 @@ function AccountQuery(data, socket) {
 				var Index = [];
 				for (var A = 0; A < Account.length; A++)
 					if ((Account[A].Environment == Acc.Environment) && (Account[A].Ownership != null) && (Account[A].Ownership.MemberNumber != null) && (Account[A].Ownership.MemberNumber == Acc.MemberNumber)) {
-						Friends.push( { MemberNumber: Account[A].MemberNumber, MemberName: Account[A].Name, ChatRoomName: (Account[A].ChatRoom == null) ? null : Account[A].ChatRoom.Name } );
+						Friends.push( { Type: "Submissive", MemberNumber: Account[A].MemberNumber, MemberName: Account[A].Name, ChatRoomName: (Account[A].ChatRoom == null) ? null : Account[A].ChatRoom.Name } );
 						Index.push(Account[A].MemberNumber);
 					}
 
@@ -308,7 +308,7 @@ function AccountQuery(data, socket) {
 							for (var A = 0; A < Account.length; A++)
 								if (Account[A].MemberNumber == Acc.FriendList[F]) {
 									if ((Account[A].Environment == Acc.Environment) && (Account[A].FriendList != null) && (Account[A].FriendList.indexOf(Acc.MemberNumber) >= 0))
-										Friends.push( { MemberNumber: Account[A].MemberNumber, MemberName: Account[A].Name, ChatRoomName: (Account[A].ChatRoom == null) ? null : (Account[A].ChatRoom.Private) ? "-Private-" : Account[A].ChatRoom.Name } );
+										Friends.push( { Type: "Friend", MemberNumber: Account[A].MemberNumber, MemberName: Account[A].Name, ChatRoomName: (Account[A].ChatRoom == null) ? null : (Account[A].ChatRoom.Private) ? "-Private-" : Account[A].ChatRoom.Name } );
 									A = Account.length;
 								}
 
@@ -331,7 +331,7 @@ function AccountBeep(data, socket) {
 		if (Acc != null)
 			for (var A = 0; A < Account.length; A++)
 				if (Account[A].MemberNumber == data.MemberNumber)
-					if ((Account[A].Environment == Acc.Environment) && (Account[A].FriendList != null) && (Account[A].FriendList.indexOf(Acc.MemberNumber) >= 0))
+					if ((Account[A].Environment == Acc.Environment) && (((Account[A].FriendList != null) && (Account[A].FriendList.indexOf(Acc.MemberNumber) >= 0)) || ((Account[A].Ownership != null) && (Account[A].Ownership.MemberNumber != null) && (Account[A].Ownership.MemberNumber == Acc.MemberNumber))))
 						Account[A].Socket.emit("AccountBeep", {MemberNumber: Acc.MemberNumber, MemberName: Acc.Name, ChatRoomName: (Acc.ChatRoom == null) ? null : Acc.ChatRoom.Name});
 
 	}
@@ -622,7 +622,7 @@ function ChatRoomGetAllowItem(Source, Target) {
 	AccountValidData(Target);
 
 	// At zero permission level or if target is source or if owner, we allow it
-	if ((Target.ItemPermission <= 0) || (Source.MemberNumber == Target.MemberNumber) || ((Target.OwnerShip != null) && (Target.Ownership.MemberNumber != null) && (Target.Ownership.MemberNumber == Source.MemberNumber))) return true;
+	if ((Target.ItemPermission <= 0) || (Source.MemberNumber == Target.MemberNumber) || ((Target.Ownership != null) && (Target.Ownership.MemberNumber != null) && (Target.Ownership.MemberNumber == Source.MemberNumber))) return true;
 
 	// At one, we allow if the source isn't on the blacklist
 	if ((Target.ItemPermission == 1) && (Target.BlackList.indexOf(Source.MemberNumber) < 0)) return true;
@@ -745,14 +745,12 @@ function AccountOwnership(data, socket) {
 	
 		// The submissive can flush it's owner at any time in the trial, or after a delay if collared
 		var Acc = AccountGet(socket.id);
-					console.log(Acc.Name);
-					console.log(Acc.Ownership);
 		if ((Acc != null) && (Acc.Ownership != null) && (Acc.Ownership.Stage != null) && (Acc.Ownership.Start != null) && ((Acc.Ownership.Stage == 0) || (Acc.Ownership.Start + OwnershipDelay <= CommonTime())) && (data.Action != null) && (typeof data.Action === "string") && (data.Action == "Break")) {
 			Acc.Owner = "";
 			Acc.Ownership = null;
 			var O = { Ownership: Acc.Ownership, Owner: Acc.Owner };
 			Database.collection("Accounts").updateOne({ AccountName : Acc.AccountName }, { $set: O }, function(err, res) { if (err) throw err; });
-			socket.emit("AccountOwnership", O);
+			socket.emit("AccountOwnership", { ClearOwnership: true });
 			return;
 		}
 
