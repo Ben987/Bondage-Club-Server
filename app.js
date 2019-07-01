@@ -20,8 +20,7 @@ var ChatRoomProduction = [
 	process.env.PRODUCTION9 || "" 
 ];
 var NextMemberNumber = 1;
-//var OwnershipDelay = 259200000; // 3 days delay for ownership events
-var OwnershipDelay = 2000; // 3 days delay for ownership events
+var OwnershipDelay = 259200000; // 3 days delay for ownership events
 
 // DB Access
 var Database;
@@ -552,11 +551,13 @@ function ChatRoomSync(CR) {
 		A.Appearance = CR.Account[C].Appearance;
 		A.ActivePose = CR.Account[C].ActivePose;
 		A.Reputation = CR.Account[C].Reputation;
+		A.Creation = CR.Account[C].Creation;
 		A.Lover = CR.Account[C].Lover;
 		A.Owner = CR.Account[C].Owner;
 		A.MemberNumber = CR.Account[C].MemberNumber;
 		A.LabelColor = CR.Account[C].LabelColor;
 		A.ItemPermission = CR.Account[C].ItemPermission;
+		A.Ownership = CR.Account[C].Ownership;
 		R.Character.push(A);
 	}
 
