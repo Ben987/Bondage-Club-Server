@@ -797,6 +797,7 @@ function AccountOwnership(data, socket) {
 								Database.collection("Accounts").updateOne({ AccountName : Acc.AccountName }, { $set: O }, function(err, res) { if (err) throw err; });
 								socket.emit("AccountOwnership", O);
 								ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "StartTrial", "ServerMessage");
+								ChatRoomSync(Acc.ChatRoom);
 							} else socket.emit("AccountOwnership", { MemberNumber: data.MemberNumber, Result: "CanStartTrial" });
 						}
 
@@ -809,6 +810,7 @@ function AccountOwnership(data, socket) {
 								Database.collection("Accounts").updateOne({ AccountName : Acc.AccountName }, { $set: O }, function(err, res) { if (err) throw err; });
 								socket.emit("AccountOwnership", O);
 								ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "EndTrial", "ServerMessage");
+								ChatRoomSync(Acc.ChatRoom);
 							} else socket.emit("AccountOwnership", { MemberNumber: data.MemberNumber, Result: "CanEndTrial" });
 						}
 
