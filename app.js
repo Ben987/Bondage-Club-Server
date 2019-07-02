@@ -431,7 +431,7 @@ function ChatRoomCreate(data, socket) {
 				NewRoom.Account.push(Acc);
 				console.log("Chat room (" + ChatRoom.length.toString() + ") " + data.Name + " created by account " + Acc.AccountName + ", ID: " + socket.id.toString());
 				socket.emit("ChatRoomCreateResponse", "ChatRoomCreated");
-				ChatRoomSync(NewRoom);
+				ChatRoomSync(NewRoom, Acc.MemberNumber);
 			} else socket.emit("ChatRoomCreateResponse", "AccountError");
 
 		} else socket.emit("ChatRoomCreateResponse", "InvalidRoomData");
@@ -462,7 +462,7 @@ function ChatRoomJoin(data, socket) {
 								Acc.ChatRoom = ChatRoom[C];
 								ChatRoom[C].Account.push(Acc);
 								socket.emit("ChatRoomSearchResponse", "JoinedRoom");
-								ChatRoomSync(ChatRoom[C]);
+								ChatRoomSync(ChatRoom[C], Acc.MemberNumber);
 								ChatRoomMessage(ChatRoom[C], Acc.MemberNumber, Acc.Name + " entered.", "Action");
 								return;
 							} else {
@@ -504,7 +504,7 @@ function ChatRoomRemove(Acc, Reason) {
 				}
 		} else {
 			ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, Acc.Name + " " + Reason + ".", "Action");
-			ChatRoomSync(Acc.ChatRoom);
+			ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber);
 		}
 		Acc.ChatRoom = null;
 
@@ -534,13 +534,14 @@ function ChatRoomChat(data, socket) {
 }
 
 // Syncs the room data with all of it's members
-function ChatRoomSync(CR) {
+function ChatRoomSync(CR, SourceMemberNumber) {
 
 	// Builds the room data
 	var R = {};
 	R.Name = CR.Name;
 	R.Background = CR.Background;
 	R.CreatorID = CR.CreatorID;
+	R.SourceMemberNumber = SourceMemberNumber;
 
 	// Adds the characters from the room
 	R.Character = [];
@@ -548,6 +549,7 @@ function ChatRoomSync(CR) {
 		var A = {};
 		A.ID = CR.Account[C].ID;
 		A.Name = CR.Account[C].Name;
+		A.AssetFamily = CR.Account[C].AssetFamily;
 		A.Appearance = CR.Account[C].Appearance;
 		A.ActivePose = CR.Account[C].ActivePose;
 		A.Reputation = CR.Account[C].Reputation;
@@ -579,7 +581,7 @@ function ChatRoomCharacterUpdate(data, socket) {
 							Database.collection("Accounts").updateOne({ AccountName : Acc.ChatRoom.Account[A].AccountName }, { $set: { Appearance: data.Appearance } }, function(err, res) { if (err) throw err; });
 							Acc.ChatRoom.Account[A].Appearance = data.Appearance;
 							Acc.ChatRoom.Account[A].ActivePose = data.ActivePose;
-							ChatRoomSync(Acc.ChatRoom);
+							ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber);
 						}
 	}
 }
@@ -797,7 +799,7 @@ function AccountOwnership(data, socket) {
 								Database.collection("Accounts").updateOne({ AccountName : Acc.AccountName }, { $set: O }, function(err, res) { if (err) throw err; });
 								socket.emit("AccountOwnership", O);
 								ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "StartTrial", "ServerMessage");
-								ChatRoomSync(Acc.ChatRoom);
+								ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber);
 							} else socket.emit("AccountOwnership", { MemberNumber: data.MemberNumber, Result: "CanStartTrial" });
 						}
 
@@ -810,7 +812,7 @@ function AccountOwnership(data, socket) {
 								Database.collection("Accounts").updateOne({ AccountName : Acc.AccountName }, { $set: O }, function(err, res) { if (err) throw err; });
 								socket.emit("AccountOwnership", O);
 								ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "EndTrial", "ServerMessage");
-								ChatRoomSync(Acc.ChatRoom);
+								ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber);
 							} else socket.emit("AccountOwnership", { MemberNumber: data.MemberNumber, Result: "CanEndTrial" });
 						}
 
