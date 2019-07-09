@@ -559,6 +559,7 @@ function ChatRoomSync(CR, SourceMemberNumber) {
 		A.MemberNumber = CR.Account[C].MemberNumber;
 		A.LabelColor = CR.Account[C].LabelColor;
 		A.ItemPermission = CR.Account[C].ItemPermission;
+		A.Inventory = CR.Account[C].Inventory;
 		A.Ownership = CR.Account[C].Ownership;
 		R.Character.push(A);
 	}
