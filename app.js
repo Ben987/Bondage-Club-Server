@@ -265,6 +265,7 @@ function AccountUpdate(data, socket) {
 				delete data.Ownership;
 				
 				// Some data is kept for future use
+				if ((data.Inventory != null) && Array.isArray(data.Inventory)) Account[P].Inventory = data.Inventory;
 				if (data.ItemPermission != null) Account[P].ItemPermission = data.ItemPermission;
 				if (data.LabelColor != null) Account[P].LabelColor = data.LabelColor;
 				if (data.Appearance != null) Account[P].Appearance = data.Appearance;
