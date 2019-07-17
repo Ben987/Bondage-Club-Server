@@ -778,7 +778,7 @@ function AccountOwnership(data, socket) {
 							}
 
 							// If trial has started, the dominant can offer to end it after the delay (Step 3 / 4)
-							if ((Acc.ChatRoom.Account[A].Ownership != null) && (Acc.ChatRoom.Account[A].Ownership.MemberNumber == Acc.MemberNumber) && (Acc.ChatRoom.Account[A].Ownership.EndTrialOfferedByMemberNumber == null) && (Acc.ChatRoom.Account[A].Ownership.Stage != null) && (Acc.ChatRoom.Account[A].Ownership.Start != null) && (Acc.ChatRoom.Account[A].Ownership.Stage == 0) && (Acc.ChatRoom.Account[A].Ownership.Start + OwnershipDelay <= CommonTime())) {
+							if ((Acc.ChatRoom != null) && (Acc.ChatRoom.Account[A].Ownership != null) && (Acc.ChatRoom.Account[A].Ownership.MemberNumber == Acc.MemberNumber) && (Acc.ChatRoom.Account[A].Ownership.EndTrialOfferedByMemberNumber == null) && (Acc.ChatRoom.Account[A].Ownership.Stage != null) && (Acc.ChatRoom.Account[A].Ownership.Start != null) && (Acc.ChatRoom.Account[A].Ownership.Stage == 0) && (Acc.ChatRoom.Account[A].Ownership.Start + OwnershipDelay <= CommonTime())) {
 								if ((data.Action != null) && (typeof data.Action === "string") && (data.Action == "Propose")) {
 									Acc.ChatRoom.Account[A].Ownership.EndTrialOfferedByMemberNumber = Acc.MemberNumber;
 									ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "OfferEndTrial", "ServerMessage");
