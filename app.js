@@ -6,7 +6,7 @@ var IO = require("socket.io")(App);
 var BCrypt = require("bcrypt");
 var Account = [];
 var ChatRoom = [];
-var ChatRoomMessageType = ["Chat", "Action", "Emote", "Whisper"];
+var ChatRoomMessageType = ["Chat", "Action", "Emote", "Whisper", "Hidden"];
 var ChatRoomProduction = [
 	process.env.PRODUCTION0 || "",
 	process.env.PRODUCTION1 || "",
@@ -81,7 +81,8 @@ DatabaseClient.connect(DatabaseURL, { useNewUrlParser: true }, function(err, db)
 				socket.on("ChatRoomLeave", function() { ChatRoomLeave(socket) });
 				socket.on("ChatRoomChat", function(data) { ChatRoomChat(data, socket) });
 				socket.on("ChatRoomCharacterUpdate", function(data) { ChatRoomCharacterUpdate(data, socket) });
-				socket.on("ChatRoomBan", function(data) { ChatRoomBan(data, socket) });
+				socket.on("ChatRoomBan", function(data) { ChatRoomBan(data, socket, true) });
+				socket.on("ChatRoomKick", function(data) { ChatRoomBan(data, socket, false) });
 				socket.on("ChatRoomAllowItem", function(data) { ChatRoomAllowItem(data, socket) });
 				socket.on("PasswordReset", function(data) { PasswordReset(data, socket) });
 				socket.on("PasswordResetProcess", function(data) { PasswordResetProcess(data, socket) });
@@ -589,7 +590,7 @@ function ChatRoomCharacterUpdate(data, socket) {
 }
 
 // When the accounts that created the chatroom wants to ban another account from it
-function ChatRoomBan(data, socket) {
+function ChatRoomBan(data, socket, ApplyBan) {
 	if ((data != null) && (typeof data === "string") && (data != "") && (data != socket.id.toString())) {
 
 		// Validates that the account is the room creator and finds the account from the ID to ban
@@ -599,9 +600,14 @@ function ChatRoomBan(data, socket) {
 				if (Acc.ChatRoom.Account[A].ID == data) {
 
 					// Adds to the ban list and kicks out
-					Acc.ChatRoom.Ban.push(Acc.ChatRoom.Account[A].AccountName);
-					Acc.ChatRoom.Account[A].Socket.emit("ChatRoomSearchResponse", "RoomBanned");
-					ChatRoomRemove(Acc.ChatRoom.Account[A], "was banned");
+					if (ApplyBan) {
+						Acc.ChatRoom.Ban.push(Acc.ChatRoom.Account[A].AccountName);
+						Acc.ChatRoom.Account[A].Socket.emit("ChatRoomSearchResponse", "RoomBanned");
+						ChatRoomRemove(Acc.ChatRoom.Account[A], "was banned from the room");
+					} else {
+						Acc.ChatRoom.Account[A].Socket.emit("ChatRoomSearchResponse", "RoomKicked");
+						ChatRoomRemove(Acc.ChatRoom.Account[A], "was kicked-out of the room");
+					}
 					break;
 
 				}
