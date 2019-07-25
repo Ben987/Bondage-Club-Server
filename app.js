@@ -187,10 +187,10 @@ function AccountLogin(data, socket) {
 
 	// Makes sure the login comes with a name and a password
 	if ((data != null) && (typeof data === "object") && (data.AccountName != null) && (typeof data.AccountName === "string") && (data.Password != null) && (typeof data.Password === "string")) {
-	
-		// Checks if there's an account that matches the name 
+
+		// Checks if there's an account that matches the name
 		data.AccountName = data.AccountName.toUpperCase();
-		Database.collection("Accounts").findOne({ AccountName : data.AccountName}, function(err, result) {	
+		Database.collection("Accounts").findOne({ AccountName : data.AccountName}, function(err, result) {
 			if (err) throw err;
 			if (result === null) {
 				socket.emit("LoginResponse", "InvalidNamePassword");
@@ -200,7 +200,7 @@ function AccountLogin(data, socket) {
 				// Compare the password to its hashed version
 				BCrypt.compare(data.Password.toUpperCase(), result.Password, function( err, res ) {
 					if (res) {
-						
+
 						// Disconnect duplicated logged accounts
 						for (var A = 0; A < Account.length; A++)
 							if ((Account[A].AccountName == result.AccountName) && (Account[A].ID != socket.id)) {
@@ -208,7 +208,7 @@ function AccountLogin(data, socket) {
 								AccountRemove(Account[A].ID);
 								break;
 							}
-							
+
 						// Assigns a member number if there's none
 						if (result.MemberNumber == null) {
 							result.MemberNumber = NextMemberNumber;
@@ -223,14 +223,15 @@ function AccountLogin(data, socket) {
 						console.log("Login account: " + result.AccountName + " ID: " + socket.id.toString() + " " + result.Environment);
 						AccountValidData(result);
 						Account.push(result);
-						result.Password = null; 
+						result.Password = null;
+						result.Email = null;
 						socket.emit("LoginResponse", result);
 						result.Socket = socket;
 						AccountSendServerInfo(socket);
 
 					} else socket.emit("LoginResponse", "InvalidNamePassword");
 				});
-				
+
 			}			
 		});
 		
