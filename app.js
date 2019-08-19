@@ -376,12 +376,21 @@ function ChatRoomSearch(data, socket) {
 						if (ChatRoom[C].Ban.indexOf(Acc.AccountName) < 0)
 							if ((data.Query == "") || (ChatRoom[C].Name.toUpperCase().indexOf(data.Query) >= 0))
 								if (!ChatRoom[C].Private || (ChatRoom[C].Name.toUpperCase() == data.Query)) {
+									var Friends = [];
+									for (var A = 0; A < ChatRoom[C].Account.length; A++) {					
+										if ((ChatRoom[C].Account.Ownership != null) && (ChatRoom[C].Account.Ownership.MemberNumber != null) && (ChatRoom[C].Account.Ownership.MemberNumber == Acc.MemberNumber)) {
+											Friends.push({ Type: "Submissive", MemberNumber: ChatRoom[C].Account.MemberNumber, MemberName: ChatRoom[C].Account.Name});
+										} else if ((Acc.FriendList != null) && (Acc.FriendList.indexOf(ChatRoom[C].Account.MemberNumber) >= 0)) {
+											Friends.push({ Type: "Friend", MemberNumber: ChatRoom[C].Account.MemberNumber, MemberName: ChatRoom[C].Account.Name});
+										}
+									}
 									CR.push({
 										Name: ChatRoom[C].Name,
 										Creator: ChatRoom[C].Creator,
 										MemberCount: ChatRoom[C].Account.length,
 										MemberLimit: ChatRoom[C].Limit,
-										Description: ChatRoom[C].Description
+										Description: ChatRoom[C].Description,
+										Friends: Friends
 									});
 								}
 
