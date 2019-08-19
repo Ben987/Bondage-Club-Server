@@ -380,7 +380,7 @@ function ChatRoomSearch(data, socket) {
 									for (var A = 0; A < ChatRoom[C].Account.length; A++) {					
 										if ((ChatRoom[C].Account.Ownership != null) && (ChatRoom[C].Account.Ownership.MemberNumber != null) && (ChatRoom[C].Account.Ownership.MemberNumber == Acc.MemberNumber)) {
 											Friends.push({ Type: "Submissive", MemberNumber: ChatRoom[C].Account.MemberNumber, MemberName: ChatRoom[C].Account.Name});
-										} else if ((Acc.FriendList != null) && (Acc.FriendList.indexOf(ChatRoom[C].Account.MemberNumber) >= 0)) {
+										} else if ((Acc.FriendList != null) && (ChatRoom[C].Account.FriendList != null) && (Acc.FriendList.indexOf(ChatRoom[C].Account.MemberNumber) >= 0) && (ChatRoom[C].Account.FriendList.indexOf(Acc.MemberNumber) >= 0)) {
 											Friends.push({ Type: "Friend", MemberNumber: ChatRoom[C].Account.MemberNumber, MemberName: ChatRoom[C].Account.Name});
 										}
 									}
