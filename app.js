@@ -82,6 +82,7 @@ DatabaseClient.connect(DatabaseURL, { useNewUrlParser: true }, function(err, db)
 				socket.on("ChatRoomChat", function(data) { ChatRoomChat(data, socket) });
 				socket.on("ChatRoomCharacterUpdate", function(data) { ChatRoomCharacterUpdate(data, socket) });
 				socket.on("ChatRoomBan", function(data) { ChatRoomBan(data, socket, true) });
+				socket.on("ChatRoomAction", function(data) { ChatRoomAction(data, socket) });
 				socket.on("ChatRoomKick", function(data) { ChatRoomBan(data, socket, false) });
 				socket.on("ChatRoomAllowItem", function(data) { ChatRoomAllowItem(data, socket) });
 				socket.on("PasswordReset", function(data) { PasswordReset(data, socket) });
@@ -616,12 +617,17 @@ function ChatRoomBan(data, socket, ApplyBan) {
 					break;
 
 				}
-		
-	} else if ((data != null) && (data.MemberNumber != null) && (data.MemberNumber != Acc.MemberNumber) && (data.Action != null)) {
+
+	}
+}
+
+// When the accounts that created the chatroom wants to ban/kick/promote another account from it
+function ChatRoomAction(data, socket) {
+	if ((data != null) && (data.MemberNumber != null) && (data.MemberNumber != Acc.MemberNumber) && (data.Action != null)) {
 		// Validates that the account is the room creator and finds the account from the MemberNumber to ban
 		var Acc = AccountGet(socket.id);
 		if ((Acc != null) && (Acc.ChatRoom != null) && ((Acc.ChatRoom.CreatorMemberNumber == Acc.MemberNumber) || (Acc.ChatRoom.PromotedMemberNumber == Acc.MemberNumber))) {
-			if ((data.Action == "Ban") && (Acc.ChatRoom.Ban.indexOf(data.MemberNumber) < 0)) {				
+			if ((data.Action == "Ban") && (Acc.ChatRoom.Ban.indexOf(data.MemberNumber) < 0)) {
 				Acc.ChatRoom.Ban.push(Acc.ChatRoom.Account[A].MemberNumber);
 			}
 			if (data.Action == "Unban") {
