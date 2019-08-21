@@ -371,19 +371,22 @@ function ChatRoomSearch(data, socket) {
 			var CR = [];
 			var C = 0;
 			for (var C = ChatRoom.length - 1; ((C >= 0) && (CR.length <= 24)); C--)
-				if (ChatRoom[C].Account.length < ChatRoom[C].Limit)
+				if ((ChatRoom[C] != null) && (ChatRoom[C].Account.length < ChatRoom[C].Limit))
 					if (Acc.Environment == ChatRoom[C].Environment)
 						if (ChatRoom[C].Ban.indexOf(Acc.AccountName) < 0)
 							if ((data.Query == "") || (ChatRoom[C].Name.toUpperCase().indexOf(data.Query) >= 0))
 								if (!ChatRoom[C].Private || (ChatRoom[C].Name.toUpperCase() == data.Query)) {
+									
+									// Builds the searching account friend list in the current room
 									var Friends = [];
-									for (var A = 0; A < ChatRoom[C].Account.length; A++) {					
-										if ((ChatRoom[C].Account.Ownership != null) && (ChatRoom[C].Account.Ownership.MemberNumber != null) && (ChatRoom[C].Account.Ownership.MemberNumber == Acc.MemberNumber)) {
-											Friends.push({ Type: "Submissive", MemberNumber: ChatRoom[C].Account.MemberNumber, MemberName: ChatRoom[C].Account.Name});
-										} else if ((Acc.FriendList != null) && (ChatRoom[C].Account.FriendList != null) && (Acc.FriendList.indexOf(ChatRoom[C].Account.MemberNumber) >= 0) && (ChatRoom[C].Account.FriendList.indexOf(Acc.MemberNumber) >= 0)) {
-											Friends.push({ Type: "Friend", MemberNumber: ChatRoom[C].Account.MemberNumber, MemberName: ChatRoom[C].Account.Name});
-										}
-									}
+									for (var A = 0; A < ChatRoom[C].Account.length; A++)
+										if (ChatRoom[C].Account[A] != null)
+											if ((ChatRoom[C].Account[A].Ownership != null) && (ChatRoom[C].Account[A].Ownership.MemberNumber != null) && (ChatRoom[C].Account[A].Ownership.MemberNumber == Acc.MemberNumber))
+												Friends.push({ Type: "Submissive", MemberNumber: ChatRoom[C].Account[A].MemberNumber, MemberName: ChatRoom[C].Account[A].Name});
+											else if ((Acc.FriendList != null) && (ChatRoom[C].Account[A].FriendList != null) && (Acc.FriendList.indexOf(ChatRoom[C].Account[A].MemberNumber) >= 0) && (ChatRoom[C].Account[A].FriendList.indexOf(Acc.MemberNumber) >= 0))
+												Friends.push({ Type: "Friend", MemberNumber: ChatRoom[C].Account[A].MemberNumber, MemberName: ChatRoom[C].Account[A].Name});
+
+									// Builds a room object with all data
 									CR.push({
 										Name: ChatRoom[C].Name,
 										Creator: ChatRoom[C].Creator,
@@ -392,6 +395,7 @@ function ChatRoomSearch(data, socket) {
 										Description: ChatRoom[C].Description,
 										Friends: Friends
 									});
+
 								}
 
 			// Sends the list to the client
