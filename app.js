@@ -438,12 +438,11 @@ function ChatRoomCreate(data, socket) {
 					Environment: Acc.Environment,
 					Creator: Acc.Name,
 					CreatorID: Acc.ID,
-					CreatorAccount: Acc.AccountName,
 					CreatorMemberNumber: Acc.MemberNumber,
-					PromotedMemberNumber: Acc.MemberNumber,
 					Creation: CommonTime(),
 					Account: [],
-					Ban: []
+					Ban: [],
+					Promote: [ Acc.MemberNumber ]
 				}
 				ChatRoom.push(NewRoom);
 				Acc.ChatRoom = NewRoom;
@@ -561,7 +560,8 @@ function ChatRoomSync(CR, SourceMemberNumber) {
 	R.Background = CR.Background;
 	R.CreatorID = CR.CreatorID;
 	R.CreatorMemberNumber = CR.CreatorMemberNumber;
-	R.PromotedMemberNumber = CR.PromotedMemberNumber;
+	R.Promote = CR.Promote;
+	R.Ban = CR.Ban;
 	R.SourceMemberNumber = SourceMemberNumber;
 
 	// Adds the characters from the room
@@ -636,17 +636,19 @@ function ChatRoomBan(data, socket, ApplyBan) {
 
 // When the accounts that created the chatroom wants to ban/kick/promote another account from it
 function ChatRoomAction(data, socket) {
-	if ((data != null) && (data.MemberNumber != null) && (data.MemberNumber != Acc.MemberNumber) && (data.Action != null)) {
+	if ((data != null) && Number.isInteger(data.MemberNumber) && (data.MemberNumber != Acc.MemberNumber) && (typeof data.Action === "string")) {
 		// Validates that the account is the room creator and finds the account from the MemberNumber to ban
 		var Acc = AccountGet(socket.id);
-		if ((Acc != null) && (Acc.ChatRoom != null) && ((Acc.ChatRoom.CreatorMemberNumber == Acc.MemberNumber) || (Acc.ChatRoom.PromotedMemberNumber == Acc.MemberNumber))) {
+		if ((Acc != null) && (Acc.ChatRoom != null) && (Acc.ChatRoom.Promote != null) && (Acc.ChatRoom.Promote.indexOf(Acc.MemberNumber) >= 0)) {
 			if ((data.Action == "Ban") && (Acc.ChatRoom.Ban.indexOf(data.MemberNumber) < 0)) {
-				Acc.ChatRoom.Ban.push(Acc.ChatRoom.Account[A].MemberNumber);
+				Acc.ChatRoom.Ban.push(Acc.ChatRoom.Account[A].MemberNumber);	
+				ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, Acc.Name + " banned: " + data.MemberNumber.toString()  + ".", "Action");
 			}
 			if (data.Action == "Unban") {
 				for (var A = 0; A < Acc.ChatRoom.Ban.length; A++) {
 					if (Acc.ChatRoom.Ban[A] == data.MemberNumber) {
 						Acc.ChatRoom.Ban.splice(A, 1);
+						ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, Acc.Name + " unbanned: " + data.MemberNumber.toString()  + ".", "Action");
 						break;
 					}
 				}
@@ -661,9 +663,20 @@ function ChatRoomAction(data, socket) {
 						Acc.ChatRoom.Account[A].Socket.emit("ChatRoomSearchResponse", "RoomKicked");
 						ChatRoomRemove(Acc.ChatRoom.Account[A], "was kicked-out of the room");
 					} else if (data.Action == "Promote") {
-						Acc.ChatRoom.PromotedMemberNumber = data.MemberNumber;
-						ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber);
-						ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "Promoted", "ServerMessage");
+						if (Acc.ChatRoom.Promote.indexOf(data.MemberNumber) < 0) {
+							Acc.ChatRoom.Promote = data.MemberNumber;
+							ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber);
+							ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, Acc.Name + " promoted: " + data.MemberNumber.toString()  + ".", "Action");
+						}
+					} else if (data.Action == "Demote") {
+						for (var P = 0; P < Acc.ChatRoom.Promote.length; P++) {
+							if (Acc.ChatRoom.Promote[A] == data.MemberNumber) {
+								Acc.ChatRoom.Promote.splice(P, 1);
+								ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber);								
+								ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, Acc.Name + " demoted: " + data.MemberNumber.toString()  + ".", "Action");
+								break;
+							}
+						}
 					}
 					break;
 				}
