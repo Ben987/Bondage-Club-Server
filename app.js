@@ -362,17 +362,21 @@ function AccountGet(ID) {
 // When a user searches for a chat room
 function ChatRoomSearch(data, socket) {
 	if ((data != null) && (typeof data === "object") && (data.Query != null) && (typeof data.Query === "string") && (data.Query.length <= 20)) {
-		
+
 		// Finds the current account
 		var Acc = AccountGet(socket.id);
 		if (Acc != null) {
+
+			// Gets the space of the chat room (empty for public, asylum, etc.)
+			var Space = "";
+			if ((data.Space != null) && (typeof data.Space === "string") && (data.Space.length <= 100)) Space = data.Space;
 
 			// Builds a list of up to 24 possible rooms, the last rooms created are shown first
 			var CR = [];
 			var C = 0;
 			for (var C = ChatRoom.length - 1; ((C >= 0) && (CR.length <= 24)); C--)
 				if ((ChatRoom[C] != null) && (ChatRoom[C].Account.length < ChatRoom[C].Limit))
-					if (Acc.Environment == ChatRoom[C].Environment)
+					if ((Acc.Environment == ChatRoom[C].Environment) && (Space == ChatRoom[C].Space))
 						if (ChatRoom[C].Ban.indexOf(Acc.AccountName) < 0)
 							if ((data.Query == "") || (ChatRoom[C].Name.toUpperCase().indexOf(data.Query) >= 0))
 								if (!ChatRoom[C].Private || (ChatRoom[C].Name.toUpperCase() == data.Query)) {
@@ -423,7 +427,11 @@ function ChatRoomCreate(data, socket) {
 					socket.emit("ChatRoomCreateResponse", "RoomAlreadyExist");
 					return;
 				}
-				
+
+			// Gets the space of the chat room (empty for public, asylum, etc.)
+			var Space = "";
+			if ((data.Space != null) && (typeof data.Space === "string") && (data.Space.length <= 100)) Space = data.Space;
+
 			// Finds the account and links it to the new room
 			var Acc = AccountGet(socket.id);
 			if (Acc != null) {
@@ -435,6 +443,7 @@ function ChatRoomCreate(data, socket) {
 					Limit: ((data.Limit == null) || (typeof data.Limit !== "string") || isNaN(parseInt(data.Limit)) || (parseInt(data.Limit) < 2) || (parseInt(data.Limit) > 10)) ? 10 : parseInt(data.Limit),
 					Private: data.Private,
 					Environment: Acc.Environment,
+					Space: Space,
 					Creator: Acc.Name,
 					CreatorID: Acc.ID,
 					CreatorAccount: Acc.AccountName,
