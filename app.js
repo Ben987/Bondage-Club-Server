@@ -445,6 +445,7 @@ function ChatRoomCreate(data, socket) {
 					Environment: Acc.Environment,
 					Space: Space,
 					Creator: Acc.Name,
+					CreatorNumber: Acc.MemberNumber,
 					CreatorID: Acc.ID,
 					CreatorAccount: Acc.AccountName,
 					Creation: CommonTime(),
@@ -484,6 +485,9 @@ function ChatRoomJoin(data, socket) {
 					if (Acc.Environment == ChatRoom[C].Environment)
 						if (ChatRoom[C].Account.length < ChatRoom[C].Limit) {
 							if (ChatRoom[C].Ban.indexOf(Acc.AccountName) < 0) {
+								if ((ChatRoom[C].CreatorID != Acc.ID)&&(ChatRoom[C].CreatorNumber == Acc.MemberNumber)){
+									ChatRoom[C].CreatorID = Acc.ID;
+								}
 								Acc.ChatRoom = ChatRoom[C];
 								ChatRoom[C].Account.push(Acc);
 								socket.emit("ChatRoomSearchResponse", "JoinedRoom");
