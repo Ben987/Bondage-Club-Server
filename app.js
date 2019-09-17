@@ -81,8 +81,7 @@ DatabaseClient.connect(DatabaseURL, { useNewUrlParser: true }, function(err, db)
 				socket.on("ChatRoomLeave", function() { ChatRoomLeave(socket) });
 				socket.on("ChatRoomChat", function(data) { ChatRoomChat(data, socket) });
 				socket.on("ChatRoomCharacterUpdate", function(data) { ChatRoomCharacterUpdate(data, socket) });
-				socket.on("ChatRoomBan", function(data) { ChatRoomBan(data, socket, true) });
-				socket.on("ChatRoomKick", function(data) { ChatRoomBan(data, socket, false) });
+				socket.on("ChatRoomAdmin", function(data) { ChatRoomAdmin(data, socket) });
 				socket.on("ChatRoomAllowItem", function(data) { ChatRoomAllowItem(data, socket) });
 				socket.on("PasswordReset", function(data) { PasswordReset(data, socket) });
 				socket.on("PasswordResetProcess", function(data) { PasswordResetProcess(data, socket) });
@@ -445,11 +444,10 @@ function ChatRoomCreate(data, socket) {
 					Environment: Acc.Environment,
 					Space: Space,
 					Creator: Acc.Name,
-					CreatorID: Acc.ID,
-					CreatorAccount: Acc.AccountName,
 					Creation: CommonTime(),
 					Account: [],
-					Ban: []
+					Ban: [],
+					Admin: [Acc.MemberNumber]
 				}
 				ChatRoom.push(NewRoom);
 				Acc.ChatRoom = NewRoom;
@@ -564,8 +562,8 @@ function ChatRoomSync(CR, SourceMemberNumber) {
 	// Builds the room data
 	var R = {};
 	R.Name = CR.Name;
+	R.Admin = CR.Admin;
 	R.Background = CR.Background;
-	R.CreatorID = CR.CreatorID;
 	R.SourceMemberNumber = SourceMemberNumber;
 
 	// Adds the characters from the room
@@ -612,26 +610,37 @@ function ChatRoomCharacterUpdate(data, socket) {
 	}
 }
 
-// When the accounts that created the chatroom wants to ban another account from it
-function ChatRoomBan(data, socket, ApplyBan) {
-	if ((data != null) && (typeof data === "string") && (data != "") && (data != socket.id.toString())) {
+// When an administrator account wants to act on another account in the room
+function ChatRoomAdmin(data, socket) {
+	if ((data != null) && (typeof data === "object") && (data.MemberNumber != null) && (typeof data.MemberNumber === "number") && (data.Action != null) && (typeof data.MemberNumber === "string")) {
 
-		// Validates that the account is the room creator and finds the account from the ID to ban
+		// Validates that the current account is a room administrator and the account to act upon is in the room
 		var Acc = AccountGet(socket.id);
-		if ((Acc != null) && (Acc.ChatRoom != null) && (Acc.ChatRoom.CreatorAccount == Acc.AccountName))
+		if ((Acc != null) && (Acc.MemberNumber != data.MemberNumber) && (Acc.ChatRoom != null) && (Acc.ChatRoom.Admin.indexOf(Acc.MemberNumber) >= 0))
 			for (var A = 0; A < Acc.ChatRoom.Account.length; A++)
-				if (Acc.ChatRoom.Account[A].ID == data) {
+				if (Acc.ChatRoom.Account[A].MemberNumber.toString() == data) {
 
-					// Adds to the ban list and kicks out
-					if (ApplyBan) {
+					// Adds to the ban list, kicks or promotes/demotes another administrator
+					if (data.Action == "Ban") {
 						Acc.ChatRoom.Ban.push(Acc.ChatRoom.Account[A].AccountName);
 						Acc.ChatRoom.Account[A].Socket.emit("ChatRoomSearchResponse", "RoomBanned");
 						ChatRoomRemove(Acc.ChatRoom.Account[A], "was banned from the room");
-					} else {
+					}
+					else if (data.Action == "Kick") {
 						Acc.ChatRoom.Account[A].Socket.emit("ChatRoomSearchResponse", "RoomKicked");
 						ChatRoomRemove(Acc.ChatRoom.Account[A], "was kicked-out of the room");
 					}
-					break;
+					else if ((data.Action == "Promote") && (Acc.ChatRoom.Admin.indexOf(Acc.ChatRoom.Account[A].MemberNumber) < 0)) {
+						Acc.ChatRoom.Admin.push(Acc.ChatRoom.Account[A].MemberNumber);
+						ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, Acc.ChatRoom.Account[A].Name + " was promoted as room administrator.", "Action");
+						ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber);
+					}
+					else if ((data.Action == "Demote") && (Acc.ChatRoom.Admin.indexOf(Acc.ChatRoom.Account[A].MemberNumber) >= 0)) {
+						Acc.ChatRoom.Admin.splice(Acc.ChatRoom.Admin.indexOf(Acc.ChatRoom.Account[A].MemberNumber), 1);
+						ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, Acc.ChatRoom.Account[A].Name + " is no longer a room administrator.", "Action");
+						ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber);
+					}
+					return;
 
 				}
 		
