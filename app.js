@@ -376,7 +376,7 @@ function ChatRoomSearch(data, socket) {
 			for (var C = ChatRoom.length - 1; ((C >= 0) && (CR.length <= 24)); C--)
 				if ((ChatRoom[C] != null) && (ChatRoom[C].Account.length < ChatRoom[C].Limit))
 					if ((Acc.Environment == ChatRoom[C].Environment) && (Space == ChatRoom[C].Space))
-						if (ChatRoom[C].Ban.indexOf(Acc.AccountName) < 0)
+						if (ChatRoom[C].Ban.indexOf(Acc.MemberNumber) < 0)
 							if ((data.Query == "") || (ChatRoom[C].Name.toUpperCase().indexOf(data.Query) >= 0))
 								if (!ChatRoom[C].Private || (ChatRoom[C].Name.toUpperCase() == data.Query)) {
 									
@@ -481,7 +481,7 @@ function ChatRoomJoin(data, socket) {
 				if (ChatRoom[C].Name.toUpperCase().trim() == data.Name.toUpperCase().trim())
 					if (Acc.Environment == ChatRoom[C].Environment)
 						if (ChatRoom[C].Account.length < ChatRoom[C].Limit) {
-							if (ChatRoom[C].Ban.indexOf(Acc.AccountName) < 0) {
+							if (ChatRoom[C].Ban.indexOf(Acc.MemberNumber) < 0) {
 								Acc.ChatRoom = ChatRoom[C];
 								ChatRoom[C].Account.push(Acc);
 								socket.emit("ChatRoomSearchResponse", "JoinedRoom");
@@ -598,7 +598,7 @@ function ChatRoomCharacterUpdate(data, socket) {
 	if ((data != null) && (typeof data === "object") && (data.ID != null) && (typeof data.ID === "string") && (data.ID != "") && (data.Appearance != null)) {
 		var Acc = AccountGet(socket.id);
 		if ((Acc != null) && (Acc.ChatRoom != null))
-			if (Acc.ChatRoom.Ban.indexOf(Acc.AccountName) < 0)
+			if (Acc.ChatRoom.Ban.indexOf(Acc.MemberNumber) < 0)
 				for (var A = 0; ((Acc.ChatRoom != null) && (A < Acc.ChatRoom.Account.length)); A++)
 					if (Acc.ChatRoom.Account[A].ID == data.ID)
 						if (ChatRoomGetAllowItem(Acc, Acc.ChatRoom.Account[A])) {
@@ -612,38 +612,43 @@ function ChatRoomCharacterUpdate(data, socket) {
 
 // When an administrator account wants to act on another account in the room
 function ChatRoomAdmin(data, socket) {
-	if ((data != null) && (typeof data === "object") && (data.MemberNumber != null) && (typeof data.MemberNumber === "number") && (data.Action != null) && (typeof data.MemberNumber === "string")) {
+	if ((data != null) && (typeof data === "object") && (data.MemberNumber != null) && (typeof data.MemberNumber === "number") && (data.Action != null) && (typeof data.Action === "string")) {
 
-		// Validates that the current account is a room administrator and the account to act upon is in the room
+		// Validates that the current account is a room administrator
 		var Acc = AccountGet(socket.id);
-		if ((Acc != null) && (Acc.MemberNumber != data.MemberNumber) && (Acc.ChatRoom != null) && (Acc.ChatRoom.Admin.indexOf(Acc.MemberNumber) >= 0))
-			for (var A = 0; A < Acc.ChatRoom.Account.length; A++)
-				if (Acc.ChatRoom.Account[A].MemberNumber.toString() == data) {
+		if ((Acc != null) && (Acc.MemberNumber != data.MemberNumber) && (Acc.ChatRoom != null) && (Acc.ChatRoom.Admin.indexOf(Acc.MemberNumber) >= 0)) {
 
-					// Adds to the ban list, kicks or promotes/demotes another administrator
+			// If the account to act upon is in the room, an administrator can ban, kick, promote or demote him
+			for (var A = 0; A < Acc.ChatRoom.Account.length; A++)
+				if (Acc.ChatRoom.Account[A].MemberNumber == data.MemberNumber) {
 					if (data.Action == "Ban") {
-						Acc.ChatRoom.Ban.push(Acc.ChatRoom.Account[A].AccountName);
+						Acc.ChatRoom.Ban.push(data.MemberNumber);
 						Acc.ChatRoom.Account[A].Socket.emit("ChatRoomSearchResponse", "RoomBanned");
-						ChatRoomRemove(Acc.ChatRoom.Account[A], "was banned from the room");
+						ChatRoomRemove(Acc.ChatRoom.Account[A], "was banned by " + Acc.Name);
 					}
 					else if (data.Action == "Kick") {
 						Acc.ChatRoom.Account[A].Socket.emit("ChatRoomSearchResponse", "RoomKicked");
-						ChatRoomRemove(Acc.ChatRoom.Account[A], "was kicked-out of the room");
+						ChatRoomRemove(Acc.ChatRoom.Account[A], "was kicked-out by " + Acc.Name);
 					}
 					else if ((data.Action == "Promote") && (Acc.ChatRoom.Admin.indexOf(Acc.ChatRoom.Account[A].MemberNumber) < 0)) {
 						Acc.ChatRoom.Admin.push(Acc.ChatRoom.Account[A].MemberNumber);
-						ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, Acc.ChatRoom.Account[A].Name + " was promoted as room administrator.", "Action");
+						ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, Acc.ChatRoom.Account[A].Name + " was promoted to administrator by " + Acc.Name + ".", "Action");
 						ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber);
 					}
 					else if ((data.Action == "Demote") && (Acc.ChatRoom.Admin.indexOf(Acc.ChatRoom.Account[A].MemberNumber) >= 0)) {
 						Acc.ChatRoom.Admin.splice(Acc.ChatRoom.Admin.indexOf(Acc.ChatRoom.Account[A].MemberNumber), 1);
-						ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, Acc.ChatRoom.Account[A].Name + " is no longer a room administrator.", "Action");
+						ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, Acc.ChatRoom.Account[A].Name + " was demoted from administration by " + Acc.Name + ".", "Action");
 						ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber);
 					}
 					return;
-
 				}
-		
+
+			// Can also ban or unban without having the player in the room, there's no visible output
+			if ((data.Action == "Ban") && (Acc.ChatRoom.Ban.indexOf(data.MemberNumber) < 0)) Acc.ChatRoom.Ban.push(data.MemberNumber);
+			if ((data.Action == "Unban") && (Acc.ChatRoom.Ban.indexOf(data.MemberNumber) >= 0)) Acc.ChatRoom.Ban.splice(Acc.ChatRoom.Ban.indexOf(data.MemberNumber), 1);
+
+		}
+
 	}
 }
 
