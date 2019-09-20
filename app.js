@@ -271,6 +271,8 @@ function AccountUpdate(data, socket) {
 				if (data.LabelColor != null) Account[P].LabelColor = data.LabelColor;
 				if (data.Appearance != null) Account[P].Appearance = data.Appearance;
 				if (data.Reputation != null) Account[P].Reputation = data.Reputation;
+				if (data.Tags != null) Account[P].Tags = data.Tags;
+				if (data.Description != null) Account[P].Description = data.Description;				
 				if ((data.WhiteList != null) && Array.isArray(data.WhiteList)) Account[P].WhiteList = data.WhiteList;
 				if ((data.BlackList != null) && Array.isArray(data.BlackList)) Account[P].BlackList = data.BlackList;
 				if ((data.FriendList != null) && Array.isArray(data.FriendList)) Account[P].FriendList = data.FriendList;
@@ -579,6 +581,8 @@ function ChatRoomSync(CR, SourceMemberNumber) {
 		A.Creation = CR.Account[C].Creation;
 		A.Lover = CR.Account[C].Lover;
 		A.Owner = CR.Account[C].Owner;
+		A.Tags = CR.Account[C].Tags;
+		A.Description = CR.Account[C].Description;
 		A.MemberNumber = CR.Account[C].MemberNumber;
 		A.LabelColor = CR.Account[C].LabelColor;
 		A.ItemPermission = CR.Account[C].ItemPermission;
@@ -595,7 +599,7 @@ function ChatRoomSync(CR, SourceMemberNumber) {
 
 // Updates a character from the chat room
 function ChatRoomCharacterUpdate(data, socket) {
-	if ((data != null) && (typeof data === "object") && (data.ID != null) && (typeof data.ID === "string") && (data.ID != "") && (data.Appearance != null)) {
+	if ((data != null) && (typeof data === "object") && (data.ID != null) && (typeof data.ID === "string") && (data.ID != "") && (data.Appearance != null || data.Tags != null || data.Description != null)) {
 		var Acc = AccountGet(socket.id);
 		if ((Acc != null) && (Acc.ChatRoom != null))
 			if (Acc.ChatRoom.Ban.indexOf(Acc.MemberNumber) < 0)
@@ -605,6 +609,8 @@ function ChatRoomCharacterUpdate(data, socket) {
 							Database.collection("Accounts").updateOne({ AccountName : Acc.ChatRoom.Account[A].AccountName }, { $set: { Appearance: data.Appearance } }, function(err, res) { if (err) throw err; });
 							Acc.ChatRoom.Account[A].Appearance = data.Appearance;
 							Acc.ChatRoom.Account[A].ActivePose = data.ActivePose;
+							Acc.ChatRoom.Account[A].Tags = data.Tags;
+							Acc.ChatRoom.Account[A].Description = data.Description;
 							ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber);
 						}
 	}
