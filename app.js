@@ -644,18 +644,18 @@ function ChatRoomAdmin(data, socket) {
 						Acc.ChatRoom.Account[A].Socket.emit("ChatRoomSearchResponse", "RoomKicked");
 						ChatRoomRemove(Acc.ChatRoom.Account[A], "was kicked-out by " + Acc.Name);
 					}
-					else if( (data.Action == "MoveLeft") && (A!=0) ){
-						let movedAccount = Acc.ChatRoom.Account[A]
-						Acc.ChatRoom.Account[A] = Acc.ChatRoom.Account[A-1];
-						Acc.ChatRoom.Account[A-1] = movedAccount;
-						ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, movedAccount.Name + " was moved to the left by " + Acc.Name + ".", "Action");
+					else if ((data.Action == "MoveLeft") && (A != 0)) {
+						var MovedAccount = Acc.ChatRoom.Account[A];
+						Acc.ChatRoom.Account[A] = Acc.ChatRoom.Account[A - 1];
+						Acc.ChatRoom.Account[A - 1] = MovedAccount;
+						ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, MovedAccount.Name + " was moved to the left by " + Acc.Name + ".", "Action");
 						ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber);
 					}
-					else if ( (data.Action == "MoveRight") && (A<(Acc.ChatRoom.Account.length-1)) ){
-						let movedAccount = Acc.ChatRoom.Account[A]
-						Acc.ChatRoom.Account[A] = Acc.ChatRoom.Account[A+1];
-						Acc.ChatRoom.Account[A+1] = movedAccount;
-						ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, movedAccount.Name + " was moved to the right by " + Acc.Name + ".", "Action");
+					else if ((data.Action == "MoveRight") && (A < Acc.ChatRoom.Account.length - 1)) {
+						var MovedAccount = Acc.ChatRoom.Account[A];
+						Acc.ChatRoom.Account[A] = Acc.ChatRoom.Account[A + 1];
+						Acc.ChatRoom.Account[A + 1] = MovedAccount;
+						ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, MovedAccount.Name + " was moved to the right by " + Acc.Name + ".", "Action");
 						ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber);
 					}
 					else if ((data.Action == "Promote") && (Acc.ChatRoom.Admin.indexOf(Acc.ChatRoom.Account[A].MemberNumber) < 0)) {
