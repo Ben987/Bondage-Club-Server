@@ -544,8 +544,22 @@ function ChatRoomLeave(socket) {
 function ChatRoomMessage(CR, Sender, Content, Type, Target) {
 	if (CR != null)
 		for (var A = 0; A < CR.Account.length; A++)
-			if ((Target == null) || (Target == CR.Account[A].MemberNumber))
+			if (Target == null) {
 				CR.Account[A].Socket.emit("ChatRoomMessage", { Sender: Sender, Content: Content, Type: Type } );
+			} else {
+
+				// A player cannot whisper to a another player if she's on her blacklist
+				if (Target == CR.Account[A].MemberNumber) {
+					if ((CR.Account[A].BlackList == null) || !Array.isArray(CR.Account[A].BlackList) || (CR.Account[A].BlackList.indexOf(Sender) < 0))
+						CR.Account[A].Socket.emit("ChatRoomMessage", { Sender: Sender, Content: Content, Type: Type } );
+					else
+						for (var S = 0; S < CR.Account.length; S++)
+							if (Sender == CR.Account[S].MemberNumber)
+								CR.Account[S].Socket.emit("ChatRoomMessage", { Sender: Target, Content: "WhisperBlocked", Type: "ServerMessage" } );
+					return;
+				}
+
+			}
 }
 
 // When a user sends a chat message, we propagate it to everyone in the room
