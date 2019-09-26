@@ -587,6 +587,7 @@ function ChatRoomSync(CR, SourceMemberNumber) {
 		A.ID = CR.Account[C].ID;
 		A.Name = CR.Account[C].Name;
 		A.AssetFamily = CR.Account[C].AssetFamily;
+		A.Title = CR.Account[C].Title;
 		A.Appearance = CR.Account[C].Appearance;
 		A.ActivePose = CR.Account[C].ActivePose;
 		A.Reputation = CR.Account[C].Reputation;
