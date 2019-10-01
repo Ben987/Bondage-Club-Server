@@ -2,7 +2,7 @@
 
 // Main game objects
 var App = require("http").createServer()
-var IO = require("socket.io")(App, { origins: "http://www.bondageprojects.com:* http://ben987.x10host.com:* http://127.0.0.1:*" } );
+var IO = require("socket.io")(App, { origins: process.env.ORIGINS || "http://www.bondageprojects.com:* http://ben987.x10host.com:* http://127.0.0.1:*" } );
 var BCrypt = require("bcrypt");
 var Account = [];
 var ChatRoom = [];
@@ -43,7 +43,7 @@ var MailTransporter = NodeMailer.createTransport({
 });
 
 // Sets the allowed origins
-IO.set("origins", "http://www.bondageprojects.com:* http://ben987.x10host.com:* http://127.0.0.1:*");
+IO.set("origins", process.env.ORIGINS || "http://www.bondageprojects.com:* http://ben987.x10host.com:* http://127.0.0.1:*");
 
 // Connects to the Mongo Database
 DatabaseClient.connect(DatabaseURL, { useNewUrlParser: true }, function(err, db) {
