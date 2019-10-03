@@ -444,6 +444,7 @@ function ChatRoomCreate(data, socket) {
 					Background: data.Background,
 					Limit: ((data.Limit == null) || (typeof data.Limit !== "string") || isNaN(parseInt(data.Limit)) || (parseInt(data.Limit) < 2) || (parseInt(data.Limit) > 10)) ? 10 : parseInt(data.Limit),
 					Private: data.Private,
+					Locked : data.Locked || false,
 					Environment: Acc.Environment,
 					Space: Space,
 					Creator: Acc.Name,
@@ -485,12 +486,29 @@ function ChatRoomJoin(data, socket) {
 					if (Acc.Environment == ChatRoom[C].Environment)
 						if (ChatRoom[C].Account.length < ChatRoom[C].Limit) {
 							if (ChatRoom[C].Ban.indexOf(Acc.MemberNumber) < 0) {
-								Acc.ChatRoom = ChatRoom[C];
-								ChatRoom[C].Account.push(Acc);
-								socket.emit("ChatRoomSearchResponse", "JoinedRoom");
-								ChatRoomSync(ChatRoom[C], Acc.MemberNumber);
-								ChatRoomMessage(ChatRoom[C], Acc.MemberNumber, Acc.Name + " entered.", "Action");
-								return;
+								if(!ChatRoom[C].Locked){
+									Acc.ChatRoom = ChatRoom[C];
+									ChatRoom[C].Account.push(Acc);
+									socket.emit("ChatRoomSearchResponse", "JoinedRoom");
+									ChatRoomSync(ChatRoom[C], Acc.MemberNumber);
+									ChatRoomMessage(ChatRoom[C], Acc.MemberNumber, Acc.Name + " entered.", "Action");
+									return;
+								} else  {
+									//If player is admin of room Allow Entry, in case of possible DC while room is locked
+									if(ChatRoom[C].Admin.indexOf(Acc.MemberNumber) >= 0) {
+										Acc.ChatRoom = ChatRoom[C];
+										ChatRoom[C].Account.push(Acc);
+										socket.emit("ChatRoomSearchResponse", "JoinedRoom");
+										ChatRoomSync(ChatRoom[C], Acc.MemberNumber);
+										ChatRoomMessage(ChatRoom[C], Acc.MemberNumber, Acc.Name + " entered using her room key.", "Action");
+										return;
+									}
+									else{
+										socket.emit("ChatRoomSearchResponse", "RoomLocked");
+										return;
+									}
+								}
+
 							} else {
 								socket.emit("ChatRoomSearchResponse", "RoomBanned");
 								return;
@@ -579,9 +597,11 @@ function ChatRoomSync(CR, SourceMemberNumber) {
 	// Builds the room data
 	var R = {};
 	R.Name = CR.Name;
+	R.Description = CR.Description;
 	R.Admin = CR.Admin;
 	R.Background = CR.Background;
 	R.SourceMemberNumber = SourceMemberNumber;
+	R.Locked = CR.Locked
 
 	// Adds the characters from the room
 	R.Character = [];
@@ -630,11 +650,23 @@ function ChatRoomCharacterUpdate(data, socket) {
 
 // When an administrator account wants to act on another account in the room
 function ChatRoomAdmin(data, socket) {
+	console.log(data);
 	if ((data != null) && (typeof data === "object") && (data.MemberNumber != null) && (typeof data.MemberNumber === "number") && (data.Action != null) && (typeof data.Action === "string")) {
 
 		// Validates that the current account is a room administrator
 		var Acc = AccountGet(socket.id);
 		if ((Acc != null) && (Acc.MemberNumber != data.MemberNumber) && (Acc.ChatRoom != null) && (Acc.ChatRoom.Admin.indexOf(Acc.MemberNumber) >= 0)) {
+
+			//Room actions
+			if (data.Action == "Private") {
+				Acc.ChatRoom.Private = !Acc.ChatRoom.Private
+				ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, Acc.Name + " set the room to " + (Acc.ChatRoom.Private ? " private" : " public" ) + ".", "Action");
+			}
+			else if(data.Action == "Lock") {
+				Acc.ChatRoom.Locked = !Acc.ChatRoom.Locked
+				ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, Acc.Name + (Acc.ChatRoom.Locked ? " locked" : " unlocked" ) + " the room.", "Action");
+				ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber);
+			}
 
 			// If the account to act upon is in the room, an administrator can ban, kick, promote or demote him
 			for (var A = 0; A < Acc.ChatRoom.Account.length; A++)
