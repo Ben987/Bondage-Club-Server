@@ -650,7 +650,6 @@ function ChatRoomCharacterUpdate(data, socket) {
 
 // When an administrator account wants to act on another account in the room
 function ChatRoomAdmin(data, socket) {
-	console.log(data);
 	if ((data != null) && (typeof data === "object") && (data.MemberNumber != null) && (typeof data.MemberNumber === "number") && (data.Action != null) && (typeof data.Action === "string")) {
 
 		// Validates that the current account is a room administrator
