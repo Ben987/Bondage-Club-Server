@@ -345,7 +345,7 @@ function AccountRemove(ID) {
 		for (var P = 0; P < Account.length; P++)
 			if (Account[P].ID == ID) {
 				ChatRoomRemove(Account[P], "disconnected");
-				console.log("Disconnecting account: " + Account[P].AccountName + " ID: " + ID.toString());
+				if (Account[P] != null) console.log("Disconnecting account: " + Account[P].AccountName + " ID: " + ID.toString());
 				Account.splice(P, 1);
 				break;
 			}
