@@ -271,6 +271,7 @@ function AccountUpdate(data, socket) {
 				if (data.LabelColor != null) Account[P].LabelColor = data.LabelColor;
 				if (data.Appearance != null) Account[P].Appearance = data.Appearance;
 				if (data.Reputation != null) Account[P].Reputation = data.Reputation;
+				if ((data.BlockItems != null) && Array.isArray(data.BlockItems)) Account[P].BlockItems = data.BlockItems;
 				if ((data.WhiteList != null) && Array.isArray(data.WhiteList)) Account[P].WhiteList = data.WhiteList;
 				if ((data.BlackList != null) && Array.isArray(data.BlackList)) Account[P].BlackList = data.BlackList;
 				if ((data.FriendList != null) && Array.isArray(data.FriendList)) Account[P].FriendList = data.FriendList;
@@ -599,6 +600,7 @@ function ChatRoomSync(CR, SourceMemberNumber) {
 		A.ItemPermission = CR.Account[C].ItemPermission;
 		A.Inventory = CR.Account[C].Inventory;
 		A.Ownership = CR.Account[C].Ownership;
+		A.BlockItems = CR.Account[C].BlockItems;
 		R.Character.push(A);
 	}
 
