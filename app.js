@@ -73,6 +73,7 @@ DatabaseClient.connect(DatabaseURL, { useNewUrlParser: true }, function(err, db)
 				socket.on("AccountQuery", function (data) { AccountQuery(data, socket) });
 				socket.on("AccountBeep", function (data) { AccountBeep(data, socket) });
 				socket.on("AccountOwnership", function(data) { AccountOwnership(data, socket) });
+				socket.on("AccountLovers", function(data) { AccountLovers(data, socket) });
 				socket.on("AccountDisconnect", function () { AccountRemove(socket.id) });
 				socket.on("disconnect", function() { AccountRemove(socket.id) });
 				socket.on("ChatRoomSearch", function(data) { ChatRoomSearch(data, socket) });
@@ -897,4 +898,25 @@ function AccountOwnership(data, socket) {
 		}
 
 	}
+}
+
+function AccountLovers(data, socket) {
+	if (data == null) {
+		return;
+	}
+	if (typeof data !== "object") {
+		return;
+	}
+	
+	var Acc = AccountGet(socket.id);
+	if (Acc == null) {
+		return;
+	}
+
+	Acc.Lover = data.Lover;
+
+	var O = { Lover: Acc.Lover };
+	Database.collection("Accounts").updateOne({ AccountName: Acc.AccountName }, { $set: O }, function (err, res) { if (err) throw err; });
+	socket.emit("AccountLovers", O);
+	ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber);
 }
