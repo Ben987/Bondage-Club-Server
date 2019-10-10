@@ -599,9 +599,12 @@ function ChatRoomSync(CR, SourceMemberNumber) {
 	R.Name = CR.Name;
 	R.Description = CR.Description;
 	R.Admin = CR.Admin;
+	R.Ban = CR.Ban;
 	R.Background = CR.Background;
+	R.Limit = CR.Limit;
 	R.SourceMemberNumber = SourceMemberNumber;
-	R.Locked = CR.Locked
+	R.Locked = CR.Locked;
+	R.Private = CR.Private;
 
 	// Adds the characters from the room
 	R.Character = [];
@@ -650,6 +653,7 @@ function ChatRoomCharacterUpdate(data, socket) {
 
 // When an administrator account wants to act on another account in the room
 function ChatRoomAdmin(data, socket) {
+
 	if ((data != null) && (typeof data === "object") && (data.MemberNumber != null) && (typeof data.MemberNumber === "number") && (data.Action != null) && (typeof data.Action === "string")) {
 
 		// Validates that the current account is a room administrator
@@ -660,11 +664,41 @@ function ChatRoomAdmin(data, socket) {
 			if (data.Action == "Private") {
 				Acc.ChatRoom.Private = !Acc.ChatRoom.Private
 				ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, Acc.Name + " set the room to " + (Acc.ChatRoom.Private ? " private" : " public" ) + ".", "Action");
+				ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber);
 			}
 			else if(data.Action == "Lock") {
 				Acc.ChatRoom.Locked = !Acc.ChatRoom.Locked
 				ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, Acc.Name + (Acc.ChatRoom.Locked ? " locked" : " unlocked" ) + " the room.", "Action");
 				ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber);
+			}
+			else if(data.Action == "Update") {
+				if ((data.Room != null)  && (typeof data.Room === "object") && (data.Room.Name != null) && (data.Room.Description != null) && (data.Room.Background != null) && (typeof data.Room.Name === "string") && (typeof data.Room.Description === "string") && (typeof data.Room.Background === "string") && (!data.Room.Admin.some(i => !Number.isInteger(i))) && (!data.Room.Ban.some(i => !Number.isInteger(i)))) {
+					data.Room.Name = data.Room.Name.trim();
+						var LN = /^[a-zA-Z0-9 ]+$/;
+						if (data.Room.Name.match(LN) && (data.Room.Name.length >= 1) && (data.Room.Name.length <= 20) && (data.Room.Description.length <= 100) && (data.Room.Background.length <= 100)) {
+							for (var C = 0; C < ChatRoom.length; C++)
+								if (Acc.ChatRoom.Name != data.Room.Name && ChatRoom[C].Name.toUpperCase().trim() == data.Room.Name.toUpperCase().trim()) {
+									socket.emit("ChatRoomUpdateResponse", "RoomAlreadyExist");
+									return;
+								}
+								try {
+									Acc.ChatRoom.Name = data.Room.Name;
+									Acc.ChatRoom.Background = data.Room.Background;
+									Acc.ChatRoom.Description = data.Room.Description;
+									Acc.ChatRoom.Ban = data.Room.Ban;
+									Acc.ChatRoom.Admin = data.Room.Admin;
+									Acc.ChatRoom.Limit = ((data.Room.Limit == null) || (typeof data.Room.Limit !== "string") || isNaN(parseInt(data.Room.Limit)) || (parseInt(data.Room.Limit) < 2) || (parseInt(data.Room.Limit) > 10)) ? 10 : parseInt(data.Room.Limit);
+									socket.emit("ChatRoomUpdateResponse", "Updated");
+									ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, Acc.Name + " updated the room settings.", "Action");
+									ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber);
+									return;
+								}
+								catch(err) {
+									socket.emit("ChatRoomUpdateResponse", "UpdateError");
+									return;
+								} 
+					}else socket.emit("ChatRoomUpdateResponse", "InvalidRoomData");
+				}else socket.emit("ChatRoomUpdateResponse", "InvalidRoomData");
 			}
 
 			// If the account to act upon is in the room, an administrator can ban, kick, promote or demote him
@@ -709,7 +743,6 @@ function ChatRoomAdmin(data, socket) {
 			// Can also ban or unban without having the player in the room, there's no visible output
 			if ((data.Action == "Ban") && (Acc.ChatRoom.Ban.indexOf(data.MemberNumber) < 0)) Acc.ChatRoom.Ban.push(data.MemberNumber);
 			if ((data.Action == "Unban") && (Acc.ChatRoom.Ban.indexOf(data.MemberNumber) >= 0)) Acc.ChatRoom.Ban.splice(Acc.ChatRoom.Ban.indexOf(data.MemberNumber), 1);
-
 		}
 
 	}
