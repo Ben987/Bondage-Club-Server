@@ -455,7 +455,7 @@ function ChatRoomCreate(data, socket) {
 				NewRoom.Account.push(Acc);
 				console.log("Chat room (" + ChatRoom.length.toString() + ") " + data.Name + " created by account " + Acc.AccountName + ", ID: " + socket.id.toString());
 				socket.emit("ChatRoomCreateResponse", "ChatRoomCreated");
-				ChatRoomSync(NewRoom, Acc.MemberNumber);
+				ChatRoomSync(NewRoom, Acc.MemberNumber, Acc.MemberNumber);
 			} else socket.emit("ChatRoomCreateResponse", "AccountError");
 
 		} else socket.emit("ChatRoomCreateResponse", "InvalidRoomData");
@@ -486,7 +486,7 @@ function ChatRoomJoin(data, socket) {
 								Acc.ChatRoom = ChatRoom[C];
 								ChatRoom[C].Account.push(Acc);
 								socket.emit("ChatRoomSearchResponse", "JoinedRoom");
-								ChatRoomSync(ChatRoom[C], Acc.MemberNumber);
+								ChatRoomSync(ChatRoom[C], Acc.MemberNumber, Acc.MemberNumber);
 								ChatRoomMessage(ChatRoom[C], Acc.MemberNumber, Acc.Name + " entered.", "Action");
 								return;
 							} else {
@@ -572,7 +572,7 @@ function ChatRoomChat(data, socket) {
 }
 
 // Syncs the room data with all of it's members
-function ChatRoomSync(CR, SourceMemberNumber) {
+function ChatRoomSync(CR, SourceMemberNumber, ...TargetMemberNumbers) {
 
 	// Builds the room data
 	var R = {};
@@ -580,6 +580,7 @@ function ChatRoomSync(CR, SourceMemberNumber) {
 	R.Admin = CR.Admin;
 	R.Background = CR.Background;
 	R.SourceMemberNumber = SourceMemberNumber;
+	R.TargetMemberNumbers = TargetMemberNumbers;
 
 	// Adds the characters from the room
 	R.Character = [];
@@ -622,7 +623,7 @@ function ChatRoomCharacterUpdate(data, socket) {
 							Database.collection("Accounts").updateOne({ AccountName : Acc.ChatRoom.Account[A].AccountName }, { $set: { Appearance: data.Appearance } }, function(err, res) { if (err) throw err; });
 							Acc.ChatRoom.Account[A].Appearance = data.Appearance;
 							Acc.ChatRoom.Account[A].ActivePose = data.ActivePose;
-							ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber);
+							ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber, Acc.ChatRoom.Account[A].MemberNumber);
 						}
 	}
 }
@@ -652,24 +653,24 @@ function ChatRoomAdmin(data, socket) {
 						Acc.ChatRoom.Account[A] = Acc.ChatRoom.Account[A - 1];
 						Acc.ChatRoom.Account[A - 1] = MovedAccount;
 						ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, MovedAccount.Name + " was moved to the left by " + Acc.Name + ".", "Action");
-						ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber);
+						ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber, Acc.ChatRoom.Account[A - 1].MemberNumber, Acc.ChatRoom.Account[A].MemberNumber);
 					}
 					else if ((data.Action == "MoveRight") && (A < Acc.ChatRoom.Account.length - 1)) {
 						var MovedAccount = Acc.ChatRoom.Account[A];
 						Acc.ChatRoom.Account[A] = Acc.ChatRoom.Account[A + 1];
 						Acc.ChatRoom.Account[A + 1] = MovedAccount;
 						ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, MovedAccount.Name + " was moved to the right by " + Acc.Name + ".", "Action");
-						ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber);
+						ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber, Acc.ChatRoom.Account[A].MemberNumber, Acc.ChatRoom.Account[A + 1].MemberNumber);
 					}
 					else if ((data.Action == "Promote") && (Acc.ChatRoom.Admin.indexOf(Acc.ChatRoom.Account[A].MemberNumber) < 0)) {
 						Acc.ChatRoom.Admin.push(Acc.ChatRoom.Account[A].MemberNumber);
 						ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, Acc.ChatRoom.Account[A].Name + " was promoted to administrator by " + Acc.Name + ".", "Action");
-						ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber);
+						ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber, Acc.ChatRoom.Account[A].MemberNumber);
 					}
 					else if ((data.Action == "Demote") && (Acc.ChatRoom.Admin.indexOf(Acc.ChatRoom.Account[A].MemberNumber) >= 0)) {
 						Acc.ChatRoom.Admin.splice(Acc.ChatRoom.Admin.indexOf(Acc.ChatRoom.Account[A].MemberNumber), 1);
 						ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, Acc.ChatRoom.Account[A].Name + " was demoted from administration by " + Acc.Name + ".", "Action");
-						ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber);
+						ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber, Acc.ChatRoom.Account[A].MemberNumber);
 					}
 					return;
 				}
@@ -875,7 +876,7 @@ function AccountOwnership(data, socket) {
 								Database.collection("Accounts").updateOne({ AccountName : Acc.AccountName }, { $set: O }, function(err, res) { if (err) throw err; });
 								socket.emit("AccountOwnership", O);
 								ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "StartTrial", "ServerMessage");
-								ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber);
+								ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber, Acc.MemberNumber);
 							} else socket.emit("AccountOwnership", { MemberNumber: data.MemberNumber, Result: "CanStartTrial" });
 						}
 
@@ -888,7 +889,7 @@ function AccountOwnership(data, socket) {
 								Database.collection("Accounts").updateOne({ AccountName : Acc.AccountName }, { $set: O }, function(err, res) { if (err) throw err; });
 								socket.emit("AccountOwnership", O);
 								ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "EndTrial", "ServerMessage");
-								ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber);
+								ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber, Acc.MemberNumber);
 							} else socket.emit("AccountOwnership", { MemberNumber: data.MemberNumber, Result: "CanEndTrial" });
 						}
 
