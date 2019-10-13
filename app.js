@@ -265,6 +265,7 @@ function AccountUpdate(data, socket) {
 				delete data.MemberNumber;
 				delete data.Environment;
 				delete data.Ownership;
+				delete data.Lover;
 				
 				// Some data is kept for future use
 				if ((data.Inventory != null) && Array.isArray(data.Inventory)) Account[P].Inventory = data.Inventory;
