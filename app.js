@@ -83,6 +83,7 @@ DatabaseClient.connect(DatabaseURL, { useNewUrlParser: true }, function(err, db)
 				socket.on("ChatRoomCharacterUpdate", function(data) { ChatRoomCharacterUpdate(data, socket) });
 				socket.on("ChatRoomAdmin", function(data) { ChatRoomAdmin(data, socket) });
 				socket.on("ChatRoomAllowItem", function(data) { ChatRoomAllowItem(data, socket) });
+				socket.on("ChatRoomStatusEvent", function(data) { ChatRoomStatusEvent(data, socket) });
 				socket.on("PasswordReset", function(data) { PasswordReset(data, socket) });
 				socket.on("PasswordResetProcess", function(data) { PasswordResetProcess(data, socket) });
 				AccountSendServerInfo(socket);
@@ -728,6 +729,23 @@ function ChatRoomAllowItem(data, socket) {
 				if (Acc.ChatRoom.Account[A].MemberNumber == data.MemberNumber)
 					socket.emit("ChatRoomAllowItem", { MemberNumber: data.MemberNumber, AllowItem: ChatRoomGetAllowItem(Acc, Acc.ChatRoom.Account[A]) });
 
+	}
+}
+
+function ChatRoomStatusEvent(data, socket) {
+	if ((data == null) || (typeof data !== "object")) return;
+
+	if (typeof data.Type !== "string" || data.Type.trim() == "") return;
+
+	var Acc = AccountGet(socket.id);
+	if ((Acc == null) || (Acc.ChatRoom == null)) return;
+
+	for (var A = 0; A < Acc.ChatRoom.Account.length; A++){
+		var Account = Acc.ChatRoom.Account[A];
+
+		var D = { MemberNumber: Acc.MemberNumber, Type: data.Type, Data: data.Data };
+
+		Account.Socket.emit("ChatRoomStatusEvent", D);
 	}
 }
 
