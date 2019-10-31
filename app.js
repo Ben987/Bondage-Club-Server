@@ -442,7 +442,7 @@ function ChatRoomCreate(data, socket) {
 					Description: data.Description,
 					Background: data.Background,
 					Limit: ((data.Limit == null) || (typeof data.Limit !== "string") || isNaN(parseInt(data.Limit)) || (parseInt(data.Limit) < 2) || (parseInt(data.Limit) > 10)) ? 10 : parseInt(data.Limit),
-					Private: data.Private,
+					Private: data.Private || false,
 					Locked : data.Locked || false,
 					Environment: Acc.Environment,
 					Space: Space,
@@ -653,18 +653,8 @@ function ChatRoomAdmin(data, socket) {
 		var Acc = AccountGet(socket.id);
 		if ((Acc != null) && (Acc.MemberNumber != data.MemberNumber) && (Acc.ChatRoom != null) && (Acc.ChatRoom.Admin.indexOf(Acc.MemberNumber) >= 0)) {
 
-			//Room actions
-			if (data.Action == "Private") {
-				Acc.ChatRoom.Private = !Acc.ChatRoom.Private
-				ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, Acc.Name + " set the room to " + (Acc.ChatRoom.Private ? " private" : " public" ) + ".", "Action");
-				ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber);
-			}
-			else if (data.Action == "Lock") {
-				Acc.ChatRoom.Locked = !Acc.ChatRoom.Locked
-				ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, Acc.Name + (Acc.ChatRoom.Locked ? " locked" : " unlocked" ) + " the room.", "Action");
-				ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber);
-			}
-			else if (data.Action == "Update") {
+			// An administrator can update most room data.  If that's 
+			if (data.Action == "Update")
 				if ((data.Room != null) && (typeof data.Room === "object") && (data.Room.Name != null) && (data.Room.Description != null) && (data.Room.Background != null) && (typeof data.Room.Name === "string") && (typeof data.Room.Description === "string") && (typeof data.Room.Background === "string") && (!data.Room.Admin.some(i => !Number.isInteger(i))) && (!data.Room.Ban.some(i => !Number.isInteger(i)))) {
 					data.Room.Name = data.Room.Name.trim();
 					var LN = /^[a-zA-Z0-9 ]+$/;
@@ -680,13 +670,14 @@ function ChatRoomAdmin(data, socket) {
 						Acc.ChatRoom.Ban = data.Room.Ban;
 						Acc.ChatRoom.Admin = data.Room.Admin;
 						Acc.ChatRoom.Limit = ((data.Room.Limit == null) || (typeof data.Room.Limit !== "string") || isNaN(parseInt(data.Room.Limit)) || (parseInt(data.Room.Limit) < 2) || (parseInt(data.Room.Limit) > 10)) ? 10 : parseInt(data.Room.Limit);
+						if ((data.Room.Private != null) && (typeof data.Room.Private === "boolean")) Acc.ChatRoom.Private = data.Room.Private;
+						if ((data.Room.Locked != null) && (typeof data.Room.Locked === "boolean")) Acc.ChatRoom.Locked = data.Room.Locked;
 						socket.emit("ChatRoomUpdateResponse", "Updated");
-						ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, Acc.Name + " updated the room settings.", "Action");
-						ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber);
+						if ((Acc != null) && (Acc.ChatRoom != null)) ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, Acc.Name + " updated the room settings.  Name: " + Acc.ChatRoom.Name + ".  Limit: " + Acc.ChatRoom.Limit + ".  " + (Acc.ChatRoom.Private ? "Room is private.  " : "") + (Acc.ChatRoom.Private ? "Room is locked.  " : ""), "ServerMessage");
+						if ((Acc != null) && (Acc.ChatRoom != null)) ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber);
 						return;
 					} else socket.emit("ChatRoomUpdateResponse", "InvalidRoomData");
 				} else socket.emit("ChatRoomUpdateResponse", "InvalidRoomData");
-			}
 
 			// If the account to act upon is in the room, an administrator can ban, kick, promote or demote him
 			for (var A = 0; A < Acc.ChatRoom.Account.length; A++)
