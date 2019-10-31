@@ -377,31 +377,32 @@ function ChatRoomSearch(data, socket) {
 			var C = 0;
 			for (var C = ChatRoom.length - 1; ((C >= 0) && (CR.length <= 24)); C--)
 				if ((ChatRoom[C] != null) && (ChatRoom[C].Account.length < ChatRoom[C].Limit))
-					if ((Acc.Environment == ChatRoom[C].Environment) && (Space == ChatRoom[C].Space))
-						if (ChatRoom[C].Ban.indexOf(Acc.MemberNumber) < 0)
-							if ((data.Query == "") || (ChatRoom[C].Name.toUpperCase().indexOf(data.Query) >= 0))
-								if (!ChatRoom[C].Private || (ChatRoom[C].Name.toUpperCase() == data.Query)) {
-									
-									// Builds the searching account friend list in the current room
-									var Friends = [];
-									for (var A = 0; A < ChatRoom[C].Account.length; A++)
-										if (ChatRoom[C].Account[A] != null)
-											if ((ChatRoom[C].Account[A].Ownership != null) && (ChatRoom[C].Account[A].Ownership.MemberNumber != null) && (ChatRoom[C].Account[A].Ownership.MemberNumber == Acc.MemberNumber))
-												Friends.push({ Type: "Submissive", MemberNumber: ChatRoom[C].Account[A].MemberNumber, MemberName: ChatRoom[C].Account[A].Name});
-											else if ((Acc.FriendList != null) && (ChatRoom[C].Account[A].FriendList != null) && (Acc.FriendList.indexOf(ChatRoom[C].Account[A].MemberNumber) >= 0) && (ChatRoom[C].Account[A].FriendList.indexOf(Acc.MemberNumber) >= 0))
-												Friends.push({ Type: "Friend", MemberNumber: ChatRoom[C].Account[A].MemberNumber, MemberName: ChatRoom[C].Account[A].Name});
+					if ((Acc.Environment == ChatRoom[C].Environment) && (Space == ChatRoom[C].Space)) // Must be in same environment (prod/dev) and same space (hall/asylum)
+						if (ChatRoom[C].Ban.indexOf(Acc.MemberNumber) < 0) // The player cannot be banned
+							if ((data.Query == "") || (ChatRoom[C].Name.toUpperCase().indexOf(data.Query) >= 0)) // Room name must contain the searched name, if any
+								if (!ChatRoom[C].Locked || (ChatRoom[C].Admin.indexOf(Acc.MemberNumber) >= 0)) // Must be unlocked, unless the player is an administrator
+									if (!ChatRoom[C].Private || (ChatRoom[C].Name.toUpperCase() == data.Query)) { // If it's private, must know the exact name
 
-									// Builds a room object with all data
-									CR.push({
-										Name: ChatRoom[C].Name,
-										Creator: ChatRoom[C].Creator,
-										MemberCount: ChatRoom[C].Account.length,
-										MemberLimit: ChatRoom[C].Limit,
-										Description: ChatRoom[C].Description,
-										Friends: Friends
-									});
+										// Builds the searching account friend list in the current room
+										var Friends = [];
+										for (var A = 0; A < ChatRoom[C].Account.length; A++)
+											if (ChatRoom[C].Account[A] != null)
+												if ((ChatRoom[C].Account[A].Ownership != null) && (ChatRoom[C].Account[A].Ownership.MemberNumber != null) && (ChatRoom[C].Account[A].Ownership.MemberNumber == Acc.MemberNumber))
+													Friends.push({ Type: "Submissive", MemberNumber: ChatRoom[C].Account[A].MemberNumber, MemberName: ChatRoom[C].Account[A].Name});
+												else if ((Acc.FriendList != null) && (ChatRoom[C].Account[A].FriendList != null) && (Acc.FriendList.indexOf(ChatRoom[C].Account[A].MemberNumber) >= 0) && (ChatRoom[C].Account[A].FriendList.indexOf(Acc.MemberNumber) >= 0))
+													Friends.push({ Type: "Friend", MemberNumber: ChatRoom[C].Account[A].MemberNumber, MemberName: ChatRoom[C].Account[A].Name});
 
-								}
+										// Builds a room object with all data
+										CR.push({
+											Name: ChatRoom[C].Name,
+											Creator: ChatRoom[C].Creator,
+											MemberCount: ChatRoom[C].Account.length,
+											MemberLimit: ChatRoom[C].Limit,
+											Description: ChatRoom[C].Description,
+											Friends: Friends
+										});
+
+									}
 
 			// Sends the list to the client
 			socket.emit("ChatRoomSearchResult", CR);
@@ -653,7 +654,7 @@ function ChatRoomAdmin(data, socket) {
 		var Acc = AccountGet(socket.id);
 		if ((Acc != null) && (Acc.MemberNumber != data.MemberNumber) && (Acc.ChatRoom != null) && (Acc.ChatRoom.Admin.indexOf(Acc.MemberNumber) >= 0)) {
 
-			// An administrator can update most room data.  If that's 
+			// An administrator can update lots of room data.  The room values are sent back to the clients.
 			if (data.Action == "Update")
 				if ((data.Room != null) && (typeof data.Room === "object") && (data.Room.Name != null) && (data.Room.Description != null) && (data.Room.Background != null) && (typeof data.Room.Name === "string") && (typeof data.Room.Description === "string") && (typeof data.Room.Background === "string") && (!data.Room.Admin.some(i => !Number.isInteger(i))) && (!data.Room.Ban.some(i => !Number.isInteger(i)))) {
 					data.Room.Name = data.Room.Name.trim();
