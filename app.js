@@ -485,39 +485,31 @@ function ChatRoomJoin(data, socket) {
 					if (Acc.Environment == ChatRoom[C].Environment)
 						if (ChatRoom[C].Account.length < ChatRoom[C].Limit) {
 							if (ChatRoom[C].Ban.indexOf(Acc.MemberNumber) < 0) {
-								if(!ChatRoom[C].Locked){
+								
+								// If the room is unlocked or the player is an admin, we allow her inside
+								if (!ChatRoom[C].Locked || (ChatRoom[C].Admin.indexOf(Acc.MemberNumber) >= 0)) {
 									Acc.ChatRoom = ChatRoom[C];
 									ChatRoom[C].Account.push(Acc);
 									socket.emit("ChatRoomSearchResponse", "JoinedRoom");
 									ChatRoomSync(ChatRoom[C], Acc.MemberNumber);
 									ChatRoomMessage(ChatRoom[C], Acc.MemberNumber, Acc.Name + " entered.", "Action");
 									return;
-								} else  {
-									//If player is admin of room Allow Entry, in case of possible DC while room is locked
-									if(ChatRoom[C].Admin.indexOf(Acc.MemberNumber) >= 0) {
-										Acc.ChatRoom = ChatRoom[C];
-										ChatRoom[C].Account.push(Acc);
-										socket.emit("ChatRoomSearchResponse", "JoinedRoom");
-										ChatRoomSync(ChatRoom[C], Acc.MemberNumber);
-										ChatRoomMessage(ChatRoom[C], Acc.MemberNumber, Acc.Name + " entered using her room key.", "Action");
-										return;
-									}
-									else{
-										socket.emit("ChatRoomSearchResponse", "RoomLocked");
-										return;
-									}
+								} else {
+									socket.emit("ChatRoomSearchResponse", "RoomLocked");
+									return;
 								}
 
 							} else {
 								socket.emit("ChatRoomSearchResponse", "RoomBanned");
 								return;
 							}
+
 						} else {
 							socket.emit("ChatRoomSearchResponse", "RoomFull");
 							return;
 						}
 
-			// If we didn't found the room
+			// Since we didn't found the room to join
 			socket.emit("ChatRoomSearchResponse", "CannotFindRoom");
 
 		} else socket.emit("ChatRoomSearchResponse", "AccountError");
@@ -667,39 +659,33 @@ function ChatRoomAdmin(data, socket) {
 				ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, Acc.Name + " set the room to " + (Acc.ChatRoom.Private ? " private" : " public" ) + ".", "Action");
 				ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber);
 			}
-			else if(data.Action == "Lock") {
+			else if (data.Action == "Lock") {
 				Acc.ChatRoom.Locked = !Acc.ChatRoom.Locked
 				ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, Acc.Name + (Acc.ChatRoom.Locked ? " locked" : " unlocked" ) + " the room.", "Action");
 				ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber);
 			}
-			else if(data.Action == "Update") {
-				if ((data.Room != null)  && (typeof data.Room === "object") && (data.Room.Name != null) && (data.Room.Description != null) && (data.Room.Background != null) && (typeof data.Room.Name === "string") && (typeof data.Room.Description === "string") && (typeof data.Room.Background === "string") && (!data.Room.Admin.some(i => !Number.isInteger(i))) && (!data.Room.Ban.some(i => !Number.isInteger(i)))) {
+			else if (data.Action == "Update") {
+				if ((data.Room != null) && (typeof data.Room === "object") && (data.Room.Name != null) && (data.Room.Description != null) && (data.Room.Background != null) && (typeof data.Room.Name === "string") && (typeof data.Room.Description === "string") && (typeof data.Room.Background === "string") && (!data.Room.Admin.some(i => !Number.isInteger(i))) && (!data.Room.Ban.some(i => !Number.isInteger(i)))) {
 					data.Room.Name = data.Room.Name.trim();
-						var LN = /^[a-zA-Z0-9 ]+$/;
-						if (data.Room.Name.match(LN) && (data.Room.Name.length >= 1) && (data.Room.Name.length <= 20) && (data.Room.Description.length <= 100) && (data.Room.Background.length <= 100)) {
-							for (var C = 0; C < ChatRoom.length; C++)
-								if (Acc.ChatRoom.Name != data.Room.Name && ChatRoom[C].Name.toUpperCase().trim() == data.Room.Name.toUpperCase().trim()) {
-									socket.emit("ChatRoomUpdateResponse", "RoomAlreadyExist");
-									return;
-								}
-								try {
-									Acc.ChatRoom.Name = data.Room.Name;
-									Acc.ChatRoom.Background = data.Room.Background;
-									Acc.ChatRoom.Description = data.Room.Description;
-									Acc.ChatRoom.Ban = data.Room.Ban;
-									Acc.ChatRoom.Admin = data.Room.Admin;
-									Acc.ChatRoom.Limit = ((data.Room.Limit == null) || (typeof data.Room.Limit !== "string") || isNaN(parseInt(data.Room.Limit)) || (parseInt(data.Room.Limit) < 2) || (parseInt(data.Room.Limit) > 10)) ? 10 : parseInt(data.Room.Limit);
-									socket.emit("ChatRoomUpdateResponse", "Updated");
-									ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, Acc.Name + " updated the room settings.", "Action");
-									ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber);
-									return;
-								}
-								catch(err) {
-									socket.emit("ChatRoomUpdateResponse", "UpdateError");
-									return;
-								} 
-					}else socket.emit("ChatRoomUpdateResponse", "InvalidRoomData");
-				}else socket.emit("ChatRoomUpdateResponse", "InvalidRoomData");
+					var LN = /^[a-zA-Z0-9 ]+$/;
+					if (data.Room.Name.match(LN) && (data.Room.Name.length >= 1) && (data.Room.Name.length <= 20) && (data.Room.Description.length <= 100) && (data.Room.Background.length <= 100)) {
+						for (var C = 0; C < ChatRoom.length; C++)
+							if (Acc.ChatRoom.Name != data.Room.Name && ChatRoom[C].Name.toUpperCase().trim() == data.Room.Name.toUpperCase().trim()) {
+								socket.emit("ChatRoomUpdateResponse", "RoomAlreadyExist");
+								return;
+							}
+						Acc.ChatRoom.Name = data.Room.Name;
+						Acc.ChatRoom.Background = data.Room.Background;
+						Acc.ChatRoom.Description = data.Room.Description;
+						Acc.ChatRoom.Ban = data.Room.Ban;
+						Acc.ChatRoom.Admin = data.Room.Admin;
+						Acc.ChatRoom.Limit = ((data.Room.Limit == null) || (typeof data.Room.Limit !== "string") || isNaN(parseInt(data.Room.Limit)) || (parseInt(data.Room.Limit) < 2) || (parseInt(data.Room.Limit) > 10)) ? 10 : parseInt(data.Room.Limit);
+						socket.emit("ChatRoomUpdateResponse", "Updated");
+						ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, Acc.Name + " updated the room settings.", "Action");
+						ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber);
+						return;
+					} else socket.emit("ChatRoomUpdateResponse", "InvalidRoomData");
+				} else socket.emit("ChatRoomUpdateResponse", "InvalidRoomData");
 			}
 
 			// If the account to act upon is in the room, an administrator can ban, kick, promote or demote him
