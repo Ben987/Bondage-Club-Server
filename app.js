@@ -674,7 +674,7 @@ function ChatRoomAdmin(data, socket) {
 						if ((data.Room.Private != null) && (typeof data.Room.Private === "boolean")) Acc.ChatRoom.Private = data.Room.Private;
 						if ((data.Room.Locked != null) && (typeof data.Room.Locked === "boolean")) Acc.ChatRoom.Locked = data.Room.Locked;
 						socket.emit("ChatRoomUpdateResponse", "Updated");
-						if ((Acc != null) && (Acc.ChatRoom != null)) ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, Acc.Name + " updated the room settings.  Name: " + Acc.ChatRoom.Name + ".  Limit: " + Acc.ChatRoom.Limit + ".  " + (Acc.ChatRoom.Private ? "Room is private.  " : "") + (Acc.ChatRoom.Private ? "Room is locked.  " : ""), "ServerMessage");
+						if ((Acc != null) && (Acc.ChatRoom != null)) ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, Acc.Name + " updated the room.  Name: " + Acc.ChatRoom.Name + ".  Limit: " + Acc.ChatRoom.Limit + (Acc.ChatRoom.Private ? ".  Private." : ".  Public.") + (Acc.ChatRoom.Locked ? "  Locked." : "  Unlocked."), "Action");
 						if ((Acc != null) && (Acc.ChatRoom != null)) ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber);
 						return;
 					} else socket.emit("ChatRoomUpdateResponse", "InvalidRoomData");
