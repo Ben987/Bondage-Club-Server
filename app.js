@@ -204,7 +204,7 @@ function AccountLogin(data, socket) {
 						for (var A = 0; A < Account.length; A++)
 							if ((Account[A].AccountName == result.AccountName) && (Account[A].ID != socket.id)) {
 								Account[A].Socket.emit("ForceDisconnect", "ErrorDuplicatedLogin");
-								AccountRemove(Account[A].ID);
+								if (Account[A] != null) AccountRemove(Account[A].ID);
 								break;
 							}
 
