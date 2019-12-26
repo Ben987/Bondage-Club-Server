@@ -554,17 +554,17 @@ function ChatRoomLeave(socket) {
 }
 
 // Sends a text message to everyone in the room
-function ChatRoomMessage(CR, Sender, Content, Type, Target) {
+function ChatRoomMessage(CR, Sender, Content, Type, Target, Dictionary) {
 	if (CR != null)
 		for (var A = 0; A < CR.Account.length; A++)
 			if (Target == null) {
-				CR.Account[A].Socket.emit("ChatRoomMessage", { Sender: Sender, Content: Content, Type: Type } );
+				CR.Account[A].Socket.emit("ChatRoomMessage", { Sender: Sender, Content: Content, Type: Type, Dictionary: Dictionary } );
 			} else {
 
 				// A player cannot whisper to a another player if she's on her blacklist
 				if (Target == CR.Account[A].MemberNumber) {
 					if ((CR.Account[A].BlackList == null) || !Array.isArray(CR.Account[A].BlackList) || (CR.Account[A].BlackList.indexOf(Sender) < 0))
-						CR.Account[A].Socket.emit("ChatRoomMessage", { Sender: Sender, Content: Content, Type: Type } );
+						CR.Account[A].Socket.emit("ChatRoomMessage", { Sender: Sender, Content: Content, Type: Type, Dictionary: Dictionary } );
 					else
 						for (var S = 0; S < CR.Account.length; S++)
 							if (Sender == CR.Account[S].MemberNumber)
@@ -579,7 +579,7 @@ function ChatRoomMessage(CR, Sender, Content, Type, Target) {
 function ChatRoomChat(data, socket) {
 	if ((data != null) && (typeof data === "object") && (data.Content != null) && (data.Type != null) && (typeof data.Content === "string") && (typeof data.Type === "string") && (ChatRoomMessageType.indexOf(data.Type) >= 0) && (data.Content.length <= 1000)) {
 		var Acc = AccountGet(socket.id);
-		if (Acc != null) ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, data.Content.trim(), data.Type, data.Target);
+		if (Acc != null) ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, data.Content.trim(), data.Type, data.Target, data.Dictionary);
 	}
 }
 
