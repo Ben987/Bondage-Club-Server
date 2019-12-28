@@ -345,7 +345,7 @@ function AccountRemove(ID) {
 	if (ID != null)
 		for (var P = 0; P < Account.length; P++)
 			if (Account[P].ID == ID) {
-				ChatRoomRemove(Account[P], "disconnected");
+				ChatRoomRemove(Account[P], "ServerDisconnect", []);
 				if (Account[P] != null) console.log("Disconnecting account: " + Account[P].AccountName + " ID: " + ID.toString());
 				Account.splice(P, 1);
 				break;
@@ -437,7 +437,7 @@ function ChatRoomCreate(data, socket) {
 			// Finds the account and links it to the new room
 			var Acc = AccountGet(socket.id);
 			if (Acc != null) {
-				ChatRoomRemove(Acc, "left");
+				ChatRoomRemove(Acc, "ServerLeave", []);
 				var NewRoom = {
 					Name: data.Name,
 					Description: data.Description,
@@ -478,7 +478,7 @@ function ChatRoomJoin(data, socket) {
 		if (Acc != null) {
 
 			// Removes it from it's current room if needed
-			ChatRoomRemove(Acc, "left");
+			ChatRoomRemove(Acc, "ServerLeave", []);
 
 			// Finds the room and join it
 			for (var C = 0; C < ChatRoom.length; C++)
@@ -493,7 +493,7 @@ function ChatRoomJoin(data, socket) {
 									ChatRoom[C].Account.push(Acc);
 									socket.emit("ChatRoomSearchResponse", "JoinedRoom");
 									ChatRoomSync(ChatRoom[C], Acc.MemberNumber);
-									ChatRoomMessage(ChatRoom[C], Acc.MemberNumber, Acc.Name + " entered.", "Action");
+									ChatRoomMessage(ChatRoom[C], Acc.MemberNumber, "ServerEnter", "Action", null, [{Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber}]);
 									return;
 								} else {
 									socket.emit("ChatRoomSearchResponse", "RoomLocked");
@@ -520,7 +520,7 @@ function ChatRoomJoin(data, socket) {
 }
 
 // Removes a player from a room
-function ChatRoomRemove(Acc, Reason) {
+function ChatRoomRemove(Acc, Reason, Dictionary) {
 	if (Acc.ChatRoom != null) {
 
 		// Removes it from the chat room array
@@ -539,7 +539,8 @@ function ChatRoomRemove(Acc, Reason) {
 					break;
 				}
 		} else {
-			ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, Acc.Name + " " + Reason + ".", "Action");
+			Dictionary.unshift({Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber});
+			ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, Reason, "Action", null, Dictionary);
 			ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber);
 		}
 		Acc.ChatRoom = null;
@@ -550,7 +551,7 @@ function ChatRoomRemove(Acc, Reason) {
 // Finds the current account and removes it from it's chat room, nothing is returned to the client
 function ChatRoomLeave(socket) {
 	var Acc = AccountGet(socket.id);
-	if (Acc != null) ChatRoomRemove(Acc, "left");
+	if (Acc != null) ChatRoomRemove(Acc, "ServerLeave", []);
 }
 
 // Sends a text message to everyone in the room
@@ -560,7 +561,6 @@ function ChatRoomMessage(CR, Sender, Content, Type, Target, Dictionary) {
 			if (Target == null) {
 				CR.Account[A].Socket.emit("ChatRoomMessage", { Sender: Sender, Content: Content, Type: Type, Dictionary: Dictionary } );
 			} else {
-
 				// A player cannot whisper to a another player if she's on her blacklist
 				if (Target == CR.Account[A].MemberNumber) {
 					if ((CR.Account[A].BlackList == null) || !Array.isArray(CR.Account[A].BlackList) || (CR.Account[A].BlackList.indexOf(Sender) < 0))
@@ -674,7 +674,15 @@ function ChatRoomAdmin(data, socket) {
 						if ((data.Room.Private != null) && (typeof data.Room.Private === "boolean")) Acc.ChatRoom.Private = data.Room.Private;
 						if ((data.Room.Locked != null) && (typeof data.Room.Locked === "boolean")) Acc.ChatRoom.Locked = data.Room.Locked;
 						socket.emit("ChatRoomUpdateResponse", "Updated");
-						if ((Acc != null) && (Acc.ChatRoom != null)) ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, Acc.Name + " updated the room.  Name: " + Acc.ChatRoom.Name + ".  Limit: " + Acc.ChatRoom.Limit + (Acc.ChatRoom.Private ? ".  Private." : ".  Public.") + (Acc.ChatRoom.Locked ? "  Locked." : "  Unlocked."), "Action");
+						if ((Acc != null) && (Acc.ChatRoom != null)) {
+							var Dictionary = [];
+							Dictionary.push({Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber})
+							Dictionary.push({Tag: "ChatRoomName", Text: Acc.ChatRoom.Name})
+							Dictionary.push({Tag: "ChatRoomLimit", Text: Acc.ChatRoom.Limit})
+							Dictionary.push({Tag: "ChatRoomPrivacy", TextToLookUp: (Acc.ChatRoom.Private ? "Private" : "Public")})
+							Dictionary.push({Tag: "ChatRoomLocked", TextToLookUp: (Acc.ChatRoom.Locked ? "Locked" : "Unlocked")})
+							ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "ServerUpdateRoom", "Action", null, Dictionary);
+						}
 						if ((Acc != null) && (Acc.ChatRoom != null)) ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber);
 						return;
 					} else socket.emit("ChatRoomUpdateResponse", "InvalidRoomData");
@@ -683,37 +691,48 @@ function ChatRoomAdmin(data, socket) {
 			// If the account to act upon is in the room, an administrator can ban, kick, promote or demote him
 			for (var A = 0; A < Acc.ChatRoom.Account.length; A++)
 				if (Acc.ChatRoom.Account[A].MemberNumber == data.MemberNumber) {
+					var Dictionary = [];
 					if (data.Action == "Ban") {
 						Acc.ChatRoom.Ban.push(data.MemberNumber);
 						Acc.ChatRoom.Account[A].Socket.emit("ChatRoomSearchResponse", "RoomBanned");
-						ChatRoomRemove(Acc.ChatRoom.Account[A], "was banned by " + Acc.Name);
+						Dictionary.push({Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber});
+						ChatRoomRemove(Acc.ChatRoom.Account[A], "ServerBan", Dictionary);
 					}
 					else if (data.Action == "Kick") {
 						Acc.ChatRoom.Account[A].Socket.emit("ChatRoomSearchResponse", "RoomKicked");
-						ChatRoomRemove(Acc.ChatRoom.Account[A], "was kicked-out by " + Acc.Name);
+						Dictionary.push({Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber});
+						ChatRoomRemove(Acc.ChatRoom.Account[A], "ServerKick", Dictionary);
 					}
 					else if ((data.Action == "MoveLeft") && (A != 0)) {
 						var MovedAccount = Acc.ChatRoom.Account[A];
 						Acc.ChatRoom.Account[A] = Acc.ChatRoom.Account[A - 1];
 						Acc.ChatRoom.Account[A - 1] = MovedAccount;
-						ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, MovedAccount.Name + " was moved to the left by " + Acc.Name + ".", "Action");
+						Dictionary.push({Tag: "SourceCharacter", Text: MovedAccount.Name, MemberNumber: MovedAccount.MemberNumber});
+						Dictionary.push({Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber});
+						ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "ServerMoveLeft", "Action", null, Dictionary);
 						ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber);
 					}
 					else if ((data.Action == "MoveRight") && (A < Acc.ChatRoom.Account.length - 1)) {
 						var MovedAccount = Acc.ChatRoom.Account[A];
 						Acc.ChatRoom.Account[A] = Acc.ChatRoom.Account[A + 1];
 						Acc.ChatRoom.Account[A + 1] = MovedAccount;
-						ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, MovedAccount.Name + " was moved to the right by " + Acc.Name + ".", "Action");
+						Dictionary.push({Tag: "SourceCharacter", Text: MovedAccount.Name, MemberNumber: MovedAccount.MemberNumber});
+						Dictionary.push({Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber});
+						ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "ServerMoveRight", "Action", null, Dictionary);
 						ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber);
 					}
 					else if ((data.Action == "Promote") && (Acc.ChatRoom.Admin.indexOf(Acc.ChatRoom.Account[A].MemberNumber) < 0)) {
 						Acc.ChatRoom.Admin.push(Acc.ChatRoom.Account[A].MemberNumber);
-						ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, Acc.ChatRoom.Account[A].Name + " was promoted to administrator by " + Acc.Name + ".", "Action");
+						Dictionary.push({Tag: "SourceCharacter", Text: Acc.ChatRoom.Account[A].Name, MemberNumber: Acc.ChatRoom.Account[A].MemberNumber});
+						Dictionary.push({Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber});
+						ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "ServerPromoteAdmin", "Action", null, Dictionary);
 						ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber);
 					}
 					else if ((data.Action == "Demote") && (Acc.ChatRoom.Admin.indexOf(Acc.ChatRoom.Account[A].MemberNumber) >= 0)) {
 						Acc.ChatRoom.Admin.splice(Acc.ChatRoom.Admin.indexOf(Acc.ChatRoom.Account[A].MemberNumber), 1);
-						ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, Acc.ChatRoom.Account[A].Name + " was demoted from administration by " + Acc.Name + ".", "Action");
+						Dictionary.push({Tag: "SourceCharacter", Text: Acc.ChatRoom.Account[A].Name, MemberNumber: Acc.ChatRoom.Account[A].MemberNumber});
+						Dictionary.push({Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber});
+						ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "ServerDemoteAdmin", "Action", null, Dictionary);
 						ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber);
 					}
 					return;
