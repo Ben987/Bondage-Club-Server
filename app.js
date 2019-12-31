@@ -2,7 +2,7 @@
 
 // Main game objects
 var App = require("http").createServer();
-var IO = require("socket.io")(App);
+var IO = require("socket.io")(App, {"maxHttpBufferSize": 100000});
 var BCrypt = require("bcrypt");
 var Account = [];
 var ChatRoom = [];
