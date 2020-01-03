@@ -744,7 +744,7 @@ function ChatRoomAdmin(data, socket) {
 			} else return;
 
 			if ((Acc != null) && (Acc.ChatRoom != null)) {
-				if (A >= 0) ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "ServerAdmin" + data.Action, "Action", null, Dictionary);
+				if ((A >= 0) && (data.Action != "Unban")) ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "ServerAdmin" + data.Action, "Action", null, Dictionary);
 				ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber);
 			}
 		}
