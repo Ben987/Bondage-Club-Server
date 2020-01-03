@@ -652,101 +652,101 @@ function ChatRoomAdmin(data, socket) {
 
 		// Validates that the current account is a room administrator
 		var Acc = AccountGet(socket.id);
-		if ((Acc == null) || (Acc.ChatRoom == null) || !Acc.ChatRoom.Admin.includes(Acc.MemberNumber))
-			return;
+		if ((Acc != null) && (Acc.ChatRoom != null) && (Acc.ChatRoom.Admin.indexOf(Acc.MemberNumber) >= 0)) {
 
-		var Dictionary = [{ Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber }];
+			var Dictionary = [{ Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber }];
 
-		// An administrator can update lots of room data.  The room values are sent back to the clients.
-		if (data.Action == "Update") {
-			if ((data.Room != null) && (typeof data.Room === "object") && (data.Room.Name != null) && (data.Room.Description != null) && (data.Room.Background != null) && (typeof data.Room.Name === "string") && (typeof data.Room.Description === "string") && (typeof data.Room.Background === "string") && (!data.Room.Admin.some(i => !Number.isInteger(i))) && (!data.Room.Ban.some(i => !Number.isInteger(i)))) {
-				data.Room.Name = data.Room.Name.trim();
-				var LN = /^[a-zA-Z0-9 ]+$/;
-				if (data.Room.Name.match(LN) && (data.Room.Name.length >= 1) && (data.Room.Name.length <= 20) && (data.Room.Description.length <= 100) && (data.Room.Background.length <= 100)) {
-					for (var C = 0; C < ChatRoom.length; C++)
-						if (Acc.ChatRoom.Name != data.Room.Name && ChatRoom[C].Name.toUpperCase().trim() == data.Room.Name.toUpperCase().trim()) {
-							socket.emit("ChatRoomUpdateResponse", "RoomAlreadyExist");
-							return;
+			// An administrator can update lots of room data.  The room values are sent back to the clients.
+			if (data.Action == "Update") {
+				if ((data.Room != null) && (typeof data.Room === "object") && (data.Room.Name != null) && (data.Room.Description != null) && (data.Room.Background != null) && (typeof data.Room.Name === "string") && (typeof data.Room.Description === "string") && (typeof data.Room.Background === "string") && (!data.Room.Admin.some(i => !Number.isInteger(i))) && (!data.Room.Ban.some(i => !Number.isInteger(i)))) {
+					data.Room.Name = data.Room.Name.trim();
+					var LN = /^[a-zA-Z0-9 ]+$/;
+					if (data.Room.Name.match(LN) && (data.Room.Name.length >= 1) && (data.Room.Name.length <= 20) && (data.Room.Description.length <= 100) && (data.Room.Background.length <= 100)) {
+						for (var C = 0; C < ChatRoom.length; C++)
+							if (Acc.ChatRoom.Name != data.Room.Name && ChatRoom[C].Name.toUpperCase().trim() == data.Room.Name.toUpperCase().trim()) {
+								socket.emit("ChatRoomUpdateResponse", "RoomAlreadyExist");
+								return;
+							}
+						Acc.ChatRoom.Name = data.Room.Name;
+						Acc.ChatRoom.Background = data.Room.Background;
+						Acc.ChatRoom.Description = data.Room.Description;
+						Acc.ChatRoom.Ban = [...new Set(data.Room.Ban)];
+						Acc.ChatRoom.Admin = [...new Set(data.Room.Admin)];
+						Acc.ChatRoom.Limit = ((data.Room.Limit == null) || (typeof data.Room.Limit !== "string") || isNaN(parseInt(data.Room.Limit)) || (parseInt(data.Room.Limit) < 2) || (parseInt(data.Room.Limit) > 10)) ? 10 : parseInt(data.Room.Limit);
+						if ((data.Room.Private != null) && (typeof data.Room.Private === "boolean")) Acc.ChatRoom.Private = data.Room.Private;
+						if ((data.Room.Locked != null) && (typeof data.Room.Locked === "boolean")) Acc.ChatRoom.Locked = data.Room.Locked;
+						socket.emit("ChatRoomUpdateResponse", "Updated");
+						if ((Acc != null) && (Acc.ChatRoom != null)) {
+							Dictionary.push({ Tag: "ChatRoomName", Text: Acc.ChatRoom.Name });
+							Dictionary.push({ Tag: "ChatRoomLimit", Text: Acc.ChatRoom.Limit });
+							Dictionary.push({ Tag: "ChatRoomPrivacy", TextToLookUp: (Acc.ChatRoom.Private ? "Private" : "Public") });
+							Dictionary.push({ Tag: "ChatRoomLocked", TextToLookUp: (Acc.ChatRoom.Locked ? "Locked" : "Unlocked") });
+							ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "ServerUpdateRoom", "Action", null, Dictionary);
 						}
-					Acc.ChatRoom.Name = data.Room.Name;
-					Acc.ChatRoom.Background = data.Room.Background;
-					Acc.ChatRoom.Description = data.Room.Description;
-					Acc.ChatRoom.Ban = [...new Set(data.Room.Ban)];
-					Acc.ChatRoom.Admin = [...new Set(data.Room.Admin)];
-					Acc.ChatRoom.Limit = ((data.Room.Limit == null) || (typeof data.Room.Limit !== "string") || isNaN(parseInt(data.Room.Limit)) || (parseInt(data.Room.Limit) < 2) || (parseInt(data.Room.Limit) > 10)) ? 10 : parseInt(data.Room.Limit);
-					if ((data.Room.Private != null) && (typeof data.Room.Private === "boolean")) Acc.ChatRoom.Private = data.Room.Private;
-					if ((data.Room.Locked != null) && (typeof data.Room.Locked === "boolean")) Acc.ChatRoom.Locked = data.Room.Locked;
-					socket.emit("ChatRoomUpdateResponse", "Updated");
-					if ((Acc != null) && (Acc.ChatRoom != null)) {
-						Dictionary.push({ Tag: "ChatRoomName", Text: Acc.ChatRoom.Name });
-						Dictionary.push({ Tag: "ChatRoomLimit", Text: Acc.ChatRoom.Limit });
-						Dictionary.push({ Tag: "ChatRoomPrivacy", TextToLookUp: (Acc.ChatRoom.Private ? "Private" : "Public") });
-						Dictionary.push({ Tag: "ChatRoomLocked", TextToLookUp: (Acc.ChatRoom.Locked ? "Locked" : "Unlocked") });
-						ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "ServerUpdateRoom", "Action", null, Dictionary);
-					}
-					if ((Acc != null) && (Acc.ChatRoom != null)) ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber);
-					return;
+						if ((Acc != null) && (Acc.ChatRoom != null)) ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber);
+						return;
+					} else socket.emit("ChatRoomUpdateResponse", "InvalidRoomData");
 				} else socket.emit("ChatRoomUpdateResponse", "InvalidRoomData");
-			} else socket.emit("ChatRoomUpdateResponse", "InvalidRoomData");
-		} else return;
+			} else return;
 
-		// If the account to act upon is in the room, an administrator can ban, kick, promote or demote him
+			// If the account to act upon is in the room, an administrator can ban, kick, promote or demote him
 
-		if (typeof data.MemberNumber !== "number") return;
+			if (typeof data.MemberNumber !== "number") return;
 
-		// some actions can not be done on the source account
-		if ((Acc.MemberNumber == data.MemberNumber) && ["Ban", "Kick", "Unban", "Promote", "Demote"].includes(data.Action)) return;
+			// some actions can not be done on the source account
+			if ((Acc.MemberNumber == data.MemberNumber) && ["Ban", "Kick", "Unban", "Promote", "Demote"].includes(data.Action)) return;
 
-		var A = Acc.ChatRoom.Account.findIndex(A => A.MemberNumber == data.MemberNumber);
-		if (A >= 0) Dictionary.push({ Tag: "TargetCharacterName", Text: Acc.ChatRoom.Account[A].Name, MemberNumber: data.MemberNumber });
+			var A = Acc.ChatRoom.Account.findIndex(A => A.MemberNumber == data.MemberNumber);
+			if (A >= 0) Dictionary.push({ Tag: "TargetCharacterName", Text: Acc.ChatRoom.Account[A].Name, MemberNumber: data.MemberNumber });
 
-		var B = (typeof data.TargetMemberNumber !== "number") ? -1 : Acc.ChatRoom.Account.findIndex(B => B.MemberNumber == data.TargetMemberNumber);
-		if (B >= 0) Dictionary.push({ Tag: "TargetCharacterName", Text: Acc.ChatRoom.Account[B].Name, MemberNumber: data.TargetMemberNumber });
+			var B = (typeof data.TargetMemberNumber !== "number") ? -1 : Acc.ChatRoom.Account.findIndex(B => B.MemberNumber == data.TargetMemberNumber);
+			if (B >= 0) Dictionary.push({ Tag: "TargetCharacterName", Text: Acc.ChatRoom.Account[B].Name, MemberNumber: data.TargetMemberNumber });
 
-		if (data.Action == "Ban") {
-			if (!Acc.ChatRoom.Ban.includes(data.MemberNumber)) Acc.ChatRoom.Ban.push(data.MemberNumber);
-			if (A >= 0) {
-				Acc.ChatRoom.Account[A].Socket.emit("ChatRoomSearchResponse", "RoomBanned");
-				ChatRoomRemove(Acc.ChatRoom.Account[A], "ServerBan", Dictionary);
+			if (data.Action == "Ban") {
+				if (!Acc.ChatRoom.Ban.includes(data.MemberNumber)) Acc.ChatRoom.Ban.push(data.MemberNumber);
+				if (A >= 0) {
+					Acc.ChatRoom.Account[A].Socket.emit("ChatRoomSearchResponse", "RoomBanned");
+					ChatRoomRemove(Acc.ChatRoom.Account[A], "ServerBan", Dictionary);
+				}
+				return;
+			} else if (data.Action == "Kick") {
+				if (A >= 0) {
+					Acc.ChatRoom.Account[A].Socket.emit("ChatRoomSearchResponse", "RoomKicked");
+					ChatRoomRemove(Acc.ChatRoom.Account[A], "ServerKick", Dictionary);
+				}
+				return;
+			} else if (data.Action == "Unban") {
+				Acc.ChatRoom.Ban = Acc.ChatRoom.Ban.filter(N => N != data.MemberNumber);
+			} else if (data.Action == "Promote") {
+				if (!Acc.ChatRoom.Admin.includes(data.MemberNumber)) Acc.ChatRoom.Admin.push(data.MemberNumber);
+			} else if (data.Action == "Demote") {
+				Acc.ChatRoom.Admin = Acc.ChatRoom.Admin.filter(N => N != data.MemberNumber);
+			} else if (data.Action == "MoveLeft") {
+				if (A >= 0 && A != 0)
+					Acc.ChatRoom.Account[A] = Acc.ChatRoom.Account.splice(A - 1, 1, Acc.ChatRoom.Account[A])[0];
+				else return;
+			} else if (data.Action == "MoveRight") {
+				if (A >= 0 && A < Acc.ChatRoom.Account.length - 1)
+					Acc.ChatRoom.Account[A] = Acc.ChatRoom.Account.splice(A + 1, 1, Acc.ChatRoom.Account[A])[0];
+				else return;
+			} else if (data.Action == "MoveLeftOf") {
+				if (A >= 0 && B >= 0 && A != B - 1)
+					Acc.ChatRoom.Account.splice((A > B) ? B : B - 1, 0, Acc.ChatRoom.Account.splice(A, 1)[0]);
+				else return;
+			} else if (data.Action == "MoveRightOf") {
+				if (A >= 0 && B >= 0 && A != B + 1)
+					Acc.ChatRoom.Account.splice((A > B) ? B + 1 : B, 0, Acc.ChatRoom.Account.splice(A, 1)[0]);
+				else return;
+			} else if (data.Action == "Swap") {
+				if (A >= 0 && B >= 0 && B != A)
+					Acc.ChatRoom.Account[A] = Acc.ChatRoom.Account.splice(B, 1, Acc.ChatRoom.Account[A])[0];
+				else return;
+			} else return;
+
+			if ((Acc != null) && (Acc.ChatRoom != null)) {
+				if (A >= 0) ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "ServerAdmin" + data.Action, "Action", null, Dictionary);
+				ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber);
 			}
-			return;
-		} else if (data.Action == "Kick") {
-			if (A >= 0) {
-				Acc.ChatRoom.Account[A].Socket.emit("ChatRoomSearchResponse", "RoomKicked");
-				ChatRoomRemove(Acc.ChatRoom.Account[A], "ServerKick", Dictionary);
-			}
-			return;
-		} else if (data.Action == "Unban") {
-			Acc.ChatRoom.Ban = Acc.ChatRoom.Ban.filter(N => N != data.MemberNumber);
-		} else if (data.Action == "Promote") {
-			if (!Acc.ChatRoom.Admin.includes(data.MemberNumber)) Acc.ChatRoom.Admin.push(data.MemberNumber);
-		} else if (data.Action == "Demote") {
-			Acc.ChatRoom.Admin = Acc.ChatRoom.Admin.filter(N => N != data.MemberNumber);
-		} else if (data.Action == "MoveLeft") {
-			if (A >= 0 && A != 0)
-				Acc.ChatRoom.Account[A] = Acc.ChatRoom.Account.splice(A - 1, 1, Acc.ChatRoom.Account[A])[0];
-			else return;
-		} else if (data.Action == "MoveRight") {
-			if (A >= 0 && A < Acc.ChatRoom.Account.length - 1)
-				Acc.ChatRoom.Account[A] = Acc.ChatRoom.Account.splice(A + 1, 1, Acc.ChatRoom.Account[A])[0];
-			else return;
-		} else if (data.Action == "MoveLeftOf") {
-			if (A >= 0 && B >= 0 && A != B - 1)
-				Acc.ChatRoom.Account.splice((A > B) ? B : B - 1, 0, Acc.ChatRoom.Account.splice(A, 1)[0]);
-			else return;
-		} else if (data.Action == "MoveRightOf") {
-			if (A >= 0 && B >= 0 && A != B + 1)
-				Acc.ChatRoom.Account.splice((A > B) ? B + 1 : B, 0, Acc.ChatRoom.Account.splice(A, 1)[0]);
-			else return;
-		} else if (data.Action == "Swap") {
-			if (A >= 0 && B >= 0 && B != A)
-				Acc.ChatRoom.Account[A] = Acc.ChatRoom.Account.splice(B, 1, Acc.ChatRoom.Account[A])[0];
-			else return;
-		} else return;
-
-		if ((Acc != null) && (Acc.ChatRoom != null)) {
-			if (A >= 0) ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "ServerAdmin" + data.Action, "Action", null, Dictionary);
-			ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber);
 		}
 	}
 }
