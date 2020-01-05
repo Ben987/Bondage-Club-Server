@@ -2,7 +2,8 @@
 
 // Main game objects
 var App = require("http").createServer();
-var IO = require("socket.io")(App, {"maxHttpBufferSize": 100000});
+var DefaultOrigins = "http://www.bondageprojects.com:* https://www.bondageprojects.com:* http://bondageprojects.com:* https://bondageprojects.com:* http://www.bondageprojects.elementfx.com:* https://www.bondageprojects.elementfx.com:* http://bondageprojects.elementfx.com:* https://bondageprojects.elementfx.com:* http://127.0.0.1:* http://localhost:*";
+var IO = require("socket.io")(App, { origins: process.env.ORIGINS || DefaultOrigins, maxHttpBufferSize: 100000 } );
 var BCrypt = require("bcrypt");
 var Account = [];
 var ChatRoom = [];
@@ -688,7 +689,7 @@ function ChatRoomAdmin(data, socket) {
 					} else socket.emit("ChatRoomUpdateResponse", "InvalidRoomData");
 				} else socket.emit("ChatRoomUpdateResponse", "InvalidRoomData");
 
-			// If the account to act upon is in the room, an administrator can ban, kick, promote or demote him
+			// If the account to act upon is in the room, an administrator can ban, kick, move, promote or demote him
 			for (var A = 0; A < Acc.ChatRoom.Account.length; A++)
 				if (Acc.ChatRoom.Account[A].MemberNumber == data.MemberNumber) {
 					var Dictionary = [];
@@ -709,7 +710,7 @@ function ChatRoomAdmin(data, socket) {
 						Acc.ChatRoom.Account[A - 1] = MovedAccount;
 						Dictionary.push({Tag: "TargetCharacterName", Text: MovedAccount.Name, MemberNumber: MovedAccount.MemberNumber});
 						Dictionary.push({Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber});
-						ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "ServerMoveLeft", "Action", null, Dictionary);
+						if ((data.Publish != null) && (typeof data.Publish === "boolean") && data.Publish) ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "ServerMoveLeft", "Action", null, Dictionary);
 						ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber);
 					}
 					else if ((data.Action == "MoveRight") && (A < Acc.ChatRoom.Account.length - 1)) {
@@ -718,7 +719,7 @@ function ChatRoomAdmin(data, socket) {
 						Acc.ChatRoom.Account[A + 1] = MovedAccount;
 						Dictionary.push({Tag: "TargetCharacterName", Text: MovedAccount.Name, MemberNumber: MovedAccount.MemberNumber});
 						Dictionary.push({Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber});
-						ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "ServerMoveRight", "Action", null, Dictionary);
+						if ((data.Publish != null) && (typeof data.Publish === "boolean") && data.Publish) ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "ServerMoveRight", "Action", null, Dictionary);
 						ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber);
 					}
 					else if ((data.Action == "Promote") && (Acc.ChatRoom.Admin.indexOf(Acc.ChatRoom.Account[A].MemberNumber) < 0)) {
