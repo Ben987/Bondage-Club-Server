@@ -540,7 +540,7 @@ function ChatRoomRemove(Acc, Reason, Dictionary) {
 					break;
 				}
 		} else {
-			Dictionary.push({Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber});
+			if (!Dictionary || (Dictionary.length == 0)) Dictionary.push({Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber});
 			ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, Reason, "Action", null, Dictionary);
 			ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber);
 		}
@@ -696,12 +696,14 @@ function ChatRoomAdmin(data, socket) {
 					if (data.Action == "Ban") {
 						Acc.ChatRoom.Ban.push(data.MemberNumber);
 						Acc.ChatRoom.Account[A].Socket.emit("ChatRoomSearchResponse", "RoomBanned");
-						Dictionary.push({Tag: "TargetCharacterName", Text: Acc.Name, MemberNumber: Acc.MemberNumber});
+						Dictionary.push({Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber});
+						Dictionary.push({Tag: "TargetCharacterName", Text: Acc.ChatRoom.Account[A].Name, MemberNumber: Acc.ChatRoom.Account[A].MemberNumber});
 						ChatRoomRemove(Acc.ChatRoom.Account[A], "ServerBan", Dictionary);
 					}
 					else if (data.Action == "Kick") {
 						Acc.ChatRoom.Account[A].Socket.emit("ChatRoomSearchResponse", "RoomKicked");
-						Dictionary.push({Tag: "TargetCharacterName", Text: Acc.Name, MemberNumber: Acc.MemberNumber});
+						Dictionary.push({Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber});
+						Dictionary.push({Tag: "TargetCharacterName", Text: Acc.ChatRoom.Account[A].Name, MemberNumber: Acc.ChatRoom.Account[A].MemberNumber});
 						ChatRoomRemove(Acc.ChatRoom.Account[A], "ServerKick", Dictionary);
 					}
 					else if ((data.Action == "MoveLeft") && (A != 0)) {
