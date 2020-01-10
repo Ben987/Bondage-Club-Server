@@ -301,7 +301,7 @@ function AccountQuery(data, socket) {
 				var Index = [];
 				for (var A = 0; A < Account.length; A++)
 					if ((Account[A].Environment == Acc.Environment) && (Account[A].Ownership != null) && (Account[A].Ownership.MemberNumber != null) && (Account[A].Ownership.MemberNumber == Acc.MemberNumber)) {
-						Friends.push({ Type: "Submissive", MemberNumber: Account[A].MemberNumber, MemberName: Account[A].Name, ChatRoomName: (Account[A].ChatRoom == null) ? null : Account[A].ChatRoom.Name });
+						Friends.push({ Type: "Submissive", MemberNumber: Account[A].MemberNumber, MemberName: Account[A].Name, ChatRoomSpace: (Account[A].ChatRoom == null) ? null : Account[A].ChatRoom.Space, ChatRoomName: (Account[A].ChatRoom == null) ? null : Account[A].ChatRoom.Name });
 						Index.push(Account[A].MemberNumber);
 					}
 
