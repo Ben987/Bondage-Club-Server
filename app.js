@@ -44,7 +44,7 @@ var MailTransporter = NodeMailer.createTransport({
 });
 
 // Connects to the Mongo Database
-DatabaseClient.connect(DatabaseURL, { useNewUrlParser: true }, function(err, db) {
+DatabaseClient.connect(DatabaseURL, { useUnifiedTopology: true, useNewUrlParser: true }, function(err, db) {
 	
 	// Keeps the database object
 	if (err) throw err;
@@ -141,6 +141,7 @@ function AccountCreate(data, socket) {
 						data.Password = hash;
 						data.Money = 100;
 						data.Creation = CommonTime();
+						data.LastLogin = CommonTime();
 						data.MemberNumber = NextMemberNumber;
 						NextMemberNumber++;
 						Database.collection("Accounts").insertOne(data, function(err, res) { if (err) throw err; });
@@ -217,6 +218,10 @@ function AccountLogin(data, socket) {
 							Database.collection("Accounts").updateOne({ AccountName : result.AccountName }, { $set: { MemberNumber: result.MemberNumber } }, function(err, res) { if (err) throw err; });
 						}
 
+						// Sets the last login date
+						result.LastLogin = CommonTime();
+						Database.collection("Accounts").updateOne({ AccountName : result.AccountName }, { $set: { LastLogin: result.LastLogin } }, function(err, res) { if (err) throw err; });
+
 						// Logs the account
 						result.ID = socket.id;
 						result.Environment = AccountGetEnvironment(socket);
@@ -258,6 +263,7 @@ function AccountUpdate(data, socket) {
 				delete data.Password;
 				delete data.Email;
 				delete data.Creation;
+				delete data.LastLogin;
 				delete data.Pose;
 				delete data.ActivePose;
 				delete data.ChatRoom;
