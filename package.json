@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "author": "Ben987",
   "engines": {
-    "node": "10.15.1"
+    "node": "12.14.1"
   },
   "repository": "https://github.com/GoogleCloudPlatform/nodejs-getting-started",
   "main": "app.js",
