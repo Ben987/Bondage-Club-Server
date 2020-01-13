@@ -352,6 +352,8 @@ function AccountRemove(Acc) {
 				break;
 			}
 		if (Acc.Socket != null) {
+			Acc.Socket.removeAllListeners("disconnect");
+			Acc.Socket.removeAllListeners("ForceDisconnect");
 			Acc.Socket.disconnect();
 			Acc.Socket = null;
 		}
