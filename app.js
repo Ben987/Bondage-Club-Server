@@ -70,20 +70,6 @@ DatabaseClient.connect(DatabaseURL, { useUnifiedTopology: true, useNewUrlParser:
 				socket.emit("ServerMessage", "Connected to the Bondage Club Server");
 				socket.on("AccountCreate", function (data) { AccountCreate(data, socket) });
 				socket.on("AccountLogin", function (data) { AccountLogin(data, socket) });
-				socket.on("AccountUpdate", function (data) { AccountUpdate(data, socket) });
-				socket.on("AccountQuery", function (data) { AccountQuery(data, socket) });
-				socket.on("AccountBeep", function (data) { AccountBeep(data, socket) });
-				socket.on("AccountOwnership", function(data) { AccountOwnership(data, socket) });
-				socket.on("AccountDisconnect", function () { AccountRemove(socket.id) });
-				socket.on("disconnect", function() { AccountRemove(socket.id) });
-				socket.on("ChatRoomSearch", function(data) { ChatRoomSearch(data, socket) });
-				socket.on("ChatRoomCreate", function(data) { ChatRoomCreate(data, socket) });
-				socket.on("ChatRoomJoin", function(data) { ChatRoomJoin(data, socket) });
-				socket.on("ChatRoomLeave", function() { ChatRoomLeave(socket) });
-				socket.on("ChatRoomChat", function(data) { ChatRoomChat(data, socket) });
-				socket.on("ChatRoomCharacterUpdate", function(data) { ChatRoomCharacterUpdate(data, socket) });
-				socket.on("ChatRoomAdmin", function(data) { ChatRoomAdmin(data, socket) });
-				socket.on("ChatRoomAllowItem", function(data) { ChatRoomAllowItem(data, socket) });
 				socket.on("PasswordReset", function(data) { PasswordReset(data, socket) });
 				socket.on("PasswordResetProcess", function(data) { PasswordResetProcess(data, socket) });
 				AccountSendServerInfo(socket);
@@ -97,6 +83,25 @@ DatabaseClient.connect(DatabaseURL, { useUnifiedTopology: true, useNewUrlParser:
 	});
 	
 });
+
+// Sets up the Account specific Client events
+function AccountElevateSocket(Acc, socket) {
+	Acc.Socket = socket;
+	socket.on("AccountUpdate", function (data) { AccountUpdate(Acc, data, socket) });
+	socket.on("AccountQuery", function (data) { AccountQuery(Acc, data, socket) });
+	socket.on("AccountBeep", function (data) { AccountBeep(Acc, data, socket) });
+	socket.on("AccountOwnership", function(data) { AccountOwnership(Acc, data, socket) });
+	socket.on("AccountDisconnect", function () { AccountRemove(Acc) });
+	socket.on("disconnect", function() { AccountRemove(Acc) });
+	socket.on("ChatRoomSearch", function(data) { ChatRoomSearch(Acc, data, socket) });
+	socket.on("ChatRoomCreate", function(data) { ChatRoomCreate(Acc, data, socket) });
+	socket.on("ChatRoomJoin", function(data) { ChatRoomJoin(Acc, data, socket) });
+	socket.on("ChatRoomLeave", function() { ChatRoomLeave(Acc, socket) });
+	socket.on("ChatRoomChat", function(data) { ChatRoomChat(Acc, data, socket) });
+	socket.on("ChatRoomCharacterUpdate", function(data) { ChatRoomCharacterUpdate(Acc, data, socket) });
+	socket.on("ChatRoomAdmin", function(data) { ChatRoomAdmin(Acc, data, socket) });
+	socket.on("ChatRoomAllowItem", function(data) { ChatRoomAllowItem(Acc, data, socket) });
+}
 
 // Sends the server info to all players or one specific player (socket)
 function AccountSendServerInfo(socket) {
@@ -147,10 +152,10 @@ function AccountCreate(data, socket) {
 						Database.collection("Accounts").insertOne(data, function(err, res) { if (err) throw err; });
 						data.Environment = AccountGetEnvironment(socket);
 						console.log("Creating new account: " + data.AccountName + " ID: " + socket.id.toString() + " " + data.Environment);
-						data.ID = socket.id;
-						data.Socket = socket;
+						data.ID = socket.id;						
 						AccountValidData(data);
 						Account.push(data);
+						AccountElevateSocket(data, socket);
 						socket.emit("CreationResponse", { ServerAnswer: "AccountCreated", OnlineID: data.ID.toString(), MemberNumber: data.MemberNumber } );
 						AccountSendServerInfo(socket);
 					});
@@ -206,7 +211,7 @@ function AccountLogin(data, socket) {
 						for (var A = 0; A < Account.length; A++)
 							if (Account[A].AccountName == result.AccountName) {
 								Account[A].Socket.emit("ForceDisconnect", "ErrorDuplicatedLogin");
-								if (Account[A] != null) AccountRemove(Account[A].ID);
+								if (Account[A] != null) AccountRemove(Account[A]);
 								break;
 							}
 
@@ -230,8 +235,8 @@ function AccountLogin(data, socket) {
 						Account.push(result);
 						result.Password = null;
 						result.Email = null;
+						AccountElevateSocket(result, socket);
 						socket.emit("LoginResponse", result);
-						result.Socket = socket;
 						AccountSendServerInfo(socket);
 
 					} else socket.emit("LoginResponse", "InvalidNamePassword");
@@ -252,178 +257,159 @@ function ObjectEmpty(obj) {
 }
 
 // Updates any account data except the basic ones that cannot change
-function AccountUpdate(data, socket) {
-	if ((data != null) && (typeof data === "object") && !Array.isArray(data))
-		for (var P = 0; P < Account.length; P++)
-			if (Account[P].ID == socket.id) {
-				
-				// Some data is never saved or updated from the client
-				delete data.Name;
-				delete data.AccountName;
-				delete data.Password;
-				delete data.Email;
-				delete data.Creation;
-				delete data.LastLogin;
-				delete data.Pose;
-				delete data.ActivePose;
-				delete data.ChatRoom;
-				delete data.ID;
-				delete data.MemberNumber;
-				delete data.Environment;
-				delete data.Ownership;
-				
-				// Some data is kept for future use
-				if ((data.Inventory != null) && Array.isArray(data.Inventory)) Account[P].Inventory = data.Inventory;
-				if (data.ItemPermission != null) Account[P].ItemPermission = data.ItemPermission;
-				if (data.LabelColor != null) Account[P].LabelColor = data.LabelColor;
-				if (data.Appearance != null) Account[P].Appearance = data.Appearance;
-				if (data.Reputation != null) Account[P].Reputation = data.Reputation;
-				if (data.Description != null) Account[P].Description = data.Description;
-				if ((data.BlockItems != null) && Array.isArray(data.BlockItems)) Account[P].BlockItems = data.BlockItems;
-				if ((data.WhiteList != null) && Array.isArray(data.WhiteList)) Account[P].WhiteList = data.WhiteList;
-				if ((data.BlackList != null) && Array.isArray(data.BlackList)) Account[P].BlackList = data.BlackList;
-				if ((data.FriendList != null) && Array.isArray(data.FriendList)) Account[P].FriendList = data.FriendList;
-				
-				// If we have data to push
-				if (!ObjectEmpty(data)) Database.collection("Accounts").updateOne({ AccountName : Account[P].AccountName }, { $set: data }, function(err, res) { if (err) throw err; });
-				break;
+function AccountUpdate(Acc, data, socket) {
+	if ((Acc != null) && (data != null) && (typeof data === "object") && !Array.isArray(data)) {
 
-			}
+		// Some data is never saved or updated from the client
+		delete data.Name;
+		delete data.AccountName;
+		delete data.Password;
+		delete data.Email;
+		delete data.Creation;
+		delete data.LastLogin;
+		delete data.Pose;
+		delete data.ActivePose;
+		delete data.ChatRoom;
+		delete data.ID;
+		delete data.MemberNumber;
+		delete data.Environment;
+		delete data.Ownership;
+
+		// Some data is kept for future use
+		if ((data.Inventory != null) && Array.isArray(data.Inventory)) Acc.Inventory = data.Inventory;
+		if (data.ItemPermission != null) Acc.ItemPermission = data.ItemPermission;
+		if (data.LabelColor != null) Acc.LabelColor = data.LabelColor;
+		if (data.Appearance != null) Acc.Appearance = data.Appearance;
+		if (data.Reputation != null) Acc.Reputation = data.Reputation;
+		if (data.Description != null) Acc.Description = data.Description;
+		if ((data.BlockItems != null) && Array.isArray(data.BlockItems)) Acc.BlockItems = data.BlockItems;
+		if ((data.WhiteList != null) && Array.isArray(data.WhiteList)) Acc.WhiteList = data.WhiteList;
+		if ((data.BlackList != null) && Array.isArray(data.BlackList)) Acc.BlackList = data.BlackList;
+		if ((data.FriendList != null) && Array.isArray(data.FriendList)) Acc.FriendList = data.FriendList;
+
+		// If we have data to push
+		if (!ObjectEmpty(data)) Database.collection("Accounts").updateOne({ AccountName: Acc.AccountName }, { $set: data }, function (err, res) { if (err) throw err; });
+	}
 }
 
 // When the client account sends a query to the server
-function AccountQuery(data, socket) {
-	if ((data != null) && (typeof data === "object") && !Array.isArray(data) && (data.Query != null) && (typeof data.Query === "string")) {
+function AccountQuery(Acc, data, socket) {
+	if ((Acc != null) && (data != null) && (typeof data === "object") && !Array.isArray(data) && (data.Query != null) && (typeof data.Query === "string")) {
 
 		// Finds the current account
-		var Acc = AccountGet(socket.id);
-		if (Acc != null) {
 
-			// OnlineFriends query - returns all friends that are online and the room name they are in
-			if ((data.Query == "OnlineFriends") && (Acc.FriendList != null)) {
+		// OnlineFriends query - returns all friends that are online and the room name they are in
+		if ((data.Query == "OnlineFriends") && (Acc.FriendList != null)) {
 
-				// Add all submissives owned by the player to the list
-				var Friends = [];
-				var Index = [];
-				for (var A = 0; A < Account.length; A++)
-					if ((Account[A].Environment == Acc.Environment) && (Account[A].Ownership != null) && (Account[A].Ownership.MemberNumber != null) && (Account[A].Ownership.MemberNumber == Acc.MemberNumber)) {
-						Friends.push( { Type: "Submissive", MemberNumber: Account[A].MemberNumber, MemberName: Account[A].Name, ChatRoomName: (Account[A].ChatRoom == null) ? null : Account[A].ChatRoom.Name } );
-						Index.push(Account[A].MemberNumber);
-					}
+			// Add all submissives owned by the player to the list
+			var Friends = [];
+			var Index = [];
+			for (var A = 0; A < Account.length; A++)
+				if ((Account[A].Environment == Acc.Environment) && (Account[A].Ownership != null) && (Account[A].Ownership.MemberNumber != null) && (Account[A].Ownership.MemberNumber == Acc.MemberNumber)) {
+					Friends.push({ Type: "Submissive", MemberNumber: Account[A].MemberNumber, MemberName: Account[A].Name, ChatRoomName: (Account[A].ChatRoom == null) ? null : Account[A].ChatRoom.Name });
+					Index.push(Account[A].MemberNumber);
+				}
 
-				// Builds the online friend list, both players must be friends to find each other
-				for (var F = 0; F < Acc.FriendList.length; F++)
-					if ((Acc.FriendList[F] != null) && (typeof Acc.FriendList[F] === "number"))
-						if (Index.indexOf(Acc.FriendList[F]) < 0) // No need to search for the friend if she's owned
-							for (var A = 0; A < Account.length; A++)
-								if (Account[A].MemberNumber == Acc.FriendList[F]) {
-									if ((Account[A].Environment == Acc.Environment) && (Account[A].FriendList != null) && (Account[A].FriendList.indexOf(Acc.MemberNumber) >= 0))
-										Friends.push( { Type: "Friend", MemberNumber: Account[A].MemberNumber, MemberName: Account[A].Name, ChatRoomName: (Account[A].ChatRoom == null) ? null : (Account[A].ChatRoom.Private) ? "-Private-" : Account[A].ChatRoom.Name } );
-									A = Account.length;
-								}
+			// Builds the online friend list, both players must be friends to find each other
+			for (var F = 0; F < Acc.FriendList.length; F++)
+				if ((Acc.FriendList[F] != null) && (typeof Acc.FriendList[F] === "number"))
+					if (Index.indexOf(Acc.FriendList[F]) < 0) // No need to search for the friend if she's owned
+						for (var A = 0; A < Account.length; A++)
+							if (Account[A].MemberNumber == Acc.FriendList[F]) {
+								if ((Account[A].Environment == Acc.Environment) && (Account[A].FriendList != null) && (Account[A].FriendList.indexOf(Acc.MemberNumber) >= 0))
+									Friends.push({ Type: "Friend", MemberNumber: Account[A].MemberNumber, MemberName: Account[A].Name, ChatRoomName: (Account[A].ChatRoom == null) ? null : (Account[A].ChatRoom.Private) ? "-Private-" : Account[A].ChatRoom.Name });
+								A = Account.length;
+							}
 
-				// Sends the query result to the client
-				socket.emit("AccountQueryResult", { Query: data.Query, Result: Friends });
-
-			}
+			// Sends the query result to the client
+			socket.emit("AccountQueryResult", { Query: data.Query, Result: Friends });
 
 		}
-
 	}
 }
 
 // When a player wants to beep another player
-function AccountBeep(data, socket) {
-	if ((data != null) && (typeof data === "object") && !Array.isArray(data) && (data.MemberNumber != null) && (typeof data.MemberNumber === "number")) {
+function AccountBeep(Acc, data, socket) {
+	if ((Acc != null) && (data != null) && (typeof data === "object") && !Array.isArray(data) && (data.MemberNumber != null) && (typeof data.MemberNumber === "number")) {
 
 		// Make sure both accounts are online, friends and sends the beep to the friend
-		var Acc = AccountGet(socket.id);
-		if (Acc != null)
-			for (var A = 0; A < Account.length; A++)
-				if (Account[A].MemberNumber == data.MemberNumber)
-					if ((Account[A].Environment == Acc.Environment) && (((Account[A].FriendList != null) && (Account[A].FriendList.indexOf(Acc.MemberNumber) >= 0)) || ((Account[A].Ownership != null) && (Account[A].Ownership.MemberNumber != null) && (Account[A].Ownership.MemberNumber == Acc.MemberNumber))))
-						Account[A].Socket.emit("AccountBeep", {MemberNumber: Acc.MemberNumber, MemberName: Acc.Name, ChatRoomName: (Acc.ChatRoom == null) ? null : Acc.ChatRoom.Name});
+		for (var A = 0; A < Account.length; A++)
+			if (Account[A].MemberNumber == data.MemberNumber)
+				if ((Account[A].Environment == Acc.Environment) && (((Account[A].FriendList != null) && (Account[A].FriendList.indexOf(Acc.MemberNumber) >= 0)) || ((Account[A].Ownership != null) && (Account[A].Ownership.MemberNumber != null) && (Account[A].Ownership.MemberNumber == Acc.MemberNumber))))
+					Account[A].Socket.emit("AccountBeep", { MemberNumber: Acc.MemberNumber, MemberName: Acc.Name, ChatRoomName: (Acc.ChatRoom == null) ? null : Acc.ChatRoom.Name });
 
 	}
 }
 
 // Removes the account from the buffer
-function AccountRemove(ID) {
-	if (ID != null)
+function AccountRemove(Acc) {
+	if (Acc != null) {
+		ChatRoomRemove(Acc, "ServerDisconnect", []);
+		console.log("Disconnecting account: " + Acc.AccountName + " ID: " + ID.toString());
 		for (var P = 0; P < Account.length; P++)
-			if (Account[P].ID == ID) {
-				ChatRoomRemove(Account[P], "ServerDisconnect", []);
-				if (Account[P] != null) console.log("Disconnecting account: " + Account[P].AccountName + " ID: " + ID.toString());
+			if (Account[P].ID == Acc.ID) {
 				Account.splice(P, 1);
 				break;
 			}
-}
-
-// Returns the account object related to it's ID
-function AccountGet(ID) {
-	for (var P = 0; P < Account.length; P++)
-		if (Account[P].ID == ID)
-			return Account[P];
-	return null;
+		if (Acc.Socket != null) {
+			Acc.Socket.disconnect();
+			Acc.Socket = null;
+		}
+	}
 }
 
 // When a user searches for a chat room
-function ChatRoomSearch(data, socket) {
-	if ((data != null) && (typeof data === "object") && (data.Query != null) && (typeof data.Query === "string") && (data.Query.length <= 20)) {
+function ChatRoomSearch(Acc, data, socket) {
+	if ((Acc != null) && (data != null) && (typeof data === "object") && (data.Query != null) && (typeof data.Query === "string") && (data.Query.length <= 20)) {
 
 		// Finds the current account
-		var Acc = AccountGet(socket.id);
-		if (Acc != null) {
 
-			// Gets the space of the chat room (empty for public, asylum, etc.)
-			var Space = "";
-			if ((data.Space != null) && (typeof data.Space === "string") && (data.Space.length <= 100)) Space = data.Space;
+		// Gets the space of the chat room (empty for public, asylum, etc.)
+		var Space = "";
+		if ((data.Space != null) && (typeof data.Space === "string") && (data.Space.length <= 100)) Space = data.Space;
 
-			// Builds a list of up to 24 possible rooms, the last rooms created are shown first
-			var CR = [];
-			var C = 0;
-			for (var C = ChatRoom.length - 1; ((C >= 0) && (CR.length <= 24)); C--)
-				if ((ChatRoom[C] != null) && (ChatRoom[C].Account.length < ChatRoom[C].Limit))
-					if ((Acc.Environment == ChatRoom[C].Environment) && (Space == ChatRoom[C].Space)) // Must be in same environment (prod/dev) and same space (hall/asylum)
-						if (ChatRoom[C].Ban.indexOf(Acc.MemberNumber) < 0) // The player cannot be banned
-							if ((data.Query == "") || (ChatRoom[C].Name.toUpperCase().indexOf(data.Query) >= 0)) // Room name must contain the searched name, if any
-								if (!ChatRoom[C].Locked || (ChatRoom[C].Admin.indexOf(Acc.MemberNumber) >= 0)) // Must be unlocked, unless the player is an administrator
-									if (!ChatRoom[C].Private || (ChatRoom[C].Name.toUpperCase() == data.Query)) { // If it's private, must know the exact name
+		// Builds a list of up to 24 possible rooms, the last rooms created are shown first
+		var CR = [];
+		var C = 0;
+		for (var C = ChatRoom.length - 1; ((C >= 0) && (CR.length <= 24)); C--)
+			if ((ChatRoom[C] != null) && (ChatRoom[C].Account.length < ChatRoom[C].Limit))
+				if ((Acc.Environment == ChatRoom[C].Environment) && (Space == ChatRoom[C].Space)) // Must be in same environment (prod/dev) and same space (hall/asylum)
+					if (ChatRoom[C].Ban.indexOf(Acc.MemberNumber) < 0) // The player cannot be banned
+						if ((data.Query == "") || (ChatRoom[C].Name.toUpperCase().indexOf(data.Query) >= 0)) // Room name must contain the searched name, if any
+							if (!ChatRoom[C].Locked || (ChatRoom[C].Admin.indexOf(Acc.MemberNumber) >= 0)) // Must be unlocked, unless the player is an administrator
+								if (!ChatRoom[C].Private || (ChatRoom[C].Name.toUpperCase() == data.Query)) { // If it's private, must know the exact name
 
-										// Builds the searching account friend list in the current room
-										var Friends = [];
-										for (var A = 0; A < ChatRoom[C].Account.length; A++)
-											if (ChatRoom[C].Account[A] != null)
-												if ((ChatRoom[C].Account[A].Ownership != null) && (ChatRoom[C].Account[A].Ownership.MemberNumber != null) && (ChatRoom[C].Account[A].Ownership.MemberNumber == Acc.MemberNumber))
-													Friends.push({ Type: "Submissive", MemberNumber: ChatRoom[C].Account[A].MemberNumber, MemberName: ChatRoom[C].Account[A].Name});
-												else if ((Acc.FriendList != null) && (ChatRoom[C].Account[A].FriendList != null) && (Acc.FriendList.indexOf(ChatRoom[C].Account[A].MemberNumber) >= 0) && (ChatRoom[C].Account[A].FriendList.indexOf(Acc.MemberNumber) >= 0))
-													Friends.push({ Type: "Friend", MemberNumber: ChatRoom[C].Account[A].MemberNumber, MemberName: ChatRoom[C].Account[A].Name});
+									// Builds the searching account friend list in the current room
+									var Friends = [];
+									for (var A = 0; A < ChatRoom[C].Account.length; A++)
+										if (ChatRoom[C].Account[A] != null)
+											if ((ChatRoom[C].Account[A].Ownership != null) && (ChatRoom[C].Account[A].Ownership.MemberNumber != null) && (ChatRoom[C].Account[A].Ownership.MemberNumber == Acc.MemberNumber))
+												Friends.push({ Type: "Submissive", MemberNumber: ChatRoom[C].Account[A].MemberNumber, MemberName: ChatRoom[C].Account[A].Name });
+											else if ((Acc.FriendList != null) && (ChatRoom[C].Account[A].FriendList != null) && (Acc.FriendList.indexOf(ChatRoom[C].Account[A].MemberNumber) >= 0) && (ChatRoom[C].Account[A].FriendList.indexOf(Acc.MemberNumber) >= 0))
+												Friends.push({ Type: "Friend", MemberNumber: ChatRoom[C].Account[A].MemberNumber, MemberName: ChatRoom[C].Account[A].Name });
 
-										// Builds a room object with all data
-										CR.push({
-											Name: ChatRoom[C].Name,
-											Creator: ChatRoom[C].Creator,
-											MemberCount: ChatRoom[C].Account.length,
-											MemberLimit: ChatRoom[C].Limit,
-											Description: ChatRoom[C].Description,
-											Friends: Friends
-										});
+									// Builds a room object with all data
+									CR.push({
+										Name: ChatRoom[C].Name,
+										Creator: ChatRoom[C].Creator,
+										MemberCount: ChatRoom[C].Account.length,
+										MemberLimit: ChatRoom[C].Limit,
+										Description: ChatRoom[C].Description,
+										Friends: Friends
+									});
 
-									}
+								}
 
-			// Sends the list to the client
-			socket.emit("ChatRoomSearchResult", CR);
-
-		}
-
+		// Sends the list to the client
+		socket.emit("ChatRoomSearchResult", CR);
 	}
 }
 
 // Creates a new chat room 
-function ChatRoomCreate(data, socket) {
+function ChatRoomCreate(Acc, data, socket) {
 
 	// Make sure we have everything to create it
-	if ((data != null) && (typeof data === "object") && (data.Name != null) && (data.Description != null) && (data.Background != null) && (data.Private != null) && (typeof data.Name === "string") && (typeof data.Description === "string") && (typeof data.Background === "string") && (typeof data.Private === "boolean")) {
+	if ((Acc != null) && (data != null) && (typeof data === "object") && (data.Name != null) && (data.Description != null) && (data.Background != null) && (data.Private != null) && (typeof data.Name === "string") && (typeof data.Description === "string") && (typeof data.Background === "string") && (typeof data.Private === "boolean")) {
 
 		// Validates the room name
 		data.Name = data.Name.trim();
@@ -442,31 +428,28 @@ function ChatRoomCreate(data, socket) {
 			if ((data.Space != null) && (typeof data.Space === "string") && (data.Space.length <= 100)) Space = data.Space;
 
 			// Finds the account and links it to the new room
-			var Acc = AccountGet(socket.id);
-			if (Acc != null) {
-				ChatRoomRemove(Acc, "ServerLeave", []);
-				var NewRoom = {
-					Name: data.Name,
-					Description: data.Description,
-					Background: data.Background,
-					Limit: ((data.Limit == null) || (typeof data.Limit !== "string") || isNaN(parseInt(data.Limit)) || (parseInt(data.Limit) < 2) || (parseInt(data.Limit) > 10)) ? 10 : parseInt(data.Limit),
-					Private: data.Private || false,
-					Locked : data.Locked || false,
-					Environment: Acc.Environment,
-					Space: Space,
-					Creator: Acc.Name,
-					Creation: CommonTime(),
-					Account: [],
-					Ban: [],
-					Admin: [Acc.MemberNumber]
-				}
-				ChatRoom.push(NewRoom);
-				Acc.ChatRoom = NewRoom;
-				NewRoom.Account.push(Acc);
-				console.log("Chat room (" + ChatRoom.length.toString() + ") " + data.Name + " created by account " + Acc.AccountName + ", ID: " + socket.id.toString());
-				socket.emit("ChatRoomCreateResponse", "ChatRoomCreated");
-				ChatRoomSync(NewRoom, Acc.MemberNumber);
-			} else socket.emit("ChatRoomCreateResponse", "AccountError");
+			ChatRoomRemove(Acc, "ServerLeave", []);
+			var NewRoom = {
+				Name: data.Name,
+				Description: data.Description,
+				Background: data.Background,
+				Limit: ((data.Limit == null) || (typeof data.Limit !== "string") || isNaN(parseInt(data.Limit)) || (parseInt(data.Limit) < 2) || (parseInt(data.Limit) > 10)) ? 10 : parseInt(data.Limit),
+				Private: data.Private || false,
+				Locked: data.Locked || false,
+				Environment: Acc.Environment,
+				Space: Space,
+				Creator: Acc.Name,
+				Creation: CommonTime(),
+				Account: [],
+				Ban: [],
+				Admin: [Acc.MemberNumber]
+			}
+			ChatRoom.push(NewRoom);
+			Acc.ChatRoom = NewRoom;
+			NewRoom.Account.push(Acc);
+			console.log("Chat room (" + ChatRoom.length.toString() + ") " + data.Name + " created by account " + Acc.AccountName + ", ID: " + socket.id.toString());
+			socket.emit("ChatRoomCreateResponse", "ChatRoomCreated");
+			ChatRoomSync(NewRoom, Acc.MemberNumber);		
 
 		} else socket.emit("ChatRoomCreateResponse", "InvalidRoomData");
 
@@ -475,55 +458,48 @@ function ChatRoomCreate(data, socket) {
 }
 
 // Join an existing chat room 
-function ChatRoomJoin(data, socket) {
+function ChatRoomJoin(Acc, data, socket) {
 
 	// Make sure we have everything to join it
-	if ((data != null) && (typeof data === "object") && (data.Name != null) && (typeof data.Name === "string") && (data.Name != "")) {
-		
-		// Finds the current account
-		var Acc = AccountGet(socket.id);
-		if (Acc != null) {
+	if ((Acc != null) && (data != null) && (typeof data === "object") && (data.Name != null) && (typeof data.Name === "string") && (data.Name != "")) {
 
-			// Removes it from it's current room if needed
-			ChatRoomRemove(Acc, "ServerLeave", []);
+		// Removes it from it's current room if needed
+		ChatRoomRemove(Acc, "ServerLeave", []);
 
-			// Finds the room and join it
-			for (var C = 0; C < ChatRoom.length; C++)
-				if (ChatRoom[C].Name.toUpperCase().trim() == data.Name.toUpperCase().trim())
-					if (Acc.Environment == ChatRoom[C].Environment)
-						if (ChatRoom[C].Account.length < ChatRoom[C].Limit) {
-							if (ChatRoom[C].Ban.indexOf(Acc.MemberNumber) < 0) {
-								
-								// If the room is unlocked or the player is an admin, we allow her inside
-								if (!ChatRoom[C].Locked || (ChatRoom[C].Admin.indexOf(Acc.MemberNumber) >= 0)) {
-									Acc.ChatRoom = ChatRoom[C];
-									ChatRoom[C].Account.push(Acc);
-									socket.emit("ChatRoomSearchResponse", "JoinedRoom");
-									ChatRoomSync(ChatRoom[C], Acc.MemberNumber);
-									ChatRoomMessage(ChatRoom[C], Acc.MemberNumber, "ServerEnter", "Action", null, [{Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber}]);
-									return;
-								} else {
-									socket.emit("ChatRoomSearchResponse", "RoomLocked");
-									return;
-								}
+		// Finds the room and join it
+		for (var C = 0; C < ChatRoom.length; C++)
+			if (ChatRoom[C].Name.toUpperCase().trim() == data.Name.toUpperCase().trim())
+				if (Acc.Environment == ChatRoom[C].Environment)
+					if (ChatRoom[C].Account.length < ChatRoom[C].Limit) {
+						if (ChatRoom[C].Ban.indexOf(Acc.MemberNumber) < 0) {
 
+							// If the room is unlocked or the player is an admin, we allow her inside
+							if (!ChatRoom[C].Locked || (ChatRoom[C].Admin.indexOf(Acc.MemberNumber) >= 0)) {
+								Acc.ChatRoom = ChatRoom[C];
+								ChatRoom[C].Account.push(Acc);
+								socket.emit("ChatRoomSearchResponse", "JoinedRoom");
+								ChatRoomSync(ChatRoom[C], Acc.MemberNumber);
+								ChatRoomMessage(ChatRoom[C], Acc.MemberNumber, "ServerEnter", "Action", null, [{ Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber }]);
+								return;
 							} else {
-								socket.emit("ChatRoomSearchResponse", "RoomBanned");
+								socket.emit("ChatRoomSearchResponse", "RoomLocked");
 								return;
 							}
 
 						} else {
-							socket.emit("ChatRoomSearchResponse", "RoomFull");
+							socket.emit("ChatRoomSearchResponse", "RoomBanned");
 							return;
 						}
 
-			// Since we didn't found the room to join
-			socket.emit("ChatRoomSearchResponse", "CannotFindRoom");
+					} else {
+						socket.emit("ChatRoomSearchResponse", "RoomFull");
+						return;
+					}
 
-		} else socket.emit("ChatRoomSearchResponse", "AccountError");
+		// Since we didn't found the room to join
+		socket.emit("ChatRoomSearchResponse", "CannotFindRoom");
 
 	} else socket.emit("ChatRoomSearchResponse", "InvalidRoomData");
-
 }
 
 // Removes a player from a room
@@ -556,8 +532,7 @@ function ChatRoomRemove(Acc, Reason, Dictionary) {
 }
 
 // Finds the current account and removes it from it's chat room, nothing is returned to the client
-function ChatRoomLeave(socket) {
-	var Acc = AccountGet(socket.id);
+function ChatRoomLeave(Acc, socket) {
 	if (Acc != null) ChatRoomRemove(Acc, "ServerLeave", []);
 }
 
@@ -583,10 +558,9 @@ function ChatRoomMessage(CR, Sender, Content, Type, Target, Dictionary) {
 }
 
 // When a user sends a chat message, we propagate it to everyone in the room
-function ChatRoomChat(data, socket) {
-	if ((data != null) && (typeof data === "object") && (data.Content != null) && (data.Type != null) && (typeof data.Content === "string") && (typeof data.Type === "string") && (ChatRoomMessageType.indexOf(data.Type) >= 0) && (data.Content.length <= 1000)) {
-		var Acc = AccountGet(socket.id);
-		if (Acc != null) ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, data.Content.trim(), data.Type, data.Target, data.Dictionary);
+function ChatRoomChat(Acc, data, socket) {
+	if ((Acc != null) && (data != null) && (typeof data === "object") && (data.Content != null) && (data.Type != null) && (typeof data.Content === "string") && (typeof data.Type === "string") && (ChatRoomMessageType.indexOf(data.Type) >= 0) && (data.Content.length <= 1000)) {
+		ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, data.Content.trim(), data.Type, data.Target, data.Dictionary);
 	}
 }
 
@@ -636,10 +610,9 @@ function ChatRoomSync(CR, SourceMemberNumber) {
 }
 
 // Updates a character from the chat room
-function ChatRoomCharacterUpdate(data, socket) {
-	if ((data != null) && (typeof data === "object") && (data.ID != null) && (typeof data.ID === "string") && (data.ID != "") && (data.Appearance != null)) {
-		var Acc = AccountGet(socket.id);
-		if ((Acc != null) && (Acc.ChatRoom != null))
+function ChatRoomCharacterUpdate(Acc, data, socket) {
+	if ((Acc != null) && (data != null) && (typeof data === "object") && (data.ID != null) && (typeof data.ID === "string") && (data.ID != "") && (data.Appearance != null)) {
+		if (Acc.ChatRoom != null)
 			if (Acc.ChatRoom.Ban.indexOf(Acc.MemberNumber) < 0)
 				for (var A = 0; ((Acc.ChatRoom != null) && (A < Acc.ChatRoom.Account.length)); A++)
 					if ((Acc.ChatRoom.Account[A].ID == data.ID) && ChatRoomGetAllowItem(Acc, Acc.ChatRoom.Account[A]))
@@ -653,13 +626,12 @@ function ChatRoomCharacterUpdate(data, socket) {
 }
 
 // When an administrator account wants to act on another account in the room
-function ChatRoomAdmin(data, socket) {
+function ChatRoomAdmin(Acc, data, socket) {
 
-	if ((data != null) && (typeof data === "object") && (data.MemberNumber != null) && (typeof data.MemberNumber === "number") && (data.Action != null) && (typeof data.Action === "string")) {
+	if ((Acc != null) && (data != null) && (typeof data === "object") && (data.MemberNumber != null) && (typeof data.MemberNumber === "number") && (data.Action != null) && (typeof data.Action === "string")) {
 
 		// Validates that the current account is a room administrator
-		var Acc = AccountGet(socket.id);
-		if ((Acc != null) && (Acc.MemberNumber != data.MemberNumber) && (Acc.ChatRoom != null) && (Acc.ChatRoom.Admin.indexOf(Acc.MemberNumber) >= 0)) {
+		if ((Acc.MemberNumber != data.MemberNumber) && (Acc.ChatRoom != null) && (Acc.ChatRoom.Admin.indexOf(Acc.MemberNumber) >= 0)) {
 
 			// An administrator can update lots of room data.  The room values are sent back to the clients.
 			if (data.Action == "Update")
@@ -790,12 +762,11 @@ function ChatRoomGetAllowItem(Source, Target) {
 }
 
 // Returns TRUE if we allow applying an item from a character to another
-function ChatRoomAllowItem(data, socket) {
-	if ((data != null) && (typeof data === "object") && (data.MemberNumber != null) && (typeof data.MemberNumber === "number") && (data.MemberNumber > 0)) {
+function ChatRoomAllowItem(Acc, data, socket) {
+	if ((Acc != null) && (data != null) && (typeof data === "object") && (data.MemberNumber != null) && (typeof data.MemberNumber === "number") && (data.MemberNumber > 0)) {
 		
 		// Gets the source account and target account to check if we allow or not
-		var Acc = AccountGet(socket.id);
-		if ((Acc != null) && (Acc.ChatRoom != null))
+		if (Acc.ChatRoom != null)
 			for (var A = 0; ((Acc.ChatRoom != null) && (A < Acc.ChatRoom.Account.length)); A++)
 				if (Acc.ChatRoom.Account[A].MemberNumber == data.MemberNumber)
 					socket.emit("ChatRoomAllowItem", { MemberNumber: data.MemberNumber, AllowItem: ChatRoomGetAllowItem(Acc, Acc.ChatRoom.Account[A]) });
@@ -891,12 +862,11 @@ function PasswordResetProcess(data, socket) {
 }
 
 // Gets the current ownership status between two players in the same chatroom
-function AccountOwnership(data, socket) {
-	if ((data != null) && (typeof data === "object") && (data.MemberNumber != null) && (typeof data.MemberNumber === "number") && (data.MemberNumber > 0)) {
+function AccountOwnership(Acc, data, socket) {
+	if ((Acc != null) && (data != null) && (typeof data === "object") && (data.MemberNumber != null) && (typeof data.MemberNumber === "number") && (data.MemberNumber > 0)) {
 	
 		// The submissive can flush it's owner at any time in the trial, or after a delay if collared
-		var Acc = AccountGet(socket.id);
-		if ((Acc != null) && (Acc.Ownership != null) && (Acc.Ownership.Stage != null) && (Acc.Ownership.Start != null) && ((Acc.Ownership.Stage == 0) || (Acc.Ownership.Start + OwnershipDelay <= CommonTime())) && (data.Action != null) && (typeof data.Action === "string") && (data.Action == "Break")) {
+		if ((Acc.Ownership != null) && (Acc.Ownership.Stage != null) && (Acc.Ownership.Start != null) && ((Acc.Ownership.Stage == 0) || (Acc.Ownership.Start + OwnershipDelay <= CommonTime())) && (data.Action != null) && (typeof data.Action === "string") && (data.Action == "Break")) {
 			Acc.Owner = "";
 			Acc.Ownership = null;
 			var O = { Ownership: Acc.Ownership, Owner: Acc.Owner };
@@ -906,7 +876,7 @@ function AccountOwnership(data, socket) {
 		}
 
 		// In a chatroom, the dominant and submissive can enter in a BDSM relationship (4 steps to complete)
-		if ((Acc != null) && (Acc.ChatRoom != null)) {
+		if (Acc.ChatRoom != null) {
 
 			// The dominant player proposes to the submissive player
 			if ((Acc.Ownership == null) || (Acc.Ownership.MemberNumber == null) || (Acc.Ownership.MemberNumber != data.MemberNumber)) // Cannot propose if target player is already owner
