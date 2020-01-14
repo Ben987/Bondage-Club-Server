@@ -322,7 +322,7 @@ function AccountQuery(data, socket) {
 				var Index = [];
 				for (var A = 0; A < Account.length; A++)
 					if ((Account[A].Environment == Acc.Environment) && (Account[A].Ownership != null) && (Account[A].Ownership.MemberNumber != null) && (Account[A].Ownership.MemberNumber == Acc.MemberNumber)) {
-						Friends.push( { Type: "Submissive", MemberNumber: Account[A].MemberNumber, MemberName: Account[A].Name, ChatRoomName: (Account[A].ChatRoom == null) ? null : Account[A].ChatRoom.Name } );
+						Friends.push({ Type: "Submissive", MemberNumber: Account[A].MemberNumber, MemberName: Account[A].Name, ChatRoomSpace: (Account[A].ChatRoom == null) ? null : Account[A].ChatRoom.Space, ChatRoomName: (Account[A].ChatRoom == null) ? null : Account[A].ChatRoom.Name });
 						Index.push(Account[A].MemberNumber);
 					}
 
@@ -333,7 +333,7 @@ function AccountQuery(data, socket) {
 							for (var A = 0; A < Account.length; A++)
 								if (Account[A].MemberNumber == Acc.FriendList[F]) {
 									if ((Account[A].Environment == Acc.Environment) && (Account[A].FriendList != null) && (Account[A].FriendList.indexOf(Acc.MemberNumber) >= 0))
-										Friends.push( { Type: "Friend", MemberNumber: Account[A].MemberNumber, MemberName: Account[A].Name, ChatRoomName: (Account[A].ChatRoom == null) ? null : (Account[A].ChatRoom.Private) ? "-Private-" : Account[A].ChatRoom.Name } );
+										Friends.push({ Type: "Friend", MemberNumber: Account[A].MemberNumber, MemberName: Account[A].Name, ChatRoomSpace: (Account[A].ChatRoom && !Account[A].ChatRoom.Private) ? Account[A].ChatRoom.Space : null, ChatRoomName: (Account[A].ChatRoom == null) ? null : (Account[A].ChatRoom.Private) ? "-Private-" : Account[A].ChatRoom.Name });
 									A = Account.length;
 								}
 
@@ -357,7 +357,7 @@ function AccountBeep(data, socket) {
 			for (var A = 0; A < Account.length; A++)
 				if (Account[A].MemberNumber == data.MemberNumber)
 					if ((Account[A].Environment == Acc.Environment) && (((Account[A].FriendList != null) && (Account[A].FriendList.indexOf(Acc.MemberNumber) >= 0)) || ((Account[A].Ownership != null) && (Account[A].Ownership.MemberNumber != null) && (Account[A].Ownership.MemberNumber == Acc.MemberNumber))))
-						Account[A].Socket.emit("AccountBeep", {MemberNumber: Acc.MemberNumber, MemberName: Acc.Name, ChatRoomName: (Acc.ChatRoom == null) ? null : Acc.ChatRoom.Name});
+						Account[A].Socket.emit("AccountBeep", { MemberNumber: Acc.MemberNumber, MemberName: Acc.Name, ChatRoomSpace: (Acc.ChatRoom == null) ? null : Acc.ChatRoom.Space, ChatRoomName: (Acc.ChatRoom == null) ? null : Acc.ChatRoom.Name });
 
 	}
 }
