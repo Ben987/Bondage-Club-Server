@@ -196,6 +196,7 @@ function AccountPurgeInfo(A) {
 	delete A.GameplaySettings;
 	delete A.Email;
 	delete A.Password;
+	delete A.LastLogin;
 }
 
 // Load a single account file
