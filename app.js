@@ -153,6 +153,7 @@ function AccountCreate(data, socket) {
 						Account.push(data);
 						socket.emit("CreationResponse", { ServerAnswer: "AccountCreated", OnlineID: data.ID.toString(), MemberNumber: data.MemberNumber } );
 						AccountSendServerInfo(socket);
+						AccountPurgeInfo(data);
 					});
 
 				}
@@ -181,6 +182,20 @@ function AccountValidData(Account) {
 		if ((Account.BlackList == null) || !Array.isArray(Account.BlackList)) Account.BlackList = [];
 		if ((Account.FriendList == null) || !Array.isArray(Account.FriendList)) Account.FriendList = [];
 	}
+}
+
+// Purge some account info that's not required to be kept in memory on the server side
+function AccountPurgeInfo(A) {
+	delete A.Log;
+	delete A.Skill;
+	delete A.Wardrobe;
+	delete A.WardrobeCharacterNames;
+	delete A.ChatSettings;
+	delete A.VisualSettings;
+	delete A.AudioSettings;
+	delete A.GameplaySettings;
+	delete A.Email;
+	delete A.Password;
 }
 
 // Load a single account file
@@ -233,7 +248,7 @@ function AccountLogin(data, socket) {
 						socket.emit("LoginResponse", result);
 						result.Socket = socket;
 						AccountSendServerInfo(socket);
-
+						AccountPurgeInfo(result);
 					} else socket.emit("LoginResponse", "InvalidNamePassword");
 				});
 
@@ -256,7 +271,7 @@ function AccountUpdate(data, socket) {
 	if ((data != null) && (typeof data === "object") && !Array.isArray(data))
 		for (var P = 0; P < Account.length; P++)
 			if (Account[P].ID == socket.id) {
-				
+
 				// Some data is never saved or updated from the client
 				delete data.Name;
 				delete data.AccountName;
@@ -271,7 +286,7 @@ function AccountUpdate(data, socket) {
 				delete data.MemberNumber;
 				delete data.Environment;
 				delete data.Ownership;
-				
+
 				// Some data is kept for future use
 				if ((data.Inventory != null) && Array.isArray(data.Inventory)) Account[P].Inventory = data.Inventory;
 				if (data.ItemPermission != null) Account[P].ItemPermission = data.ItemPermission;
@@ -283,7 +298,7 @@ function AccountUpdate(data, socket) {
 				if ((data.WhiteList != null) && Array.isArray(data.WhiteList)) Account[P].WhiteList = data.WhiteList;
 				if ((data.BlackList != null) && Array.isArray(data.BlackList)) Account[P].BlackList = data.BlackList;
 				if ((data.FriendList != null) && Array.isArray(data.FriendList)) Account[P].FriendList = data.FriendList;
-				
+
 				// If we have data to push
 				if (!ObjectEmpty(data)) Database.collection("Accounts").updateOne({ AccountName : Account[P].AccountName }, { $set: data }, function(err, res) { if (err) throw err; });
 				break;
