@@ -711,6 +711,32 @@ function ChatRoomAdmin(data, socket) {
 					} else socket.emit("ChatRoomUpdateResponse", "InvalidRoomData");
 				} else socket.emit("ChatRoomUpdateResponse", "InvalidRoomData");
 
+			if (data.Action == "Move") {
+				if (data.TargetMemberNumber == data.DestinationMemberNumber) return;
+
+				var TargetAccountIndex = Acc.ChatRoom.Account.findIndex(x => x.MemberNumber == data.TargetMemberNumber);
+				var DestinationAccountIndex = Acc.ChatRoom.Account.findIndex(x => x.MemberNumber == data.DestinationMemberNumber);
+
+				if (TargetAccountIndex < 0 || DestinationAccountIndex < 0) return;
+
+				var TargetAccount = Acc.ChatRoom.Account[TargetAccountIndex];
+				var DestinationAccount = Acc.ChatRoom.Account[DestinationAccountIndex];
+
+				if ((data.Publish != null) && (typeof data.Publish === "boolean") && data.Publish) {
+					var Dictionary = [];
+					Dictionary.push({ Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber });
+					Dictionary.push({ Tag: "TargetCharacterName", Text: TargetAccount.Name, MemberNumber: TargetAccount.MemberNumber });
+					Dictionary.push({ Tag: "DestinationCharacterName", Text: DestinationAccount.Name, MemberNumber: DestinationAccount.MemberNumber });
+					ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "ServerMove", "Action", null, Dictionary);
+				}
+
+				Acc.ChatRoom.Account[TargetAccountIndex] = DestinationAccount;
+				Acc.ChatRoom.Account[DestinationAccountIndex] = TargetAccount;
+
+				ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber);
+				return;
+			}
+
 			// If the account to act upon is in the room, an administrator can ban, kick, move, promote or demote him
 			for (var A = 0; A < Acc.ChatRoom.Account.length; A++)
 				if (Acc.ChatRoom.Account[A].MemberNumber == data.MemberNumber) {
