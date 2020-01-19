@@ -711,28 +711,20 @@ function ChatRoomAdmin(data, socket) {
 					} else socket.emit("ChatRoomUpdateResponse", "InvalidRoomData");
 				} else socket.emit("ChatRoomUpdateResponse", "InvalidRoomData");
 
-			if (data.Action == "Move") {
-				if (data.TargetMemberNumber == data.DestinationMemberNumber) return;
-
+			// An administrator can swap the position of two characters in a room
+			if ((data.Action == "Swap") && (data.TargetMemberNumber != null) && (typeof data.TargetMemberNumber === "number") && (data.DestinationMemberNumber != null) && (typeof data.DestinationMemberNumber === "number") && (data.TargetMemberNumber != data.DestinationMemberNumber)) {
 				var TargetAccountIndex = Acc.ChatRoom.Account.findIndex(x => x.MemberNumber == data.TargetMemberNumber);
 				var DestinationAccountIndex = Acc.ChatRoom.Account.findIndex(x => x.MemberNumber == data.DestinationMemberNumber);
-
-				if (TargetAccountIndex < 0 || DestinationAccountIndex < 0) return;
-
+				if ((TargetAccountIndex < 0) || (DestinationAccountIndex < 0)) return;
 				var TargetAccount = Acc.ChatRoom.Account[TargetAccountIndex];
 				var DestinationAccount = Acc.ChatRoom.Account[DestinationAccountIndex];
-
-				if ((data.Publish != null) && (typeof data.Publish === "boolean") && data.Publish) {
-					var Dictionary = [];
-					Dictionary.push({ Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber });
-					Dictionary.push({ Tag: "TargetCharacterName", Text: TargetAccount.Name, MemberNumber: TargetAccount.MemberNumber });
-					Dictionary.push({ Tag: "DestinationCharacterName", Text: DestinationAccount.Name, MemberNumber: DestinationAccount.MemberNumber });
-					ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "ServerMove", "Action", null, Dictionary);
-				}
-
+				var Dictionary = [];
+				Dictionary.push({ Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber });
+				Dictionary.push({ Tag: "TargetCharacterName", Text: TargetAccount.Name, MemberNumber: TargetAccount.MemberNumber });
+				Dictionary.push({ Tag: "DestinationCharacterName", Text: DestinationAccount.Name, MemberNumber: DestinationAccount.MemberNumber });
+				ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "ServerSwap", "Action", null, Dictionary);
 				Acc.ChatRoom.Account[TargetAccountIndex] = DestinationAccount;
 				Acc.ChatRoom.Account[DestinationAccountIndex] = TargetAccount;
-
 				ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber);
 				return;
 			}
