@@ -606,6 +606,28 @@ function ChatRoomChat(data, socket) {
 	}
 }
 
+function ChatRoomSyncGetCharSharedData(Account) {
+	var A = {};
+	A.ID = Account.ID;
+	A.Name = Account.Name;
+	A.AssetFamily = Account.AssetFamily;
+	A.Title = Account.Title;
+	A.Appearance = Account.Appearance;
+	A.ActivePose = Account.ActivePose;
+	A.Reputation = Account.Reputation;
+	A.Creation = Account.Creation;
+	A.Lover = Account.Lover;
+	A.Description = Account.Description;
+	A.Owner = Account.Owner;
+	A.MemberNumber = Account.MemberNumber;
+	A.LabelColor = Account.LabelColor;
+	A.ItemPermission = Account.ItemPermission;
+	A.Inventory = Account.Inventory;
+	A.Ownership = Account.Ownership;
+	A.BlockItems = Account.BlockItems;
+	return A;
+}
+
 // Syncs the room data with all of it's members
 function ChatRoomSync(CR, SourceMemberNumber) {
 
@@ -624,31 +646,24 @@ function ChatRoomSync(CR, SourceMemberNumber) {
 	// Adds the characters from the room
 	R.Character = [];
 	for (var C = 0; C < CR.Account.length; C++) {
-		var A = {};
-		A.ID = CR.Account[C].ID;
-		A.Name = CR.Account[C].Name;
-		A.AssetFamily = CR.Account[C].AssetFamily;
-		A.Title = CR.Account[C].Title;
-		A.Appearance = CR.Account[C].Appearance;
-		A.ActivePose = CR.Account[C].ActivePose;
-		A.Reputation = CR.Account[C].Reputation;
-		A.Creation = CR.Account[C].Creation;
-		A.Lover = CR.Account[C].Lover;
-		A.Description = CR.Account[C].Description;
-		A.Owner = CR.Account[C].Owner;
-		A.MemberNumber = CR.Account[C].MemberNumber;
-		A.LabelColor = CR.Account[C].LabelColor;
-		A.ItemPermission = CR.Account[C].ItemPermission;
-		A.Inventory = CR.Account[C].Inventory;
-		A.Ownership = CR.Account[C].Ownership;
-		A.BlockItems = CR.Account[C].BlockItems;
-		R.Character.push(A);
+		R.Character.push(ChatRoomSyncGetCharSharedData(CR.Account[C]));
 	}
 
 	// Sends the full packet to everyone in the room
 	for (var A = 0; A < CR.Account.length; A++)
 		CR.Account[A].Socket.emit("ChatRoomSync", R);
+}
 
+// Syncs single character data with all room members
+function ChatRoomSyncSingle(Acc, SourceMemberNumber) {
+
+	var R = {};
+	R.SourceMemberNumber = SourceMemberNumber;
+	R.Character = ChatRoomSyncGetCharSharedData(Acc);
+
+	// Sends to everyone in the room
+	for (var A = 0; A < Acc.ChatRoom.Account.length; A++)
+		Acc.ChatRoom.Account[A].Socket.emit("ChatRoomSyncSingle", R);
 }
 
 // Updates a character from the chat room
@@ -663,7 +678,8 @@ function ChatRoomCharacterUpdate(data, socket) {
 							Database.collection("Accounts").updateOne({ AccountName : Acc.ChatRoom.Account[A].AccountName }, { $set: { Appearance: data.Appearance } }, function(err, res) { if (err) throw err; });
 							Acc.ChatRoom.Account[A].Appearance = data.Appearance;
 							Acc.ChatRoom.Account[A].ActivePose = data.ActivePose;
-							ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber);
+							ChatRoomSyncSingle(Acc.ChatRoom.Account[A], Acc.MemberNumber);
+							// ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber);
 						}
 	}
 }
