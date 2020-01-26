@@ -594,7 +594,7 @@ function ChatRoomMessage(CR, Sender, Content, Type, Target, Dictionary) {
 					else
 						for (var S = 0; S < CR.Account.length; S++)
 							if (Sender == CR.Account[S].MemberNumber)
-								CR.Account[S].Socket.emit("ChatRoomMessage", { Sender: Target, Content: "WhisperBlocked", Type: "ServerMessage" } );
+								CR.Account[S].Socket.emit("ChatRoomMessage", { Sender: Target, Content: "WhisperBlocked", Type: "ServerMessage", Dictionary: [{ Tag: "SourceCharacter", Text: CR.Account[S].Name, MemberNumber: CR.Account[S].MemberNumber }]} );
 					return;
 				}
 
@@ -816,11 +816,11 @@ function ChatRoomGetAllowItem(Source, Target) {
 	// At one, we allow if the source isn't on the blacklist
 	if ((Target.ItemPermission == 1) && (Target.BlackList.indexOf(Source.MemberNumber) < 0)) return true;
 
-	// At two, we allow if the source is Dominant compared to the Target (25 points allowed) or on whitelist
-	if ((Target.ItemPermission == 2) && (Target.BlackList.indexOf(Source.MemberNumber) < 0) && ((ChatRoomDominantValue(Source) + 25 >= ChatRoomDominantValue(Target)) || (Target.WhiteList.indexOf(Source.MemberNumber) >= 0))) return true;
+	// At two, we allow if the source is Dominant compared to the Target (25 points allowed) or on whitelist or a lover
+	if ((Target.ItemPermission == 2) && (Target.BlackList.indexOf(Source.MemberNumber) < 0) && ((ChatRoomDominantValue(Source) + 25 >= ChatRoomDominantValue(Target)) || (Target.WhiteList.indexOf(Source.MemberNumber) >= 0) || (Target.Lovership && (Target.Lovership.MemberNumber == Source.MemberNumber)))) return true;
 
-	// At three, we allow if the source is Dominant compared to the Target (25 points allowed)
-	if ((Target.ItemPermission == 3) && (Target.WhiteList.indexOf(Source.MemberNumber) >= 0)) return true;
+	// At three, we allow if the source is on the whitelist of the Target or a lover
+	if ((Target.ItemPermission == 3) && ((Target.WhiteList.indexOf(Source.MemberNumber) >= 0) || (Target.Lovership && (Target.Lovership.MemberNumber == Source.MemberNumber)))) return true;
 
 	// No valid combo, we don't allow the item
 	return false;
@@ -957,7 +957,7 @@ function AccountOwnership(data, socket) {
 								if ((data.Action != null) && (typeof data.Action === "string") && (data.Action == "Propose")) {
 									Acc.ChatRoom.Account[A].Owner = "";
 									Acc.ChatRoom.Account[A].Ownership = { StartTrialOfferedByMemberNumber: Acc.MemberNumber };
-									ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "OfferStartTrial", "ServerMessage", Acc.ChatRoom.Account[A].MemberNumber);
+									ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "OfferStartTrial", "ServerMessage", Acc.ChatRoom.Account[A].MemberNumber, [{ Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber }]);
 								} else socket.emit("AccountOwnership", { MemberNumber: data.MemberNumber, Result: "CanOfferStartTrial" });
 							}
 
@@ -965,7 +965,7 @@ function AccountOwnership(data, socket) {
 							if ((Acc.ChatRoom != null) && (Acc.ChatRoom.Account[A].Ownership != null) && (Acc.ChatRoom.Account[A].Ownership.MemberNumber == Acc.MemberNumber) && (Acc.ChatRoom.Account[A].Ownership.EndTrialOfferedByMemberNumber == null) && (Acc.ChatRoom.Account[A].Ownership.Stage != null) && (Acc.ChatRoom.Account[A].Ownership.Start != null) && (Acc.ChatRoom.Account[A].Ownership.Stage == 0) && (Acc.ChatRoom.Account[A].Ownership.Start + OwnershipDelay <= CommonTime())) {
 								if ((data.Action != null) && (typeof data.Action === "string") && (data.Action == "Propose")) {
 									Acc.ChatRoom.Account[A].Ownership.EndTrialOfferedByMemberNumber = Acc.MemberNumber;
-									ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "OfferEndTrial", "ServerMessage");
+									ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "OfferEndTrial", "ServerMessage", null, [{ Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber }]);
 								} else socket.emit("AccountOwnership", { MemberNumber: data.MemberNumber, Result: "CanOfferEndTrial" });
 							}
 
@@ -984,7 +984,7 @@ function AccountOwnership(data, socket) {
 								var O = { Ownership: Acc.Ownership, Owner: Acc.Owner };
 								Database.collection("Accounts").updateOne({ AccountName : Acc.AccountName }, { $set: O }, function(err, res) { if (err) throw err; });
 								socket.emit("AccountOwnership", O);
-								ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "StartTrial", "ServerMessage");
+								ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "StartTrial", "ServerMessage", null, [{ Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber }]);
 								ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber);
 							} else socket.emit("AccountOwnership", { MemberNumber: data.MemberNumber, Result: "CanStartTrial" });
 						}
@@ -997,7 +997,7 @@ function AccountOwnership(data, socket) {
 								var O = { Ownership: Acc.Ownership, Owner: Acc.Owner };
 								Database.collection("Accounts").updateOne({ AccountName : Acc.AccountName }, { $set: O }, function(err, res) { if (err) throw err; });
 								socket.emit("AccountOwnership", O);
-								ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "EndTrial", "ServerMessage");
+								ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "EndTrial", "ServerMessage", null, [{ Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber }]);
 								ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber);
 							} else socket.emit("AccountOwnership", { MemberNumber: data.MemberNumber, Result: "CanEndTrial" });
 						}
@@ -1012,10 +1012,20 @@ function AccountOwnership(data, socket) {
 function AccountLovership(data, socket) {
 	if ((data != null) && (typeof data === "object") && (data.MemberNumber != null) && (typeof data.MemberNumber === "number") && (data.MemberNumber > 0)) {
 
-		// The submissive can flush it's Lover at any time in the trial, or after a delay if collared
+        // A Lover can break her relationship any time in the trial, or after a delay if official
 		var Acc = AccountGet(socket.id);
 		if ((Acc != null) && (Acc.Lovership != null) && (Acc.Lovership.Stage != null) && (Acc.Lovership.Start != null) && ((Acc.Lovership.Stage == 0) || (Acc.Lovership.Start + LovershipDelay <= CommonTime())) && (data.Action != null) && (typeof data.Action === "string") && (data.Action == "Break")) {
-			Acc.Lover = "";
+
+			// Update the other account if online
+			for (var A = 0; A < Account.length; A++)
+                if (Account[A].MemberNumber == Acc.Lovership.MemberNumber) {
+                    Account[A].Lover = "";
+                    Account[A].Lovership = null;
+                    Account[A].Socket.emit("AccountLovership", { ClearLovership: true });
+					if (Account[A].ChatRoom != null) ChatRoomSync(Account[A].ChatRoom, Account[A].MemberNumber);
+				}
+            Database.collection("Accounts").updateOne({ MemberNumber : Acc.Lovership.MemberNumber}, { $set: { Lovership: null, Lover: ""}}, function(err, res) { if (err) throw err; });
+		    Acc.Lover = "";
 			Acc.Lovership = null;
 			var O = { Lovership: Acc.Lovership, Lover: Acc.Lover };
 			Database.collection("Accounts").updateOne({ AccountName : Acc.AccountName }, { $set: O }, function(err, res) { if (err) throw err; });
@@ -1023,61 +1033,75 @@ function AccountLovership(data, socket) {
 			return;
 		}
 
-		// In a chatroom, the dominant and submissive can enter in a BDSM relationship (4 steps to complete)
+        // In a chatroom, two players can enter in a lover relationship (4 steps to complete)
 		if ((Acc != null) && (Acc.ChatRoom != null)) {
 
-			// The dominant player proposes to the submissive player
-			if ((Acc.Lovership == null) || (Acc.Lovership.MemberNumber == null) || (Acc.Lovership.MemberNumber != data.MemberNumber)) // Cannot propose if target player is already Lover
+			// One player propose to another
+			if ((Acc.Lovership == null) || (Acc.Lovership.MemberNumber == null) || (Acc.Lover == "")) // Cannot propose if target player is already a Lover
 				for (var A = 0; ((Acc.ChatRoom != null) && (A < Acc.ChatRoom.Account.length)); A++)
 					if ((Acc.ChatRoom.Account[A].MemberNumber == data.MemberNumber) && (Acc.ChatRoom.Account[A].BlackList.indexOf(Acc.MemberNumber) < 0)) // Cannot propose if on blacklist
-						if ((Acc.ChatRoom.Account[A].Lover == null) || (Acc.ChatRoom.Account[A].Lover == "")) { // Cannot propose if owned by a NPC
+						if ((Acc.ChatRoom.Account[A].Lover == null) || (Acc.ChatRoom.Account[A].Lover == "")) { // Cannot propose if in love with a NPC
 
-							// If there's no Lovership, the dominant can propose to start a trial (Step 1 / 4)
+							// If there's no Lovership, one player can propose to start a trial (Step 1 / 4)
 							if ((Acc.ChatRoom.Account[A].Lovership == null) || (Acc.ChatRoom.Account[A].Lovership.MemberNumber == null)) {
 								if ((data.Action != null) && (typeof data.Action === "string") && (data.Action == "Propose")) {
 									Acc.ChatRoom.Account[A].Lover = "";
 									Acc.ChatRoom.Account[A].Lovership = { StartTrialOfferedByMemberNumber: Acc.MemberNumber };
-									ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "OfferStartTrialLover", "ServerMessage", Acc.ChatRoom.Account[A].MemberNumber);
+									ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "OfferStartTrialLover", "ServerMessage", Acc.ChatRoom.Account[A].MemberNumber, [{ Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber }]);
 								} else socket.emit("AccountLovership", { MemberNumber: data.MemberNumber, Result: "CanOfferStartTrial" });
 							}
 
-							// If trial has started, the dominant can offer to end it after the delay (Step 3 / 4)
+							// If a trial has started, a player can propose to end it after a delay (Step 3 / 4)
 							if ((Acc.ChatRoom != null) && (Acc.ChatRoom.Account[A].Lovership != null) && (Acc.ChatRoom.Account[A].Lovership.MemberNumber == Acc.MemberNumber) && (Acc.ChatRoom.Account[A].Lovership.EndTrialOfferedByMemberNumber == null) && (Acc.ChatRoom.Account[A].Lovership.Stage != null) && (Acc.ChatRoom.Account[A].Lovership.Start != null) && (Acc.ChatRoom.Account[A].Lovership.Stage == 0) && (Acc.ChatRoom.Account[A].Lovership.Start + LovershipDelay <= CommonTime())) {
 								if ((data.Action != null) && (typeof data.Action === "string") && (data.Action == "Propose")) {
 									Acc.ChatRoom.Account[A].Lovership.EndTrialOfferedByMemberNumber = Acc.MemberNumber;
-									ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "OfferEndTrialLover", "ServerMessage");
+									ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "OfferEndTrialLover", "ServerMessage", Acc.ChatRoom.Account[A].MemberNumber, [{ Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber }]);
 								} else socket.emit("AccountLovership", { MemberNumber: data.MemberNumber, Result: "CanOfferEndTrial" });
 							}
 
 						}
 
-			// The submissive player can accept a proposal from the dominant
-			if ((Acc.Lovership != null) && ((Acc.Lovership.MemberNumber == null) || (Acc.Lovership.MemberNumber == data.MemberNumber))) // No possible interaction if the player is owned by someone else
+			// A player can accept a proposal from another one
+			if ((Acc.Lovership != null) && ((Acc.Lovership.MemberNumber == null) || (Acc.Lovership.MemberNumber == data.MemberNumber))) // No possible interaction if the player is in love with someone else
 				for (var A = 0; ((Acc.ChatRoom != null) && (A < Acc.ChatRoom.Account.length)); A++)
 					if ((Acc.ChatRoom.Account[A].MemberNumber == data.MemberNumber) && (Acc.ChatRoom.Account[A].BlackList.indexOf(Acc.MemberNumber) < 0)) { // Cannot accept if on blacklist
 
-						// If the submissive wants to accept to start the trial period (Step 2 / 4)
+						// If a player wants to accept to start the trial period (Step 2 / 4)
 						if ((Acc.Lovership.StartTrialOfferedByMemberNumber != null) && (Acc.Lovership.StartTrialOfferedByMemberNumber == data.MemberNumber)) {
 							if ((data.Action != null) && (typeof data.Action === "string") && (data.Action == "Accept")) {
 								Acc.Lover = "";
 								Acc.Lovership = { MemberNumber: data.MemberNumber, Name: Acc.ChatRoom.Account[A].Name, Start: CommonTime(), Stage: 0 };
+								Acc.ChatRoom.Account[A].Lover = "";
+								Acc.ChatRoom.Account[A].Lovership = { MemberNumber: Acc.MemberNumber, Name: Acc.Name, Start: CommonTime(), Stage: 0 };
 								var O = { Lovership: Acc.Lovership, Lover: Acc.Lover };
-								Database.collection("Accounts").updateOne({ AccountName : Acc.AccountName }, { $set: O }, function(err, res) { if (err) throw err; });
-								socket.emit("AccountLovership", O);
-								ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "StartTrialLover", "ServerMessage");
+								var P = { Lovership: Acc.ChatRoom.Account[A].Lovership, Lover: Acc.ChatRoom.Account[A].Lover };
+                                Database.collection("Accounts").updateOne({ AccountName : Acc.AccountName }, { $set: O }, function(err, res) { if (err) throw err; });
+                                Database.collection("Accounts").updateOne({ MemberNumber : Acc.Lovership.MemberNumber}, { $set: P }, function(err, res) { if (err) throw err; });
+                                socket.emit("AccountLovership", O);
+								var Dictionary = [];
+								Dictionary.push({ Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber });
+								Dictionary.push({ Tag: "TargetCharacter", Text: Acc.Lovership.Name, MemberNumber: Acc.Lovership.MemberNumber });
+								ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "StartTrialLover", "ServerMessage", null, Dictionary);
 								ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber);
 							} else socket.emit("AccountLovership", { MemberNumber: data.MemberNumber, Result: "CanStartTrial" });
 						}
 
-						// If the submissive wants to accept the full collar (Step 4 /4)
+						// If the player wants to become a lover (Step 4 /4)
 						if ((Acc.Lovership.Stage != null) && (Acc.Lovership.Stage == 0) && (Acc.Lovership.EndTrialOfferedByMemberNumber != null) && (Acc.Lovership.EndTrialOfferedByMemberNumber == data.MemberNumber)) {
 							if ((data.Action != null) && (typeof data.Action === "string") && (data.Action == "Accept")) {
 								Acc.Lover = Acc.ChatRoom.Account[A].Name;
 								Acc.Lovership = { MemberNumber: data.MemberNumber, Name: Acc.ChatRoom.Account[A].Name, Start: CommonTime(), Stage: 1 };
+								Acc.ChatRoom.Account[A].Lover = Acc.Name;
+								Acc.ChatRoom.Account[A].Lovership = { MemberNumber: Acc.MemberNumber, Name: Acc.Name, Start: CommonTime(), Stage: 1 };
 								var O = { Lovership: Acc.Lovership, Lover: Acc.Lover };
+								var P = { Lovership: Acc.ChatRoom.Account[A].Lovership, Lover: Acc.ChatRoom.Account[A].Lover };
 								Database.collection("Accounts").updateOne({ AccountName : Acc.AccountName }, { $set: O }, function(err, res) { if (err) throw err; });
+								Database.collection("Accounts").updateOne({ MemberNumber : Acc.Lovership.MemberNumber }, { $set: P }, function(err, res) { if (err) throw err; });
 								socket.emit("AccountLovership", O);
-								ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "EndTrialLover", "ServerMessage");
+								var Dictionary = [];
+								Dictionary.push({ Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber });
+								Dictionary.push({ Tag: "TargetCharacter", Text: Acc.Lovership.Name, MemberNumber: Acc.Lovership.MemberNumber });
+								ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "EndTrialLover", "ServerMessage", null, Dictionary);
 								ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber);
 							} else socket.emit("AccountLovership", { MemberNumber: data.MemberNumber, Result: "CanEndTrial" });
 						}
