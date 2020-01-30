@@ -1043,7 +1043,7 @@ function AccountLovership(data, socket) {
 						if (((Acc.ChatRoom.Account[A].Lover == null) || (Acc.ChatRoom.Account[A].Lover == "")) && ((Acc.Lover == null) || (Acc.Lover == ""))) { // Cannot propose if in love with a NPC
 
 							// If there's no Lovership, one player can propose to start dating (Step 1 / 6)
-							if ((Acc.ChatRoom.Account[A].Lovership == null) || (Acc.ChatRoom.Account[A].Lovership.MemberNumber == null)) {
+							if ((Acc.Lovership == null) && ((Acc.ChatRoom.Account[A].Lovership == null) || (Acc.ChatRoom.Account[A].Lovership.MemberNumber == null))) {
 								if ((data.Action != null) && (typeof data.Action === "string") && (data.Action == "Propose")) {
 									Acc.ChatRoom.Account[A].Lover = "";
 									Acc.ChatRoom.Account[A].Lovership = { BeginDatingOfferedByMemberNumber: Acc.MemberNumber };
