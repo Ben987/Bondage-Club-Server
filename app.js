@@ -822,6 +822,9 @@ function ChatRoomGetAllowItem(Source, Target) {
 	// At three, we allow if the source is on the whitelist of the Target or a lover
 	if ((Target.ItemPermission == 3) && ((Target.WhiteList.indexOf(Source.MemberNumber) >= 0) || (Target.Lovership && (Target.Lovership.MemberNumber == Source.MemberNumber)))) return true;
 
+	// At four, we allow if the source is a lover
+	if ((Target.ItemPermission == 4) && ((Target.Lovership && (Target.Lovership.MemberNumber == Source.MemberNumber)))) return true;
+
 	// No valid combo, we don't allow the item
 	return false;
 
