@@ -250,6 +250,12 @@ function AccountLogin(data, socket) {
 						result.Socket = socket;
 						AccountSendServerInfo(socket);
 						AccountPurgeInfo(result);
+
+						// If we last disconnect while in a room try to relog inside of it
+						if (result.LastRoomName) {
+							ChatRoomJoin({ Name: result.LastRoomName }, socket);
+							Database.collection("Accounts").updateOne({ AccountName : result.AccountName }, { $unset: { LastRoomName: "" } }, function(err, res) { if (err) throw err; });
+						}
 					} else socket.emit("LoginResponse", "InvalidNamePassword");
 				});
 
@@ -565,6 +571,10 @@ function ChatRoomRemove(Acc, Reason, Dictionary) {
 			if (!Dictionary || (Dictionary.length == 0)) Dictionary.push({Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber});
 			ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, Reason, "Action", null, Dictionary);
 			ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber);
+			// Store the room name if we are disconnecting so we can relog inside of it
+			if (Reason == "ServerDisconnect") {
+				Database.collection("Accounts").updateOne({ AccountName : Acc.AccountName }, { $set: { LastRoomName: Acc.ChatRoom.Name } }, function(err, res) { if (err) throw err; });
+			}
 		}
 		Acc.ChatRoom = null;
 
