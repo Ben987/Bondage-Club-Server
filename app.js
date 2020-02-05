@@ -71,6 +71,7 @@ DatabaseClient.connect(DatabaseURL, { useUnifiedTopology: true, useNewUrlParser:
 				socket.on("AccountCreate", function (data) { AccountCreate(data, socket) });
 				socket.on("AccountLogin", function (data) { AccountLogin(data, socket) });
 				socket.on("AccountUpdate", function (data) { AccountUpdate(data, socket) });
+				socket.on("AccountUpdateEmail", function (data) { AccountUpdateEmail(data, socket) });
 				socket.on("AccountQuery", function (data) { AccountQuery(data, socket) });
 				socket.on("AccountBeep", function (data) { AccountBeep(data, socket) });
 				socket.on("AccountOwnership", function(data) { AccountOwnership(data, socket) });
@@ -305,6 +306,17 @@ function AccountUpdate(data, socket) {
 				break;
 
 			}
+}
+
+// Updates email address
+function AccountUpdateEmail(data, socket) {
+	if ((data != null) && (typeof data === "object") && (data.Email != null)) {
+		var E = /^[a-zA-Z0-9@.!#$%&'*+/=?^_`{|}~-]+$/;
+		if ((data.Email.match(E) || (data.Email == "")) && data.Email.length <= 100) {
+			var Acc = AccountGet(socket.id);
+			Database.collection("Accounts").updateOne({ AccountName : Acc.AccountName }, { $set: { Email: data.Email }}, function(err, res) { if (err) throw err; });
+		}
+	}
 }
 
 // When the client account sends a query to the server
