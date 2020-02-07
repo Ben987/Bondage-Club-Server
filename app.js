@@ -355,6 +355,15 @@ function AccountQuery(data, socket) {
 
 			}
 
+			// MailStatus query - returns true if an email is linked to the account
+			if (data.Query == "EmailStatus") {
+				Database.collection("Accounts").find({ AccountName : Acc.AccountName }).toArray(function(err, result) {
+					if (err) throw err;
+					if ((result != null) && (typeof result === "object") && (result.length > 0)) {
+						socket.emit("AccountQueryResult", { Query: data.Query, Result: (result[0].Email != null) && (result[0].Email != "") });
+					}
+				});
+			}
 		}
 
 	}
