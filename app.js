@@ -1093,6 +1093,8 @@ function AccountLovership(data, socket) {
                                 Database.collection("Accounts").updateOne({ AccountName : Acc.AccountName }, { $set: O }, function(err, res) { if (err) throw err; });
                                 Database.collection("Accounts").updateOne({ MemberNumber : Acc.Lovership.MemberNumber}, { $set: P }, function(err, res) { if (err) throw err; });
                                 socket.emit("AccountLovership", O);
+								for (var A = 0; A < Account.length; A++)
+									if (Account[A].MemberNumber == Acc.Lovership.MemberNumber) Account[A].Socket.emit("AccountLovership", P);
 								var Dictionary = [];
 								Dictionary.push({ Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber });
 								Dictionary.push({ Tag: "TargetCharacter", Text: Acc.Lovership.Name, MemberNumber: Acc.Lovership.MemberNumber });
@@ -1113,6 +1115,8 @@ function AccountLovership(data, socket) {
 								Database.collection("Accounts").updateOne({ AccountName : Acc.AccountName }, { $set: O }, function(err, res) { if (err) throw err; });
 								Database.collection("Accounts").updateOne({ MemberNumber : Acc.Lovership.MemberNumber }, { $set: P }, function(err, res) { if (err) throw err; });
 								socket.emit("AccountLovership", O);
+								for (var A = 0; A < Account.length; A++)
+									if (Account[A].MemberNumber == Acc.Lovership.MemberNumber) Account[A].Socket.emit("AccountLovership", P);
 								var Dictionary = [];
 								Dictionary.push({ Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber });
 								Dictionary.push({ Tag: "TargetCharacter", Text: Acc.Lovership.Name, MemberNumber: Acc.Lovership.MemberNumber });
@@ -1133,6 +1137,8 @@ function AccountLovership(data, socket) {
 								Database.collection("Accounts").updateOne({ AccountName : Acc.AccountName }, { $set: O }, function(err, res) { if (err) throw err; });
 								Database.collection("Accounts").updateOne({ MemberNumber : Acc.Lovership.MemberNumber }, { $set: P }, function(err, res) { if (err) throw err; });
 								socket.emit("AccountLovership", O);
+								for (var A = 0; A < Account.length; A++)
+									if (Account[A].MemberNumber == Acc.Lovership.MemberNumber) Account[A].Socket.emit("AccountLovership", P);
 								var Dictionary = [];
 								Dictionary.push({ Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber });
 								Dictionary.push({ Tag: "TargetCharacter", Text: Acc.Lovership.Name, MemberNumber: Acc.Lovership.MemberNumber });
