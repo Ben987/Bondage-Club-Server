@@ -823,7 +823,7 @@ function ChatRoomGetAllowItem(Source, Target) {
 	if ((Target.ItemPermission == 3) && ((Target.WhiteList.indexOf(Source.MemberNumber) >= 0) || (Target.Lovership && (Target.Lovership.MemberNumber == Source.MemberNumber)))) return true;
 
 	// At four, we allow if the source is a lover
-	if ((Target.ItemPermission == 4) && ((Target.Lovership && (Target.Lovership.MemberNumber == Source.MemberNumber)))) return true;
+	if ((Target.ItemPermission == 4) && ((Target.Lovership != null) && (Target.Lovership.MemberNumber == Source.MemberNumber))) return true;
 
 	// No valid combo, we don't allow the item
 	return false;
@@ -1018,7 +1018,7 @@ function AccountLovership(data, socket) {
 
         // A Lover can break her relationship any time in the trial, or after a delay if official
 		var Acc = AccountGet(socket.id);
-		if ((Acc != null) && (Acc.Lovership != null) && (Acc.Lovership.Stage != null) && (Acc.Lovership.Start != null) && ((Acc.Lovership.Stage == 0) || (Acc.Lovership.Start + LovershipDelay <= CommonTime())) && (data.Action != null) && (typeof data.Action === "string") && (data.Action == "Break")) {
+		if ((Acc != null) && (Acc.Lovership != null) && (Acc.Lovership.Stage != null) && (Acc.Lovership.Start != null) && ((Acc.Lovership.Stage != 2) || (Acc.Lovership.Start + LovershipDelay <= CommonTime())) && (data.Action != null) && (typeof data.Action === "string") && (data.Action == "Break")) {
 
 			// Update the other account if she's online, then update the database
 			for (var A = 0; A < Account.length; A++)
