@@ -68,7 +68,8 @@ DatabaseClient.connect(DatabaseURL, { useUnifiedTopology: true, useNewUrlParser:
 			console.log("****************************************");
 			IO.on("connection", function (socket) {
 				socket.id = Math.round(Math.random() * 1000000000000);
-				socket.emit("ServerMessage", "Connected to the Bondage Club Server");
+				socket.emit("ServerMessage", "Connected to the Bondage Club Server.");
+				socket.emit("ServerMessage", "Warning!  Console scripts can break your account or steal your data.");
 				socket.on("AccountCreate", function (data) { AccountCreate(data, socket) });
 				socket.on("AccountLogin", function (data) { AccountLogin(data, socket) });
 				socket.on("AccountUpdate", function (data) { AccountUpdate(data, socket) });
