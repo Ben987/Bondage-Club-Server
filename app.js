@@ -1083,7 +1083,7 @@ function AccountLovership(data, socket) {
 					if ((Acc.ChatRoom.Account[A].MemberNumber == data.MemberNumber) && (Acc.ChatRoom.Account[A].BlackList.indexOf(Acc.MemberNumber) < 0)) { // Cannot accept if on blacklist
 
 						// If a player wants to accept to start dating (Step 2 / 6)
-						if ((Acc.Lovership.BeginDatingOfferedByMemberNumber != null) && (Acc.Lovership.BeginDatingOfferedByMemberNumber == data.MemberNumber)) {
+						if ((Acc.Lovership.BeginDatingOfferedByMemberNumber != null) && (Acc.Lovership.BeginDatingOfferedByMemberNumber == data.MemberNumber) && (Acc.ChatRoom.Account[A].Lovership == null)) {
 							if ((data.Action != null) && (typeof data.Action === "string") && (data.Action == "Accept")) {
 								Acc.Lover = "";
 								Acc.Lovership = { MemberNumber: data.MemberNumber, Name: Acc.ChatRoom.Account[A].Name, Start: CommonTime(), Stage: 0 };
@@ -1094,8 +1094,7 @@ function AccountLovership(data, socket) {
                                 Database.collection("Accounts").updateOne({ AccountName : Acc.AccountName }, { $set: O }, function(err, res) { if (err) throw err; });
                                 Database.collection("Accounts").updateOne({ MemberNumber : Acc.Lovership.MemberNumber}, { $set: P }, function(err, res) { if (err) throw err; });
                                 socket.emit("AccountLovership", O);
-								for (var A = 0; A < Account.length; A++)
-									if (Account[A].MemberNumber == Acc.Lovership.MemberNumber) Account[A].Socket.emit("AccountLovership", P);
+								Acc.ChatRoom.Account[A].Socket.emit("AccountLovership", P);
 								var Dictionary = [];
 								Dictionary.push({ Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber });
 								Dictionary.push({ Tag: "TargetCharacter", Text: Acc.Lovership.Name, MemberNumber: Acc.Lovership.MemberNumber });
@@ -1116,8 +1115,7 @@ function AccountLovership(data, socket) {
 								Database.collection("Accounts").updateOne({ AccountName : Acc.AccountName }, { $set: O }, function(err, res) { if (err) throw err; });
 								Database.collection("Accounts").updateOne({ MemberNumber : Acc.Lovership.MemberNumber }, { $set: P }, function(err, res) { if (err) throw err; });
 								socket.emit("AccountLovership", O);
-								for (var A = 0; A < Account.length; A++)
-									if (Account[A].MemberNumber == Acc.Lovership.MemberNumber) Account[A].Socket.emit("AccountLovership", P);
+								Acc.ChatRoom.Account[A].Socket.emit("AccountLovership", P);
 								var Dictionary = [];
 								Dictionary.push({ Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber });
 								Dictionary.push({ Tag: "TargetCharacter", Text: Acc.Lovership.Name, MemberNumber: Acc.Lovership.MemberNumber });
@@ -1138,8 +1136,7 @@ function AccountLovership(data, socket) {
 								Database.collection("Accounts").updateOne({ AccountName : Acc.AccountName }, { $set: O }, function(err, res) { if (err) throw err; });
 								Database.collection("Accounts").updateOne({ MemberNumber : Acc.Lovership.MemberNumber }, { $set: P }, function(err, res) { if (err) throw err; });
 								socket.emit("AccountLovership", O);
-								for (var A = 0; A < Account.length; A++)
-									if (Account[A].MemberNumber == Acc.Lovership.MemberNumber) Account[A].Socket.emit("AccountLovership", P);
+								Acc.ChatRoom.Account[A].Socket.emit("AccountLovership", P);
 								var Dictionary = [];
 								Dictionary.push({ Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber });
 								Dictionary.push({ Tag: "TargetCharacter", Text: Acc.Lovership.Name, MemberNumber: Acc.Lovership.MemberNumber });
