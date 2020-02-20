@@ -1083,7 +1083,7 @@ function AccountLovership(data, socket) {
 					if ((Acc.ChatRoom.Account[A].MemberNumber == data.MemberNumber) && (Acc.ChatRoom.Account[A].BlackList.indexOf(Acc.MemberNumber) < 0)) { // Cannot accept if on blacklist
 
 						// If a player wants to accept to start dating (Step 2 / 6)
-						if ((Acc.Lovership.BeginDatingOfferedByMemberNumber != null) && (Acc.Lovership.BeginDatingOfferedByMemberNumber == data.MemberNumber) && (Acc.ChatRoom.Account[A].Lovership == null)) {
+						if ((Acc.Lovership.BeginDatingOfferedByMemberNumber != null) && (Acc.Lovership.BeginDatingOfferedByMemberNumber == data.MemberNumber) && ((Acc.ChatRoom.Account[A].Lovership == null) || (Acc.ChatRoom.Account[A].Lovership.MemberNumber == null))) {
 							if ((data.Action != null) && (typeof data.Action === "string") && (data.Action == "Accept")) {
 								Acc.Lover = "";
 								Acc.Lovership = { MemberNumber: data.MemberNumber, Name: Acc.ChatRoom.Account[A].Name, Start: CommonTime(), Stage: 0 };
