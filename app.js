@@ -21,7 +21,7 @@ var ChatRoomProduction = [
 	process.env.PRODUCTION9 || "" 
 ];
 var NextMemberNumber = 1;
-var OwnershipDelay = 259200000; // 3 days delay for ownership events
+var OwnershipDelay = 604800000; // 7 days delay for ownership events
 var LovershipDelay = 604800000; // 7 days delay for lovership events
 
 // DB Access
@@ -931,7 +931,7 @@ function PasswordResetProcess(data, socket) {
 	} else socket.emit("PasswordResetResponse", "InvalidPasswordResetInfo");
 }
 
-// Gets the current ownership status between two players in the same chatroom
+// Gets the current ownership status between two players in the same chatroom, can also trigger the progress in the relationship
 function AccountOwnership(data, socket) {
 	if ((data != null) && (typeof data === "object") && (data.MemberNumber != null) && (typeof data.MemberNumber === "number") && (data.MemberNumber > 0)) {
 	
@@ -1012,6 +1012,7 @@ function AccountOwnership(data, socket) {
 	}
 }
 
+// Gets the current lovership status between two players in the same chatroom, can also trigger the progress in the relationship
 function AccountLovership(data, socket) {
 	if ((data != null) && (typeof data === "object") && (data.MemberNumber != null) && (typeof data.MemberNumber === "number") && (data.MemberNumber > 0)) {
 
@@ -1019,7 +1020,7 @@ function AccountLovership(data, socket) {
 		var Acc = AccountGet(socket.id);
 		if ((Acc != null) && (Acc.Lovership != null) && (Acc.Lovership.Stage != null) && (Acc.Lovership.Start != null) && ((Acc.Lovership.Stage == 0) || (Acc.Lovership.Start + LovershipDelay <= CommonTime())) && (data.Action != null) && (typeof data.Action === "string") && (data.Action == "Break")) {
 
-			// Update the other account if online
+			// Update the other account if she's online, then update the database
 			for (var A = 0; A < Account.length; A++)
                 if (Account[A].MemberNumber == Acc.Lovership.MemberNumber) {
                     Account[A].Lover = "";
@@ -1028,24 +1029,27 @@ function AccountLovership(data, socket) {
 					if (Account[A].ChatRoom != null) ChatRoomSync(Account[A].ChatRoom, Account[A].MemberNumber);
 				}
             Database.collection("Accounts").updateOne({ MemberNumber : Acc.Lovership.MemberNumber}, { $set: { Lovership: null, Lover: ""}}, function(err, res) { if (err) throw err; });
+
+			// Updates the account that triggered the break up
 		    Acc.Lover = "";
 			Acc.Lovership = null;
 			var O = { Lovership: Acc.Lovership, Lover: Acc.Lover };
 			Database.collection("Accounts").updateOne({ AccountName : Acc.AccountName }, { $set: O }, function(err, res) { if (err) throw err; });
 			socket.emit("AccountLovership", { ClearLovership: true });
 			return;
+
 		}
 
-        // In a chatroom, two players can enter in a lover relationship (4 steps to complete)
+        // In a chatroom, two players can enter in a lover relationship (6 steps to complete)
 		if ((Acc != null) && (Acc.ChatRoom != null)) {
 
 			// One player propose to another
-			if ((Acc.Lovership == null) || (Acc.Lovership.MemberNumber == null) || (Acc.Lover == "")) // Cannot propose if target player is already a Lover
+			if ((Acc.Lovership == null) || (Acc.Lovership.MemberNumber == null) || (Acc.Lover == "")) // Cannot propose if target player is already a lover
 				for (var A = 0; ((Acc.ChatRoom != null) && (A < Acc.ChatRoom.Account.length)); A++)
 					if ((Acc.ChatRoom.Account[A].MemberNumber == data.MemberNumber) && (Acc.ChatRoom.Account[A].BlackList.indexOf(Acc.MemberNumber) < 0)) // Cannot propose if on blacklist
 						if (((Acc.ChatRoom.Account[A].Lover == null) || (Acc.ChatRoom.Account[A].Lover == "")) && ((Acc.Lover == null) || (Acc.Lover == ""))) { // Cannot propose if in love with a NPC
 
-							// If there's no Lovership, one player can propose to start dating (Step 1 / 6)
+							// If there's no lovership, one player can propose to start dating (Step 1 / 6)
 							if ((Acc.Lovership == null) && ((Acc.ChatRoom.Account[A].Lovership == null) || (Acc.ChatRoom.Account[A].Lovership.MemberNumber == null))) {
 								if ((data.Action != null) && (typeof data.Action === "string") && (data.Action == "Propose")) {
 									Acc.ChatRoom.Account[A].Lover = "";
