@@ -295,6 +295,7 @@ function AccountUpdate(data, socket) {
 				// Some data is kept for future use
 				if ((data.Inventory != null) && Array.isArray(data.Inventory)) Account[P].Inventory = data.Inventory;
 				if (data.ItemPermission != null) Account[P].ItemPermission = data.ItemPermission;
+				if (data.ArousalSettings != null) Account[P].ArousalSettings = data.ArousalSettings;
 				if (data.LabelColor != null) Account[P].LabelColor = data.LabelColor;
 				if (data.Appearance != null) Account[P].Appearance = data.Appearance;
 				if (data.Reputation != null) Account[P].Reputation = data.Reputation;
@@ -647,6 +648,7 @@ function ChatRoomSync(CR, SourceMemberNumber) {
 		A.Inventory = CR.Account[C].Inventory;
 		A.Ownership = CR.Account[C].Ownership;
 		A.BlockItems = CR.Account[C].BlockItems;
+		A.ArousalSettings = CR.Account[C].ArousalSettings;
 		R.Character.push(A);
 	}
 
@@ -668,6 +670,7 @@ function ChatRoomCharacterUpdate(data, socket) {
 							Database.collection("Accounts").updateOne({ AccountName : Acc.ChatRoom.Account[A].AccountName }, { $set: { Appearance: data.Appearance } }, function(err, res) { if (err) throw err; });
 							Acc.ChatRoom.Account[A].Appearance = data.Appearance;
 							Acc.ChatRoom.Account[A].ActivePose = data.ActivePose;
+							Acc.ChatRoom.Account[A].ArousalSettings = data.ArousalSettings;
 							ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber);
 						}
 	}
