@@ -200,6 +200,7 @@ function AccountPurgeInfo(A) {
 	delete A.Email;
 	delete A.Password;
 	delete A.LastLogin;
+	delete A.GhostList;
 }
 
 // Load a single account file
