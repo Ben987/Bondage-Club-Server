@@ -7,7 +7,7 @@ var IO = require("socket.io")(App, { origins: process.env.ORIGINS || DefaultOrig
 var BCrypt = require("bcrypt");
 var Account = [];
 var ChatRoom = [];
-var ChatRoomMessageType = ["Chat", "Action", "Emote", "Whisper", "Hidden"];
+var ChatRoomMessageType = ["Chat", "Action", "Activity", "Emote", "Whisper", "Hidden"];
 var ChatRoomProduction = [
 	process.env.PRODUCTION0 || "",
 	process.env.PRODUCTION1 || "",
