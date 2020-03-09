@@ -316,12 +316,20 @@ function AccountUpdate(data, socket) {
 
 // Updates email address
 function AccountUpdateEmail(data, socket) {
-	if ((data != null) && (typeof data === "object") && (data.Email != null)) {
+	if ((data != null) && (typeof data === "object") && (data.EmailOld != null) && (data.EmailNew != null)) {
+		var Acc = AccountGet(socket.id);
 		var E = /^[a-zA-Z0-9@.!#$%&'*+/=?^_`{|}~-]+$/;
-		if ((data.Email.match(E) || (data.Email == "")) && data.Email.length <= 100) {
-			var Acc = AccountGet(socket.id);
-			Database.collection("Accounts").updateOne({ AccountName : Acc.AccountName }, { $set: { Email: data.Email }}, function(err, res) { if (err) throw err; });
-		}
+		if ((data.EmailNew.match(E) || (data.EmailNew == "")) && (data.EmailNew.length <= 100) && (data.EmailNew.match(E) || (data.EmailNew == "")) && (data.EmailNew.length <= 100))
+			Database.collection("Accounts").find({ AccountName : Acc.AccountName }).toArray(function(err, result) {
+				if (err) throw err;
+				if ((result != null) && (typeof result === "object") && (result.length > 0) && data.EmailOld == result[0].Email) {
+					socket.emit("AccountQueryResult", { Query: "EmailUpdate", Result: true });
+					Database.collection("Accounts").updateOne({ AccountName : Acc.AccountName }, { $set: { Email: data.EmailNew }}, function(err, res) { if (err) throw err; });
+					return;
+				}
+			});
+
+		socket.emit("AccountQueryResult", { Query: "EmailUpdate", Result: false });
 	}
 }
 
@@ -361,12 +369,12 @@ function AccountQuery(data, socket) {
 
 			}
 
-			// MailStatus query - returns true if an email is linked to the account
+			// EmailStatus query - returns true if an email is linked to the account
 			if (data.Query == "EmailStatus") {
 				Database.collection("Accounts").find({ AccountName : Acc.AccountName }).toArray(function(err, result) {
 					if (err) throw err;
 					if ((result != null) && (typeof result === "object") && (result.length > 0)) {
-						socket.emit("AccountQueryResult", { Query: data.Query, Result: (result[0].Email != null) && (result[0].Email != "") });
+						socket.emit("AccountQueryResult", { Query: data.Query, Result: ((result[0].Email != null) && (result[0].Email != "")) });
 					}
 				});
 			}
