@@ -642,6 +642,7 @@ function ChatRoomChat(data, socket) {
 	}
 }
 
+// Builds the character packet to send over to the clients
 function ChatRoomSyncGetCharSharedData(Account) {
 	var A = {};
 	A.ID = Account.ID;
@@ -661,6 +662,7 @@ function ChatRoomSyncGetCharSharedData(Account) {
 	A.Inventory = Account.Inventory;
 	A.Ownership = Account.Ownership;
 	A.BlockItems = Account.BlockItems;
+	A.ArousalSettings = Account.ArousalSettings;
 	return A;
 }
 
@@ -689,14 +691,11 @@ function ChatRoomSync(CR, SourceMemberNumber) {
 		CR.Account[A].Socket.emit("ChatRoomSync", R);
 }
 
-// Syncs single character data with all room members
+// Syncs a single character data with all room members
 function ChatRoomSyncSingle(Acc, SourceMemberNumber) {
-
 	var R = {};
 	R.SourceMemberNumber = SourceMemberNumber;
 	R.Character = ChatRoomSyncGetCharSharedData(Acc);
-
-	// Sends to everyone in the room
 	for (var A = 0; A < Acc.ChatRoom.Account.length; A++)
 		Acc.ChatRoom.Account[A].Socket.emit("ChatRoomSyncSingle", R);
 }
@@ -713,7 +712,7 @@ function ChatRoomCharacterUpdate(data, socket) {
 							Database.collection("Accounts").updateOne({ AccountName : Acc.ChatRoom.Account[A].AccountName }, { $set: { Appearance: data.Appearance } }, function(err, res) { if (err) throw err; });
 							Acc.ChatRoom.Account[A].Appearance = data.Appearance;
 							Acc.ChatRoom.Account[A].ActivePose = data.ActivePose;
-							if (data.ArousalSettings != null) Acc.ChatRoom.Account[A].ArousalSettings = data.ArousalSettings;
+							if ((data.ArousalSettings != null) && (Acc.MemberNumber == Acc.ChatRoom.Account[A].MemberNumber)) Acc.ChatRoom.Account[A].ArousalSettings = data.ArousalSettings;
 							ChatRoomSyncSingle(Acc.ChatRoom.Account[A], Acc.MemberNumber);
 							// ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber);
 						}
@@ -880,7 +879,7 @@ function ChatRoomGetAllowItem(Source, Target) {
 
 // Returns TRUE if we allow applying an item from a character to another
 function ChatRoomAllowItem(data, socket) {
-	if ((data != null) && (typeof data === "object") && (data.MemberNumber != null) && (typeof data.MemberNumber === "number") && (data.MemberNumber > 0)) {
+	if ((data != null) && (typeof data === "object") && (data.MemberNumber != null) && (typeof data.MemberNumber === "number")) {
 		
 		// Gets the source account and target account to check if we allow or not
 		var Acc = AccountGet(socket.id);
@@ -981,7 +980,7 @@ function PasswordResetProcess(data, socket) {
 
 // Gets the current ownership status between two players in the same chatroom, can also trigger the progress in the relationship
 function AccountOwnership(data, socket) {
-	if ((data != null) && (typeof data === "object") && (data.MemberNumber != null) && (typeof data.MemberNumber === "number") && (data.MemberNumber > 0)) {
+	if ((data != null) && (typeof data === "object") && (data.MemberNumber != null) && (typeof data.MemberNumber === "number")) {
 	
 		// The submissive can flush it's owner at any time in the trial, or after a delay if collared
 		var Acc = AccountGet(socket.id);
@@ -1062,7 +1061,7 @@ function AccountOwnership(data, socket) {
 
 // Gets the current lovership status between two players in the same chatroom, can also trigger the progress in the relationship
 function AccountLovership(data, socket) {
-	if ((data != null) && (typeof data === "object") && (data.MemberNumber != null) && (typeof data.MemberNumber === "number") && (data.MemberNumber > 0)) {
+	if ((data != null) && (typeof data === "object") && (data.MemberNumber != null) && (typeof data.MemberNumber === "number")) {
 
         // A Lover can break her relationship any time in the trial, or after a delay if official
 		var Acc = AccountGet(socket.id);
