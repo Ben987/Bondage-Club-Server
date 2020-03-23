@@ -654,6 +654,7 @@ function ChatRoomSyncGetCharSharedData(Account) {
 	A.Reputation = Account.Reputation;
 	A.Creation = Account.Creation;
 	A.Lover = Account.Lover;
+	A.Lovership = Account.Lovership;
 	A.Description = Account.Description;
 	A.Owner = Account.Owner;
 	A.MemberNumber = Account.MemberNumber;
