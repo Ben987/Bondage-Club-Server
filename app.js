@@ -697,9 +697,8 @@ function ChatRoomSyncSingle(Acc, SourceMemberNumber) {
 	var R = {};
 	R.SourceMemberNumber = SourceMemberNumber;
 	R.Character = ChatRoomSyncGetCharSharedData(Acc);
-	if ((Acc.ChatRoom != null) && (Acc.ChatRoom.Account != null))
-		for (var A = 0; A < Acc.ChatRoom.Account.length; A++)
-			Acc.ChatRoom.Account[A].Socket.emit("ChatRoomSyncSingle", R);
+	for (var A = 0; (Acc.ChatRoom != null) && (Acc.ChatRoom.Account != null) && (A < Acc.ChatRoom.Account.length); A++)
+		Acc.ChatRoom.Account[A].Socket.emit("ChatRoomSyncSingle", R);
 }
 
 // Updates a character from the chat room
