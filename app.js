@@ -88,6 +88,7 @@ DatabaseClient.connect(DatabaseURL, { useUnifiedTopology: true, useNewUrlParser:
 				socket.on("ChatRoomCharacterUpdate", function(data) { ChatRoomCharacterUpdate(data, socket) });
 				socket.on("ChatRoomAdmin", function(data) { ChatRoomAdmin(data, socket) });
 				socket.on("ChatRoomAllowItem", function(data) { ChatRoomAllowItem(data, socket) });
+				socket.on("ChatRoomGame", function(data) { ChatRoomGame(data, socket) });
 				socket.on("PasswordReset", function(data) { PasswordReset(data, socket) });
 				socket.on("PasswordResetProcess", function(data) { PasswordResetProcess(data, socket) });
 				AccountSendServerInfo(socket);
@@ -298,6 +299,7 @@ function AccountUpdate(data, socket) {
 				if ((data.Inventory != null) && Array.isArray(data.Inventory)) Account[P].Inventory = data.Inventory;
 				if (data.ItemPermission != null) Account[P].ItemPermission = data.ItemPermission;
 				if (data.ArousalSettings != null) Account[P].ArousalSettings = data.ArousalSettings;
+				if (data.Game != null) Account[P].Game = data.Game;
 				if (data.LabelColor != null) Account[P].LabelColor = data.LabelColor;
 				if (data.Appearance != null) Account[P].Appearance = data.Appearance;
 				if (data.Reputation != null) Account[P].Reputation = data.Reputation;
@@ -642,6 +644,16 @@ function ChatRoomChat(data, socket) {
 	}
 }
 
+// When a user sends a game packet (for LARP or other games), we propagate it to everyone in the room
+function ChatRoomGame(data, socket) {
+	if ((data != null) && (typeof data === "object")) {
+		var R = Math.random();
+		var Acc = AccountGet(socket.id);
+		for (var A = 0; (Acc != null) && (Acc.ChatRoom != null) && (Acc.ChatRoom.Account != null) && (A < Acc.ChatRoom.Account.length); A++)
+			Acc.ChatRoom.Account[A].Socket.emit("ChatRoomGameResponse", { Sender: Acc.MemberNumber, Data: data, RNG: R } );
+	}
+}
+
 // Builds the character packet to send over to the clients
 function ChatRoomSyncGetCharSharedData(Account) {
 	var A = {};
@@ -664,6 +676,7 @@ function ChatRoomSyncGetCharSharedData(Account) {
 	A.Ownership = Account.Ownership;
 	A.BlockItems = Account.BlockItems;
 	A.ArousalSettings = Account.ArousalSettings;
+	A.Game = Account.Game;
 	return A;
 }
 
@@ -715,7 +728,6 @@ function ChatRoomCharacterUpdate(data, socket) {
 							Acc.ChatRoom.Account[A].ActivePose = data.ActivePose;
 							if ((data.ArousalSettings != null) && (Acc.MemberNumber == Acc.ChatRoom.Account[A].MemberNumber)) Acc.ChatRoom.Account[A].ArousalSettings = data.ArousalSettings;
 							ChatRoomSyncSingle(Acc.ChatRoom.Account[A], Acc.MemberNumber);
-							// ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber);
 						}
 	}
 }
