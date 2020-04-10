@@ -186,6 +186,7 @@ function AccountValidData(Account) {
 		if ((Account.WhiteList == null) || !Array.isArray(Account.WhiteList)) Account.WhiteList = [];
 		if ((Account.BlackList == null) || !Array.isArray(Account.BlackList)) Account.BlackList = [];
 		if ((Account.FriendList == null) || !Array.isArray(Account.FriendList)) Account.FriendList = [];
+		if ((Account.GhostList == null) || !Array.isArray(Account.GhostList)) Account.GhostList = [];
 	}
 }
 
@@ -202,7 +203,6 @@ function AccountPurgeInfo(A) {
 	delete A.Email;
 	delete A.Password;
 	delete A.LastLogin;
-	delete A.GhostList;
 }
 
 // Load a single account file
@@ -308,6 +308,7 @@ function AccountUpdate(data, socket) {
 				if ((data.WhiteList != null) && Array.isArray(data.WhiteList)) Account[P].WhiteList = data.WhiteList;
 				if ((data.BlackList != null) && Array.isArray(data.BlackList)) Account[P].BlackList = data.BlackList;
 				if ((data.FriendList != null) && Array.isArray(data.FriendList)) Account[P].FriendList = data.FriendList;
+				if ((data.GhostList != null) && Array.isArray(data.GhostList)) Account[P].GhostList = data.GhostList;
 
 				// If we have data to push
 				if (!ObjectEmpty(data)) Database.collection("Accounts").updateOne({ AccountName : Account[P].AccountName }, { $set: data }, function(err, res) { if (err) throw err; });
@@ -624,7 +625,7 @@ function ChatRoomMessage(CR, Sender, Content, Type, Target, Dictionary) {
 			} else {
 				// A player cannot whisper to a another player if she's on her blacklist
 				if (Target == CR.Account[A].MemberNumber) {
-					if ((CR.Account[A].BlackList == null) || !Array.isArray(CR.Account[A].BlackList) || (CR.Account[A].BlackList.indexOf(Sender) < 0))
+					if ((CR.Account[A].GhostList == null) || !Array.isArray(CR.Account[A].GhostList) || (CR.Account[A].GhostList.indexOf(Sender) < 0))
 						CR.Account[A].Socket.emit("ChatRoomMessage", { Sender: Sender, Content: Content, Type: Type, Dictionary: Dictionary } );
 					else
 						for (var S = 0; S < CR.Account.length; S++)
