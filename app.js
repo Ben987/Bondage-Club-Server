@@ -615,24 +615,17 @@ function ChatRoomLeave(socket) {
 	if (Acc != null) ChatRoomRemove(Acc, "ServerLeave", []);
 }
 
-// Sends a text message to everyone in the room
+// Sends a text message to everyone in the room or a specific target
 function ChatRoomMessage(CR, Sender, Content, Type, Target, Dictionary) {
 	if (CR != null)
 		for (var A = 0; A < CR.Account.length; A++)
 			if (Target == null) {
 				CR.Account[A].Socket.emit("ChatRoomMessage", { Sender: Sender, Content: Content, Type: Type, Dictionary: Dictionary } );
 			} else {
-				// A player cannot whisper to a another player if she's on her blacklist
 				if (Target == CR.Account[A].MemberNumber) {
-					if ((CR.Account[A].BlackList == null) || !Array.isArray(CR.Account[A].BlackList) || (CR.Account[A].BlackList.indexOf(Sender) < 0))
-						CR.Account[A].Socket.emit("ChatRoomMessage", { Sender: Sender, Content: Content, Type: Type, Dictionary: Dictionary } );
-					else
-						for (var S = 0; S < CR.Account.length; S++)
-							if (Sender == CR.Account[S].MemberNumber)
-								CR.Account[S].Socket.emit("ChatRoomMessage", { Sender: Target, Content: "WhisperBlocked", Type: "ServerMessage", Dictionary: [{ Tag: "SourceCharacter", Text: CR.Account[S].Name, MemberNumber: CR.Account[S].MemberNumber }]} );
+					CR.Account[A].Socket.emit("ChatRoomMessage", { Sender: Sender, Content: Content, Type: Type, Dictionary: Dictionary } );
 					return;
 				}
-
 			}
 }
 
