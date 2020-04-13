@@ -683,6 +683,9 @@ function ChatRoomSyncGetCharSharedData(Account) {
 // Syncs the room data with all of it's members
 function ChatRoomSync(CR, SourceMemberNumber) {
 
+	// Exits right away if the chat room was destroyed
+	if (CR == null) return;
+
 	// Builds the room data
 	var R = {};
 	R.Name = CR.Name;
