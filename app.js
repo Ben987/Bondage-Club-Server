@@ -735,6 +735,7 @@ function ChatRoomCharacterUpdate(data, socket) {
 function ChatRoomCharacterExpressionUpdate(data, socket) {
 	if ((data != null) && (typeof data === "object") && (data.Group != null) && (typeof data.Group === "string") && (data.Group != "")) {
 		var Acc = AccountGet(socket.id);
+		if ((Acc != null) && (data.Appearance != null) && Array.isArray(data.Appearance) && (data.Appearance.length >= 5)) Acc.Appearance = data.Appearance;
 		for (var A = 0; (Acc != null) && (Acc.ChatRoom != null) && (Acc.ChatRoom.Account != null) && (A < Acc.ChatRoom.Account.length); A++)
 			if (Acc.ChatRoom.Account[A].MemberNumber != Acc.MemberNumber)
 				Acc.ChatRoom.Account[A].Socket.emit("ChatRoomSyncExpression", { MemberNumber: Acc.MemberNumber, Name: data.Name, Group: data.Group });
