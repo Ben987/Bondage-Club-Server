@@ -86,6 +86,8 @@ DatabaseClient.connect(DatabaseURL, { useUnifiedTopology: true, useNewUrlParser:
 				socket.on("ChatRoomLeave", function() { ChatRoomLeave(socket) });
 				socket.on("ChatRoomChat", function(data) { ChatRoomChat(data, socket) });
 				socket.on("ChatRoomCharacterUpdate", function(data) { ChatRoomCharacterUpdate(data, socket) });
+				socket.on("ChatRoomCharacterExpressionUpdate", function(data) { ChatRoomCharacterExpressionUpdate(data, socket) });
+				socket.on("ChatRoomCharacterPoseUpdate", function(data) { ChatRoomCharacterPoseUpdate(data, socket) });
 				socket.on("ChatRoomAdmin", function(data) { ChatRoomAdmin(data, socket) });
 				socket.on("ChatRoomAllowItem", function(data) { ChatRoomAllowItem(data, socket) });
 				socket.on("ChatRoomGame", function(data) { ChatRoomGame(data, socket) });
@@ -707,7 +709,8 @@ function ChatRoomSyncSingle(Acc, SourceMemberNumber) {
 	R.SourceMemberNumber = SourceMemberNumber;
 	R.Character = ChatRoomSyncGetCharSharedData(Acc);
 	for (var A = 0; (Acc.ChatRoom != null) && (Acc.ChatRoom.Account != null) && (A < Acc.ChatRoom.Account.length); A++)
-		Acc.ChatRoom.Account[A].Socket.emit("ChatRoomSyncSingle", R);
+		if (Acc.ChatRoom.Account[A].MemberNumber != Acc.MemberNumber)
+			Acc.ChatRoom.Account[A].Socket.emit("ChatRoomSyncSingle", R);
 }
 
 // Updates a character from the chat room
@@ -725,6 +728,28 @@ function ChatRoomCharacterUpdate(data, socket) {
 							if ((data.ArousalSettings != null) && (Acc.MemberNumber == Acc.ChatRoom.Account[A].MemberNumber)) Acc.ChatRoom.Account[A].ArousalSettings = data.ArousalSettings;
 							ChatRoomSyncSingle(Acc.ChatRoom.Account[A], Acc.MemberNumber);
 						}
+	}
+}
+
+// Updates a character expression for a chat room, this does not update the database
+function ChatRoomCharacterExpressionUpdate(data, socket) {
+	if ((data != null) && (typeof data === "object") && (data.Group != null) && (typeof data.Group === "string") && (data.Group != "")) {
+		var Acc = AccountGet(socket.id);
+		for (var A = 0; (Acc != null) && (Acc.ChatRoom != null) && (Acc.ChatRoom.Account != null) && (A < Acc.ChatRoom.Account.length); A++)
+			if (Acc.ChatRoom.Account[A].MemberNumber != Acc.MemberNumber)
+				Acc.ChatRoom.Account[A].Socket.emit("ChatRoomSyncExpression", { MemberNumber: Acc.MemberNumber, Name: data.Name, Group: data.Group });
+	}
+}
+
+// Updates a character pose for a chat room, this does not update the database
+function ChatRoomCharacterPoseUpdate(data, socket) {
+	if ((data != null) && (typeof data === "object")) {
+		if (typeof data.Pose !== "string") data.Pose = null;
+		var Acc = AccountGet(socket.id);
+		if (Acc != null) Acc.ActivePose = data.Pose;
+		for (var A = 0; (Acc != null) && (Acc.ChatRoom != null) && (Acc.ChatRoom.Account != null) && (A < Acc.ChatRoom.Account.length); A++)
+			if (Acc.ChatRoom.Account[A].MemberNumber != Acc.MemberNumber)
+				Acc.ChatRoom.Account[A].Socket.emit("ChatRoomSyncPose", { MemberNumber: Acc.MemberNumber, Pose: data.Pose });
 	}
 }
 
