@@ -88,6 +88,7 @@ DatabaseClient.connect(DatabaseURL, { useUnifiedTopology: true, useNewUrlParser:
 				socket.on("ChatRoomCharacterUpdate", function(data) { ChatRoomCharacterUpdate(data, socket) });
 				socket.on("ChatRoomCharacterExpressionUpdate", function(data) { ChatRoomCharacterExpressionUpdate(data, socket) });
 				socket.on("ChatRoomCharacterPoseUpdate", function(data) { ChatRoomCharacterPoseUpdate(data, socket) });
+				socket.on("ChatRoomCharacterArousalUpdate", function(data) { ChatRoomCharacterArousalUpdate(data, socket) });
 				socket.on("ChatRoomAdmin", function(data) { ChatRoomAdmin(data, socket) });
 				socket.on("ChatRoomAllowItem", function(data) { ChatRoomAllowItem(data, socket) });
 				socket.on("ChatRoomGame", function(data) { ChatRoomGame(data, socket) });
@@ -709,8 +710,7 @@ function ChatRoomSyncSingle(Acc, SourceMemberNumber) {
 	R.SourceMemberNumber = SourceMemberNumber;
 	R.Character = ChatRoomSyncGetCharSharedData(Acc);
 	for (var A = 0; (Acc.ChatRoom != null) && (Acc.ChatRoom.Account != null) && (A < Acc.ChatRoom.Account.length); A++)
-		if (Acc.ChatRoom.Account[A].MemberNumber != Acc.MemberNumber)
-			Acc.ChatRoom.Account[A].Socket.emit("ChatRoomSyncSingle", R);
+		Acc.ChatRoom.Account[A].Socket.emit("ChatRoomSyncSingle", R);
 }
 
 // Updates a character from the chat room
@@ -751,6 +751,21 @@ function ChatRoomCharacterPoseUpdate(data, socket) {
 		for (var A = 0; (Acc != null) && (Acc.ChatRoom != null) && (Acc.ChatRoom.Account != null) && (A < Acc.ChatRoom.Account.length); A++)
 			if (Acc.ChatRoom.Account[A].MemberNumber != Acc.MemberNumber)
 				Acc.ChatRoom.Account[A].Socket.emit("ChatRoomSyncPose", { MemberNumber: Acc.MemberNumber, Pose: data.Pose });
+	}
+}
+
+// Updates a character arousal meter for a chat room, this does not update the database
+function ChatRoomCharacterArousalUpdate(data, socket) {
+	if ((data != null) && (typeof data === "object")) {
+		var Acc = AccountGet(socket.id);
+		if ((Acc != null) && (Acc.ArousalSettings != null)) {
+			Acc.ArousalSettings.OrgasmTimer = data.OrgasmTimer;
+			Acc.ArousalSettings.Progress = data.Progress;
+			Acc.ArousalSettings.ProgressTimer = data.ProgressTimer;
+		}
+		for (var A = 0; (Acc != null) && (Acc.ChatRoom != null) && (Acc.ChatRoom.Account != null) && (A < Acc.ChatRoom.Account.length); A++)
+			if (Acc.ChatRoom.Account[A].MemberNumber != Acc.MemberNumber)
+				Acc.ChatRoom.Account[A].Socket.emit("ChatRoomSyncArousal", { MemberNumber: Acc.MemberNumber, OrgasmTimer: data.OrgasmTimer, Progress: data.Progress, ProgressTimer: data.ProgressTimer });
 	}
 }
 
