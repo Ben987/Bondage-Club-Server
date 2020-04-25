@@ -89,6 +89,7 @@ DatabaseClient.connect(DatabaseURL, { useUnifiedTopology: true, useNewUrlParser:
 				socket.on("ChatRoomCharacterExpressionUpdate", function(data) { ChatRoomCharacterExpressionUpdate(data, socket) });
 				socket.on("ChatRoomCharacterPoseUpdate", function(data) { ChatRoomCharacterPoseUpdate(data, socket) });
 				socket.on("ChatRoomCharacterArousalUpdate", function(data) { ChatRoomCharacterArousalUpdate(data, socket) });
+				socket.on("ChatRoomCharacterItemUpdate", function(data) { ChatRoomCharacterItemUpdate(data, socket) });
 				socket.on("ChatRoomAdmin", function(data) { ChatRoomAdmin(data, socket) });
 				socket.on("ChatRoomAllowItem", function(data) { ChatRoomAllowItem(data, socket) });
 				socket.on("ChatRoomGame", function(data) { ChatRoomGame(data, socket) });
@@ -766,6 +767,25 @@ function ChatRoomCharacterArousalUpdate(data, socket) {
 		for (var A = 0; (Acc != null) && (Acc.ChatRoom != null) && (Acc.ChatRoom.Account != null) && (A < Acc.ChatRoom.Account.length); A++)
 			if (Acc.ChatRoom.Account[A].MemberNumber != Acc.MemberNumber)
 				Acc.ChatRoom.Account[A].Socket.emit("ChatRoomSyncArousal", { MemberNumber: Acc.MemberNumber, OrgasmTimer: data.OrgasmTimer, Progress: data.Progress, ProgressTimer: data.ProgressTimer });
+	}
+}
+
+// Updates a character arousal meter for a chat room, this does not update the database
+function ChatRoomCharacterItemUpdate(data, socket) {
+	if ((data != null) && (typeof data === "object") && (data.Target != null) && (typeof data.Target === "number") && (data.Group != null) && (typeof data.Group === "string")) {
+
+		// Make sure the source account isn't banned from the chat room and has access to use items on the target
+		var Acc = AccountGet(socket.id);
+		if ((Acc == null) || (Acc.ChatRoom == null) || (Acc.ChatRoom.Ban.indexOf(Acc.MemberNumber) >= 0)) return;
+		for (var A = 0; (Acc != null) && (Acc.ChatRoom != null) && (Acc.ChatRoom.Account != null) && (A < Acc.ChatRoom.Account.length); A++)
+			if ((Acc.ChatRoom.Account[A].MemberNumber == data.Target) && !ChatRoomGetAllowItem(Acc, Acc.ChatRoom.Account[A]))
+				return;
+
+		// Sends the item to use to everyone but the source
+		for (var A = 0; (Acc != null) && (Acc.ChatRoom != null) && (Acc.ChatRoom.Account != null) && (A < Acc.ChatRoom.Account.length); A++)
+			if (Acc.ChatRoom.Account[A].MemberNumber != Acc.MemberNumber)
+				Acc.ChatRoom.Account[A].Socket.emit("ChatRoomSyncItem", { Source: Acc.MemberNumber, Item: data });
+
 	}
 }
 
