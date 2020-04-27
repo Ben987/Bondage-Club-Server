@@ -726,7 +726,6 @@ function ChatRoomCharacterUpdate(data, socket) {
 							Database.collection("Accounts").updateOne({ AccountName : Acc.ChatRoom.Account[A].AccountName }, { $set: { Appearance: data.Appearance } }, function(err, res) { if (err) throw err; });
 							Acc.ChatRoom.Account[A].Appearance = data.Appearance;
 							Acc.ChatRoom.Account[A].ActivePose = data.ActivePose;
-							if ((data.ArousalSettings != null) && (Acc.MemberNumber == Acc.ChatRoom.Account[A].MemberNumber)) Acc.ChatRoom.Account[A].ArousalSettings = data.ArousalSettings;
 							ChatRoomSyncSingle(Acc.ChatRoom.Account[A], Acc.MemberNumber);
 						}
 	}
