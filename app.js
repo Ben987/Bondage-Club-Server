@@ -300,7 +300,7 @@ function AccountUpdate(data, socket) {
 				delete data.Lovership;
 
 				// Some data is kept for future use
-				if ((data.Inventory != null) && Array.isArray(data.Inventory)) Account[P].Inventory = data.Inventory;
+				if ((data.Inventory != null) && (typeof data.Inventory === "string")) Account[P].Inventory = data.Inventory;
 				if (data.ItemPermission != null) Account[P].ItemPermission = data.ItemPermission;
 				if (data.ArousalSettings != null) Account[P].ArousalSettings = data.ArousalSettings;
 				if (data.Game != null) Account[P].Game = data.Game;
