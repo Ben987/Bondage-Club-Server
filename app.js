@@ -351,14 +351,18 @@ function AccountQuery(data, socket) {
 			// OnlineFriends query - returns all friends that are online and the room name they are in
 			if ((data.Query == "OnlineFriends") && (Acc.FriendList != null)) {
 
-				// Add all submissives owned by the player to the list
+				// Add all submissives owned by the player and all lovers of the players to the list
 				var Friends = [];
 				var Index = [];
-				for (var A = 0; A < Account.length; A++)
-					if ((Account[A].Environment == Acc.Environment) && (Account[A].Ownership != null) && (Account[A].Ownership.MemberNumber != null) && (Account[A].Ownership.MemberNumber == Acc.MemberNumber)) {
+				for (var A = 0; A < Account.length; A++) {
+					if ((Account[A].Environment == Acc.Environment)
+						&& ((Account[A].Ownership != null) && (Account[A].Ownership.MemberNumber != null) && (Account[A].Ownership.MemberNumber == Acc.MemberNumber)
+						|| (Account[A].Lovership != null) && (Account[A].Lovership.MemberNumber != null) && (Account[A].Lovership.MemberNumber == Acc.MemberNumber))) {
 						Friends.push({ Type: "Submissive", MemberNumber: Account[A].MemberNumber, MemberName: Account[A].Name, ChatRoomSpace: (Account[A].ChatRoom == null) ? null : Account[A].ChatRoom.Space, ChatRoomName: (Account[A].ChatRoom == null) ? null : Account[A].ChatRoom.Name });
 						Index.push(Account[A].MemberNumber);
 					}
+				}
+
 
 				// Builds the online friend list, both players must be friends to find each other
 				for (var F = 0; F < Acc.FriendList.length; F++)
