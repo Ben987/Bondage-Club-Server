@@ -309,7 +309,9 @@ function AccountUpdate(data, socket) {
 				if (data.Reputation != null) Account[P].Reputation = data.Reputation;
 				if (data.Description != null) Account[P].Description = data.Description;
 				if ((data.BlockItems != null) && Array.isArray(data.BlockItems)) Account[P].BlockItems = data.BlockItems;
-				if ((data.WhiteList != null) && Array.isArray(data.WhiteList)) Account[P].WhiteList = data.WhiteList;
+				if ((data.LimitedItems != null) && Array.isArray(data.LimitedItems)) Account[P].LimitedItems = data.LimitedItems;
+				// Whitelist will be kept only if the player has permission settings requiring it and has at least a limited item
+				if ((data.WhiteList != null) && Array.isArray(data.WhiteList)) Account[P].WhiteList = ((Account[P].ItemPermission < 3) && (Account[P].LimitedItems) && Account[P].LimitedItems.length) ? data.Whitelist : [];
 				if ((data.BlackList != null) && Array.isArray(data.BlackList)) Account[P].BlackList = data.BlackList;
 				if ((data.FriendList != null) && Array.isArray(data.FriendList)) Account[P].FriendList = data.FriendList;
 
@@ -672,7 +674,10 @@ function ChatRoomSyncGetCharSharedData(Account) {
 	A.Inventory = Account.Inventory;
 	A.Ownership = Account.Ownership;
 	A.BlockItems = Account.BlockItems;
+	A.LimitedItems = Account.LimitedItems;
 	A.ArousalSettings = Account.ArousalSettings;
+	// Whitelist will be sent only if the player has permission settings requiring it and has at least a limited item
+	A.WhiteList = ((Account.ItemPermission < 3) && Account.LimitedItems.length) ? Account.WhiteList : [];
 	A.Game = Account.Game;
 	return A;
 }
