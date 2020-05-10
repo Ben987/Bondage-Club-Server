@@ -7,7 +7,7 @@ var MSl = require("./msl.js");
 //LabelColor VisualSettings Description WardrobeCharacterNames Wardrobe PrivateCharacter
 //Appearance Inventory Lovership
 
-var playerAccountDataFields = ["Name", "Log", "Inventory", "profileSettings"];
+var playerAccountDataFields = ["Name", "Log", "Inventory", "profileSettings", "Wardrobe", "WardrobeCharacterNames"];
 var playerLocationDataFieldsOther = ["AppearanceGrouped", "Inventory", "Lovership", "Ownership", "Lover", "Owner", "ItemPermission", "Reputation", "Skill", "Description"];
 var playerLocationDataFieldsSelf = playerLocationDataFieldsOther.slice();
 playerLocationDataFieldsSelf.push("AudioSettings", "ChatSettings", "GameplaySettings");
