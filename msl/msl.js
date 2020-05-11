@@ -4,6 +4,7 @@ var MainApp = require("../app.js");
 var Util = require("./util.js"); 
 var Serializer = require("./serializer.js"); 
 var Locations = require("./locations.js");
+var F3dcgAssets = require("./assets.js");
 
 //session info by socket id
 //session info by player id
@@ -69,16 +70,12 @@ var MainServer = {
 	,Success(data){return {meta:{success:true},data:data};}
 	
 	,GetPlayerCharacter(data, socket){	
-		MainServer.databaseHandle.collection("Accounts").findOne({MemberNumber : data.memberNumber}, function(err, player) {
+		MainServer.databaseHandle.collection("Accounts").findOne({MemberNumber : data.memberNumber}, function(err, Player) {
 			if (err) throw err;
-			if (player === null)
+			if (Player === null)
 				socket.emit("LoginResponse", MainServer.Error("InvalidNamePassword"));
 			else{
-				player.id = player.MemberNumber;
-				player.AppearanceGrouped = {};
-				for(var i = 0; i < player.Appearance.length; i++) 
-					player.AppearanceGrouped[player.Appearance[i].Group] = player.Appearance[i]
-				
+				var player = F3dcgAssets.ConvertPlayer(Player);				
 				player = StartOrRenewSession(socket, player);
 				socket.emit("GetPlayerCharacter", MainServer.Success({player:Serializer.PlayerGeneralInfo(player)}));
 			}

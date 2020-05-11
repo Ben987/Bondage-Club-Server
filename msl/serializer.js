@@ -13,12 +13,14 @@ var playerLocationDataFieldsSelf = playerLocationDataFieldsOther.slice();
 playerLocationDataFieldsSelf.push("AudioSettings", "ChatSettings", "GameplaySettings");
 
 exports.PlayerGeneralInfo = function(player){
+	return player;
 	var data = {id:player.id};
 	playerAccountDataFields.forEach(fieldName => data[fieldName] = player[fieldName]);
 	return data;
 }
 
 var PlayerLocationSelf = function(player){
+	return player;
 	var data = {id:player.id};
 	playerLocationDataFieldsSelf.forEach(fieldName => data[fieldName] = player[fieldName]);
 	return data;
@@ -26,6 +28,7 @@ var PlayerLocationSelf = function(player){
 exports.PlayerLocationSelf = PlayerLocationSelf;
 
 var PlayerLocationOther = function(player){
+	return player;
 	var data = {id:player.id};
 	playerLocationDataFieldsOther.forEach(fieldName => data[fieldName] = player[fieldName]);
 	return data;
