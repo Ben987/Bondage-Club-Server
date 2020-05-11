@@ -1,5 +1,6 @@
 //'use strict'
 
+var LZString = require('lz-string');
 var fs = require('fs');
 
 eval(fs.readFileSync('../Bondage-College/BondageClub/Assets/Female3DCG/Female3DCG.js', 'utf8'));
@@ -26,7 +27,8 @@ exports.ConvertPlayer = function(Player){
 	ConvertPlayerAppearance(Player, player);
 	ConvertPlayerWardrobe(Player, player);
 	ConvertPlayerInventory(Player, player);
-	ConvertPlayerClubStats(Player, player);
+	ConvertPlayerClubRep(Player, player);
+	ConvertPlayerSkills(Player, player);
 	ConvertPlayerSettings(Player, player);
 
 	return player;
@@ -40,40 +42,62 @@ function ConvertPlayerSettings(Player, player){
 	player.settings = {};
 }
 
-function ConvertPlayerClubStats(Player, player){
-	var clubStats = {jobs:{}, skill:{}, reputation:{}};
+function ConvertPlayerSkills(Player, player){
+	var skills = {}
+	if(Player.Skill)
+		for(var i = 0; i < Player.Skill.length; i ++)
+			skills[Player.Skill[i].Type] = Player.Skill[i].Value;
+	
+	player.skills = skills;
+}
+
+function ConvertPlayerClubRep(Player, player){
+	var clubRep = {jobs:{}, reputation:{}};
 	
 	if(Player.Log){
 		for(var i = 0; i < Player.Log.length; i++){
 			var LogEntry = Player.Log[i];
 			if(LogEntry.Group == "Management" && LogEntry.Name == "ClubMistress"){
-				clubStats.jobs.mistress = {active:true}
+				clubRep.jobs.mistress = {active:true}
 			}else if(LogEntry.Group == "Management" && LogEntry.Name == "MistressWasPaid"){
-				clubStats.jobs.mistress.paid = LogEntry.Value;
+				clubRep.jobs.mistress.paid = LogEntry.Value;
 			}
 		}
 	}
 	
 	if(Player.Reputation)
 		for(var i = 0; i < Player.Reputation.length; i ++)
-			clubStats.reputation[Player.Reputation[i].Type] = Player.Reputation[i].Value;
-	
-	if(Player.Skills)
-		for(var i = 0; i < Player.Skills.length; i ++)
-			clubStats.skills[Player.Skills[i].Type] = Player.Skills[i].Value;
+			clubRep.reputation[Player.Reputation[i].Type] = Player.Reputation[i].Value;
 	
 	if(Player.Ownership)
-		clubStats.owner = {id:Player.Ownership.MemberNumber, name:Player.Ownership.Name};
+		clubRep.owner = {id:Player.Ownership.MemberNumber, name:Player.Ownership.Name};
 	
 	if(Player.Lovership)
-		clubStats.lover = {id:Player.Lovership.MemberNumber, name:Player.Lovership.Name};
+		clubRep.lover = {id:Player.Lovership.MemberNumber, name:Player.Lovership.Name};
 	
-	player.clubStats = clubStats;
+	player.clubRep = clubRep;
 }
 
 
 function ConvertPlayerInventory(Player, player){
-	player.Inventory = Player.Inventory;
+	var Inventory = Array.isArray(Player.Inventory) ? Player.Inventory : JSON.parse(LZString.decompressFromUTF16(Player.Inventory));
+	var inventory = {locksKeys:[], cloth:[], bondageToys:[], bondageToysBlocked:[]}
+	
+	for(var i = 0; i < Inventory.length; i++){
+		var itemName = Inventory[i][0], groupName = Inventory[i][1];
+		if(groupName == "ItemMisc" && itemName.includes("Padlock"))
+			inventory.locksKeys.push(itemName);
+		else if(F3dcgAssets.BondageToyGroups.includes(groupName))
+			inventory.bondageToys.push(itemName)
+		else if(F3dcgAssets.AccessoriesGroups.includes(groupName) || F3dcgAssets.ClothesGroups.includes(groupName))
+			inventory.cloth.push(itemName);//assuming all cloth items are unique -- atm, the only collision is rope items
+	}
+	
+	if(Player.BlockItems)
+		for(var i = 0; i < Player.BlockItems.length; i++)
+			inventory.bondageToysBlocked.push(Player.BlockItems[i].Name);
+	
+	player.inventory = inventory;
 }
 
 function ConvertPlayerWardrobe(Player, player){
@@ -85,10 +109,9 @@ function ConvertPlayerWardrobe(Player, player){
 			var suit = {name : Player.WardrobeCharacterNames[i], clothes:{}};
 			player.wardrobe.push(suit);
 			
-			for(var j = 0; j < Suit.length; j++){
+			for(var j = 0; j < Suit.length; j++)
 				if(! F3dcgAssets.ExpressionGroups.includes(Suit[j].Group)) //Wardrobe for some reason has expression type items
 					suit.clothes[Suit[j].Group] = convertCloth(Suit[j]);
-			}
 		}
 	}
 }
@@ -128,9 +151,9 @@ function ConvertPlayerAppearance(Player, player){
 		delete AppearanceGrouped[F3dcgAssets.BondageToyGroups[i]];
 	}
 	
-	for(var i = 0; i < F3dcgAssets.AccessoriesGrooups.length; i++){
-		appearance.accessories[F3dcgAssets.AccessoriesGrooups[i]] = convertAccessory(AppearanceGrouped[F3dcgAssets.AccessoriesGrooups[i]]);
-		delete AppearanceGrouped[F3dcgAssets.AccessoriesGrooups[i]];
+	for(var i = 0; i < F3dcgAssets.AccessoriesGroups.length; i++){
+		appearance.accessories[F3dcgAssets.AccessoriesGroups[i]] = convertAccessory(AppearanceGrouped[F3dcgAssets.AccessoriesGroups[i]]);
+		delete AppearanceGrouped[F3dcgAssets.AccessoriesGroups[i]];
 	}
 	
 	for(var i = 0; i < F3dcgAssets.ClothesGroups.length; i++){
