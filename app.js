@@ -309,6 +309,7 @@ function AccountUpdate(data, socket) {
 				if (data.Reputation != null) Account[P].Reputation = data.Reputation;
 				if (data.Description != null) Account[P].Description = data.Description;
 				if ((data.BlockItems != null) && Array.isArray(data.BlockItems)) Account[P].BlockItems = data.BlockItems;
+				if ((data.LimitedItems != null) && Array.isArray(data.LimitedItems)) Account[P].LimitedItems = data.LimitedItems;
 				if ((data.WhiteList != null) && Array.isArray(data.WhiteList)) Account[P].WhiteList = data.WhiteList;
 				if ((data.BlackList != null) && Array.isArray(data.BlackList)) Account[P].BlackList = data.BlackList;
 				if ((data.FriendList != null) && Array.isArray(data.FriendList)) Account[P].FriendList = data.FriendList;
@@ -655,7 +656,7 @@ function ChatRoomGame(data, socket) {
 	}
 }
 
-// Builds the character packet to send over to the clients
+// Builds the character packet to send over to the clients, white list is only sent if there are limited items and a low item permission
 function ChatRoomSyncGetCharSharedData(Account) {
 	var A = {};
 	A.ID = Account.ID;
@@ -676,7 +677,9 @@ function ChatRoomSyncGetCharSharedData(Account) {
 	A.Inventory = Account.Inventory;
 	A.Ownership = Account.Ownership;
 	A.BlockItems = Account.BlockItems;
+	A.LimitedItems = Account.LimitedItems;
 	A.ArousalSettings = Account.ArousalSettings;
+	A.WhiteList = ((Account.ItemPermission < 3) && (Account.LimitedItems != null) && Array.isArray(Account.LimitedItems) && (Account.LimitedItems.length > 0)) ? Account.WhiteList : [];
 	A.Game = Account.Game;
 	return A;
 }
