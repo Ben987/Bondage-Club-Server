@@ -128,13 +128,13 @@ Location.prototype.ActionStart_ChatMessage = function(player, data){
 
 Location.prototype.ActionStart_AppearanceUpdateOther = function(player, data){
 	var targetPlayer = Msl.GetPlayer(data.targetPlayerId);
-	var AppearanceApplied = Assets.UpdateApearance(targetPlayer.AppearanceGrouped, data.AppearanceUpdate);
-	return new InstantAction(player, "AppearanceUpdateOther", null, Msl.GetPlayer(data.targetPlayerId), AppearanceApplied);
+	Assets.UpdateAppearance(targetPlayer.appearance, data.appearanceUpdate);
+	return new InstantAction(player, "AppearanceUpdateOther", null, Msl.GetPlayer(data.targetPlayerId), data.appearanceUpdate);
 }
 
 Location.prototype.ActionStart_AppearanceUpdateSelf = function(player, data){
-	var AppearanceApplied = Assets.UpdateApearance(player.AppearanceGrouped, data.AppearanceUpdate);
-	return new InstantAction(player, "AppearanceUpdateSelf", null, null, AppearanceApplied);
+	Assets.UpdateAppearance(player.appearance, data.appearanceUpdate);
+	return new InstantAction(player, "AppearanceUpdateSelf", null, null, data.appearanceUpdate);
 }
 /*
 Location.prototype.ActionStart_Restrain = function(player, data){

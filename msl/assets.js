@@ -4,23 +4,16 @@ var LZString = require('lz-string');
 var fs = require('fs');
 
 eval(fs.readFileSync('../Bondage-College/BondageClub/Assets/Female3DCG/Female3DCG.js', 'utf8'));
-eval(fs.readFileSync('../Bondage-College/Msl/Scripts/F3dcgAssetsInventory.js', 'utf8'));
+eval(fs.readFileSync('../Bondage-College/Msl/Scripts/F3dcgValidation.js', 'utf8'));
 eval(fs.readFileSync('../Bondage-College/Msl/Scripts/F3dcgAssets.js', 'utf8'));
 
 F3dcgAssets.Init();
 
-/*
-exports.UpdateApearance = function(AppearanceGrouped, AppearanceUpdateList){
-	for(var i = 0; i < AppearanceUpdateList.length; i++)
-		if(AppearanceUpdateList[i].Name == "None")
-			delete AppearanceGrouped[AppearanceUpdateList[i].Group];
-		else
-			AppearanceGrouped[AppearanceUpdateList[i].Group] = AppearanceUpdateList[i];
-	
-	return AppearanceUpdateList;
+
+exports.UpdateAppearance = function(appearance, appearanceUpdate){
+	return F3dcgAssets.UpdateAppearance(appearance, appearanceUpdate);
 }
-	*/
-	
+
 exports.ConvertPlayer = function(Player){
 	var player = {id:Player.MemberNumber, name:Player.Name};
 	
@@ -81,16 +74,18 @@ function ConvertPlayerClubRep(Player, player){
 
 function ConvertPlayerInventory(Player, player){
 	var Inventory = Array.isArray(Player.Inventory) ? Player.Inventory : JSON.parse(LZString.decompressFromUTF16(Player.Inventory));
-	var inventory = {locksKeys:[], cloth:[], bondageToys:[], bondageToysBlocked:[]}
+	var inventory = {locksKeys:[], clothes:[], accessories:[], bondageToys:[], bondageToysBlocked:[]}
 	
 	for(var i = 0; i < Inventory.length; i++){
 		var itemName = Inventory[i][0], groupName = Inventory[i][1];
 		if(groupName == "ItemMisc" && itemName.includes("Padlock"))
 			inventory.locksKeys.push(itemName);
 		else if(F3dcgAssets.BondageToyGroups.includes(groupName))
-			inventory.bondageToys.push(itemName)
-		else if(F3dcgAssets.AccessoriesGroups.includes(groupName) || F3dcgAssets.ClothesGroups.includes(groupName))
-			inventory.cloth.push(itemName);//assuming all cloth items are unique -- atm, the only collision is rope items
+			inventory[F3dcgAssets.BONDAGE_TOY].push(itemName)
+		else if(F3dcgAssets.AccessoriesGroups.includes(groupName))
+			inventory[F3dcgAssets.ACCESSORY].push(itemName);//assuming all cloth items are unique -- atm, the only collision is rope items
+		else if(F3dcgAssets.ClothesGroups.includes(groupName))
+			inventory[F3dcgAssets.CLOTH].push(itemName);
 	}
 	
 	if(Player.BlockItems)
@@ -103,92 +98,93 @@ function ConvertPlayerInventory(Player, player){
 function ConvertPlayerWardrobe(Player, player){
 	player.wardrobe = [];
 	if(! Player.WardrobeCharacterNames) return;
-	for(var i = 0; i < Player.WardrobeCharacterNames.length; i++){
-		if(Player.Wardrobe[i]){
-			var Suit = Player.Wardrobe[i];
-			var suit = {name : Player.WardrobeCharacterNames[i], clothes:{}};
-			player.wardrobe.push(suit);
+	for(var j = 0; j < Player.WardrobeCharacterNames.length; j++){
+		if(Player.Wardrobe[j]){
+			var Appearance = Player.Wardrobe[j];
+			var appearance = {frame:{}};
+			player.wardrobe.push({name : Player.WardrobeCharacterNames[j], appearance:appearance});
 			
-			for(var j = 0; j < Suit.length; j++)
-				if(! F3dcgAssets.ExpressionGroups.includes(Suit[j].Group)) //Wardrobe for some reason has expression type items
-					suit.clothes[Suit[j].Group] = convertCloth(Suit[j]);
+			var AppearanceGrouped = {};
+			for(var i = 0; i < Appearance.length; i++)
+				if(! F3dcgAssets.IgnoreGroups.includes(Appearance[i].Group))
+					AppearanceGrouped[Appearance[i].Group] = Appearance[i];
+			
+			appearance.frame.height = AppearanceGrouped.Height.Name;
+			appearance.frame.color = AppearanceGrouped.BodyUpper.Color;
+			appearance.frame.upperSize = AppearanceGrouped.BodyUpper.Name;
+			appearance.frame.lowerSize = AppearanceGrouped.BodyLower.Name;
+			
+			for(var groupTypeName in F3dcgAssets.SuitSelfTypeGroups){
+				var groupNames = F3dcgAssets.SuitSelfTypeGroups[groupTypeName];
+				appearance[groupTypeName] = {};
+				for(var i = 0; i < groupNames.length; i++)
+					appearance[groupTypeName][groupNames[i]] = convertItem(groupTypeName, AppearanceGrouped[groupNames[i]]);
+			}		
 		}
 	}
 }
 
-
 function ConvertPlayerAppearance(Player, player){
-	var appearance = {body:{items:{}},clothes:{}, expressions:{}, bondageToys:{}, accessories:{}}
+	var appearance = {frame:{}};
 	
 	var AppearanceGrouped = {};
 	for(var i = 0; i < Player.Appearance.length; i++)
 		if(! F3dcgAssets.IgnoreGroups.includes(Player.Appearance[i].Group))
 			AppearanceGrouped[Player.Appearance[i].Group] = Player.Appearance[i];
 	
-	appearance.body.height = AppearanceGrouped.Height.Name;
-	appearance.body.color = AppearanceGrouped.BodyUpper.Color;
-	appearance.body.upperSize = AppearanceGrouped.BodyUpper.Name;
-	appearance.body.lowerSize = AppearanceGrouped.BodyLower.Name;
-	appearance.body.hands = null//hands are redundant
+	appearance.frame.height = AppearanceGrouped.Height.Name;
+	appearance.frame.color = AppearanceGrouped.BodyUpper.Color;
+	appearance.frame.upperSize = AppearanceGrouped.BodyUpper.Name;
+	appearance.frame.lowerSize = AppearanceGrouped.BodyLower.Name;
+	appearance.frame.hands = null//hands are redundant
 	
 	delete AppearanceGrouped.Height;
 	delete AppearanceGrouped.BodyUpper;
 	delete AppearanceGrouped.BodyLower;
 	delete AppearanceGrouped.Hands;
 	
-	for(var i = 0; i < F3dcgAssets.BodyItemsGroups.length; i++){
-		appearance.body.items[F3dcgAssets.BodyItemsGroups[i]] = convertBodyItem(AppearanceGrouped[F3dcgAssets.BodyItemsGroups[i]]);
-		delete AppearanceGrouped[F3dcgAssets.BodyItemsGroups[i]];
-	}
-
-	for(var i = 0; i < F3dcgAssets.ExpressionGroups.length; i++){
-		appearance.expressions[F3dcgAssets.ExpressionGroups[i]] = convertExpression(AppearanceGrouped[F3dcgAssets.ExpressionGroups[i]]);
-		delete AppearanceGrouped[F3dcgAssets.ExpressionGroups[i]];
-	}
-	
-	for(var i = 0; i < F3dcgAssets.BondageToyGroups.length; i++){
-		appearance.bondageToys[F3dcgAssets.BondageToyGroups[i]] = convertBondageToy(AppearanceGrouped[F3dcgAssets.BondageToyGroups[i]]);
-		delete AppearanceGrouped[F3dcgAssets.BondageToyGroups[i]];
-	}
-	
-	for(var i = 0; i < F3dcgAssets.AccessoriesGroups.length; i++){
-		appearance.accessories[F3dcgAssets.AccessoriesGroups[i]] = convertAccessory(AppearanceGrouped[F3dcgAssets.AccessoriesGroups[i]]);
-		delete AppearanceGrouped[F3dcgAssets.AccessoriesGroups[i]];
-	}
-	
-	for(var i = 0; i < F3dcgAssets.ClothesGroups.length; i++){
-		appearance.clothes[F3dcgAssets.ClothesGroups[i]] = convertCloth(AppearanceGrouped[F3dcgAssets.ClothesGroups[i]]);
-		delete AppearanceGrouped[F3dcgAssets.ClothesGroups[i]];
+	for(var groupTypeName in F3dcgAssets.FullCharacterTypeGroups){
+		var groupNames = F3dcgAssets.FullCharacterTypeGroups[groupTypeName];
+		appearance[groupTypeName] = {};
+		for(var i = 0; i < groupNames.length; i++)
+			appearance[groupTypeName][groupNames[i]] = convertItem(groupTypeName, AppearanceGrouped[groupNames[i]]);
 	}
 	
 	player.appearance = appearance;
 }
 
 
+function convertItem(groupTypeName, AppItem){
+	switch(groupTypeName){
+		case F3dcgAssets.BODY:  		return convertBodyItem(AppItem);
+		case F3dcgAssets.CLOTH:  		return convertCloth(AppItem);
+		case F3dcgAssets.ACCESSORY:		return convertAccessory(AppItem);
+		case F3dcgAssets.BONDAGE_TOY:  	return convertBondageToy(AppItem);
+		case F3dcgAssets.EXPRESSION:  	return convertExpression(AppItem);
+	}
+}
+
 function convertBondageToy(AppItem){
 	if(! AppItem) return null;
 	
-	var appearanceItem = {name:AppItem.Name, color:AppItem.Color};
-	if(AppItem.Property && AppItem.Property.Type)	appearanceItem.variantName = AppItem.Property.Type;
-	if(AppItem.Property && AppItem.Property.Restrain)	appearanceItem.variantName = AppItem.Property.Restrain;
+	var variant;
+	if(AppItem.Property && AppItem.Property.Type)		variantName = AppItem.Property.Type;
+	if(AppItem.Property && AppItem.Property.Restrain)	variantName = AppItem.Property.Restrain;
 	
-	return appearanceItem;
+	return F3dcgAssets.BuildBondageToyAppearanceItem(AppItem.Name, AppItem.Color, variant);
 }
-function convertBodyItem(AppItem){//no null check as this type is always present
+function convertBodyItem(AppItem){
+	if(! AppItem) return null;  //Wardrobe comes without certain items
 	var variantName = (AppItem.Group == "Mouth" || AppItem.Group == "Eyes") && AppItem.Property ? AppItem.Property.Expression : null;
-	return {name:AppItem.Name, color:AppItem.Color, variantName:variantName};
+	return F3dcgAssets.BuildBodyAppearanceItem(AppItem.Name, AppItem.Color);
 }
 function convertExpression(AppItem){
 	return AppItem.Property && AppItem.Property.Expression ? AppItem.Property.Expression : AppItem.Group ;
 }
 function convertCloth(AppItem){
-	return AppItem ? {name:AppItem.Name, color:AppItem.Color} : null;
+	return AppItem ? F3dcgAssets.BuildClothAppearanceItem(AppItem.Name, AppItem.Color) : null;
 }
 function convertAccessory(AppItem){
-	return AppItem ? {name:AppItem.Name, color:AppItem.Color} : null;
+	return AppItem ? F3dcgAssets.BuildAccessoryAppearanceItem(AppItem.Name, AppItem.Color) : null;
 }
-
-
-
-
 

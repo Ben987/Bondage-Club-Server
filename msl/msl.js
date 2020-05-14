@@ -69,7 +69,7 @@ var MainServer = {
 	,Error(e){if(e.name && e.message) console.log(e); return {meta:{success:false,error:e.toString()}};}
 	,Success(data){return {meta:{success:true},data:data};}
 	
-	,GetPlayerCharacter(data, socket){	
+	,GetPlayerCharacter(data, socket){
 		MainServer.databaseHandle.collection("Accounts").findOne({MemberNumber : data.memberNumber}, function(err, Player) {
 			if (err) throw err;
 			if (Player === null)
