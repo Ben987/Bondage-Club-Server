@@ -247,7 +247,7 @@ function AccountLogin(data, socket) {
 
 						//Updates lovership if needed
 						if (!Array.isArray(result.Lovership)) {
-							 result.Lovership = result.Lovership != undefined ? [C.Lovership] : [];
+							 result.Lovership = result.Lovership != undefined ? [result.Lovership] : [];
 						}
 
 						// Sets the last login date
@@ -320,8 +320,17 @@ function AccountUpdate(data, socket) {
 				if ((data.BlackList != null) && Array.isArray(data.BlackList)) Account[P].BlackList = data.BlackList;
 				if ((data.FriendList != null) && Array.isArray(data.FriendList)) Account[P].FriendList = data.FriendList;
 				if ((data.Lover != null) && (Array.isArray(Account[P].Lovership))) {
-					Account[P].Lovership.push({Name: data.Lover});
-					data.Lovership = Account[P].Lovership;
+					var isLoverPresent = false;
+					for (var L = 0; L < Account[P].Lovership.length; L++) {
+						if ((Account[P].Lovership[L].Name != null) && (Account[P].Lovership[L].Name == data.Lover)) {
+							isLoverPresent = true;
+							break;
+						}
+					}
+					if (!isLoverPresent) {
+						Account[P].Lovership.push({Name: data.Lover});
+						data.Lovership = Account[P].Lovership;
+					}
 					delete data.Lover;
 				}
 
@@ -1195,23 +1204,7 @@ function AccountLovership(data, socket) {
 							TargetLoversNumbers.push(P[L].MemberNumber ? P[L].MemberNumber : -1);
 						}
 
-						/*console.log("before " + data.MemberNumber + " :");
-						for (var L = 0; L < TargetLoversNumbers.length; L++) {
-							console.log(TargetLoversNumbers[L]);
-						}*/
-
 						P.splice(TargetLoversNumbers.indexOf(Acc.MemberNumber), 1);
-
-						/*console.log("after :");
-						for (var L = 0; L < P.length; L++) {
-							console.log(P[L].MemberNumber ? P[L].MemberNumber : -1);
-						}
-
-						console.log("before self :");
-						for (var L = 0; L < AccLoversNumbers.length; L++) {
-							console.log(AccLoversNumbers[L]);
-						}*/
-
 
 						for (var A = 0; A < Account.length; A++)
 							if (Account[A].MemberNumber == data.MemberNumber) {
@@ -1225,11 +1218,6 @@ function AccountLovership(data, socket) {
 						// Updates the account that triggered the break up
 						Acc.Lovership.splice(AL, 1);
 						var O = { Lovership: Acc.Lovership };
-
-						/*console.log("after self :");
-						for (var L = 0; L < Acc.Lovership.length; L++) {
-							console.log(Acc.Lovership[L].MemberNumber ? Acc.Lovership[L].MemberNumber : -1);
-						}*/
 
 						Database.collection("Accounts").updateOne({ AccountName : Acc.AccountName }, { $set: O }, function(err, res) { if (err) throw err; });
 						socket.emit("AccountLovership", O);
