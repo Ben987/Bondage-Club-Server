@@ -319,7 +319,7 @@ function AccountUpdate(data, socket) {
 				if ((data.WhiteList != null) && Array.isArray(data.WhiteList)) Account[P].WhiteList = data.WhiteList;
 				if ((data.BlackList != null) && Array.isArray(data.BlackList)) Account[P].BlackList = data.BlackList;
 				if ((data.FriendList != null) && Array.isArray(data.FriendList)) Account[P].FriendList = data.FriendList;
-				if ((data.Lover != null) && (Array.isArray(Account[P].Lovership))) {
+				if ((data.Lover != null) && (Array.isArray(Account[P].Lovership)) && (Account[P].Lovership.length < 5)) {
 					var isLoverPresent = false;
 					for (var L = 0; L < Account[P].Lovership.length; L++) {
 						if ((Account[P].Lovership[L].Name != null) && (Account[P].Lovership[L].Name == data.Lover)) {
@@ -330,6 +330,7 @@ function AccountUpdate(data, socket) {
 					if (!isLoverPresent) {
 						Account[P].Lovership.push({Name: data.Lover});
 						data.Lovership = Account[P].Lovership;
+						socket.emit("AccountLovership", { Lovership: data.Lovership });
 					}
 					delete data.Lover;
 				}
@@ -1189,7 +1190,7 @@ function AccountLovership(data, socket) {
 			var AL = AccLoversNumbers.indexOf(data.MemberNumber);
 
 			// breaking with other players
-			if ((Acc.Lovership != null) && (Acc.Lovership[AL].Stage != null)
+			if ((Acc.Lovership != null) && (AL >= 0) && (Acc.Lovership[AL].Stage != null)
 				&& (Acc.Lovership[AL].Start != null) && ((Acc.Lovership[AL].Stage != 2) || (Acc.Lovership[AL].Start + LovershipDelay <= CommonTime()))) {
 
 				// Update the other account if she's online, then update the database
@@ -1227,7 +1228,7 @@ function AccountLovership(data, socket) {
 			}
 			// breaking with NPC
 			else if ((Acc.Lovership != null) && (data.MemberNumber < 0) && (data.Name != null)) {
-				Acc.Lovership = Acc.Lovership.splice(AccLoversNumbers.indexOf(data.Name), 1);
+				Acc.Lovership.splice(AccLoversNumbers.indexOf(data.Name), 1);
 				var O = { Lovership: Acc.Lovership };
 				Database.collection("Accounts").updateOne({ AccountName : Acc.AccountName }, { $set: O }, function(err, res) { if (err) throw err; });
 				socket.emit("AccountLovership", O);
