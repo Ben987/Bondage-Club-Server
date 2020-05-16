@@ -4,8 +4,10 @@ var LZString = require('lz-string');
 var fs = require('fs');
 
 eval(fs.readFileSync('../Bondage-College/BondageClub/Assets/Female3DCG/Female3DCG.js', 'utf8'));
-eval(fs.readFileSync('../Bondage-College/Msl/Scripts/F3dcgValidation.js', 'utf8'));
-eval(fs.readFileSync('../Bondage-College/Msl/Scripts/F3dcgAssets.js', 'utf8'));
+eval(fs.readFileSync('../Bondage-College/Msl/Scripts/F3dcgAssets/MainAssets.js', 'utf8'));
+eval(fs.readFileSync('../Bondage-College/Msl/Scripts/F3dcgAssets/Import.js', 'utf8'));
+eval(fs.readFileSync('../Bondage-College/Msl/Scripts/F3dcgAssets/Validation.js', 'utf8'));
+eval(fs.readFileSync('../Bondage-College/Msl/Scripts/F3dcgAssets/Inventory.js', 'utf8'));
 
 F3dcgAssets.Init();
 
@@ -179,7 +181,8 @@ function convertBodyItem(AppItem){
 	return F3dcgAssets.BuildBodyAppearanceItem(AppItem.Name, AppItem.Color);
 }
 function convertExpression(AppItem){
-	return AppItem.Property && AppItem.Property.Expression ? AppItem.Property.Expression : AppItem.Group ;
+	var itemName = AppItem.Property && AppItem.Property.Expression ? AppItem.Property.Expression : AppItem.Group ;
+	return F3dcgAssets.BuildExpressionAppearanceItem(itemName);
 }
 function convertCloth(AppItem){
 	return AppItem ? F3dcgAssets.BuildClothAppearanceItem(AppItem.Name, AppItem.Color) : null;
