@@ -7,7 +7,7 @@ eval(fs.readFileSync('../Bondage-College/BondageClub/Assets/Female3DCG/Female3DC
 eval(fs.readFileSync('../Bondage-College/Msl/Scripts/F3dcgAssets/MainAssets.js', 'utf8'));
 eval(fs.readFileSync('../Bondage-College/Msl/Scripts/F3dcgAssets/Import.js', 'utf8'));
 eval(fs.readFileSync('../Bondage-College/Msl/Scripts/F3dcgAssets/Validation.js', 'utf8'));
-eval(fs.readFileSync('../Bondage-College/Msl/Scripts/F3dcgAssets/Inventory.js', 'utf8'));
+//eval(fs.readFileSync('../Bondage-College/Msl/Scripts/F3dcgAssets/Inventory.js', 'utf8'));
 
 F3dcgAssets.Init();
 
@@ -168,8 +168,10 @@ function convertItem(groupTypeName, AppItem){
 
 function convertBondageToy(AppItem){
 	if(! AppItem) return null;
+	var AssetItem = F3dcgAssets.AssetGroups[AppItem.Group].Items[AppItem.Name];
 	
 	var variant;
+	if(AssetItem.Variant) variant = Object.values(AssetItem.Variant)[0].Name;
 	if(AppItem.Property && AppItem.Property.Type)		variantName = AppItem.Property.Type;
 	if(AppItem.Property && AppItem.Property.Restrain)	variantName = AppItem.Property.Restrain;
 	
