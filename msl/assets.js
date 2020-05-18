@@ -22,19 +22,38 @@ exports.ConvertPlayer = function(Player){
 	ConvertPlayerAppearance(Player, player);
 	ConvertPlayerWardrobe(Player, player);
 	ConvertPlayerInventory(Player, player);
-	ConvertPlayerClubRep(Player, player);
+	ConvertPlayerClubStanding(Player, player);
 	ConvertPlayerSkills(Player, player);
 	ConvertPlayerSettings(Player, player);
 
 	return player;
 }
 
+
 function ConvertPlayerSettings(Player, player){
-	var settings = Player.GameplaySettings;
-	settings.chatLabelColor = Player.Label;
-	settings.forceFullHeight = Player.ForceFullHeight;
+	var settings = {gui:{chat:{}, focus:{}},permissions:{itemLists:{black:[]}, playerLists:{}, actions:{}}};
+
+	//body and accessories are self only
+	settings.permissions.actions.bondageToys = Player.ItemPermission;
+	settings.permissions.actions.clothes = Player.ItemPermission;
+	settings.permissions.actions.arousal = Player.ItemPermission;
+	settings.permissions.actions.poses = Player.ItemPermission;
 	
-	player.settings = {};
+	settings.permissions.playerLists.black = Player.BlackList ? Player.BlackList : [];
+	settings.permissions.playerLists.white = Player.WhiteList ? Player.WhiteList : [];
+	settings.permissions.playerLists.friend = Player.FriendList ? Player.FriendList : [];
+	settings.permissions.playerLists.ghost = Player.GhostList ? Player.GhostList : [];
+	
+	if(Player.BlockItems)
+		for(var i = 0; i < Player.BlockItems.length; i++)
+			settings.permissions.itemLists.black.push(convertItemName(Player.BlockItems[i].Name, Player.BlockItems[i].Group));
+	
+	settings.gui.chat.labelColor = Player.LabelColor;
+	settings.gui.focus.transparentBackground = true;
+	
+	//settings.forceFullHeight = Player.ForceFullHeight;
+	
+	player.settings = settings;
 }
 
 function ConvertPlayerSkills(Player, player){
@@ -46,53 +65,57 @@ function ConvertPlayerSkills(Player, player){
 	player.skills = skills;
 }
 
-function ConvertPlayerClubRep(Player, player){
-	var clubRep = {jobs:{}, reputation:{}};
+function ConvertPlayerClubStanding(Player, player){
+	var clubStanding = {jobs:{}, reputation:{}};
 	
 	if(Player.Log){
 		for(var i = 0; i < Player.Log.length; i++){
 			var LogEntry = Player.Log[i];
 			if(LogEntry.Group == "Management" && LogEntry.Name == "ClubMistress"){
-				clubRep.jobs.mistress = {active:true}
+				clubStanding.jobs.mistress = {active:true}
 			}else if(LogEntry.Group == "Management" && LogEntry.Name == "MistressWasPaid"){
-				clubRep.jobs.mistress.paid = LogEntry.Value;
+				clubStanding.jobs.mistress.paid = LogEntry.Value;
 			}
 		}
 	}
 	
 	if(Player.Reputation)
 		for(var i = 0; i < Player.Reputation.length; i ++)
-			clubRep.reputation[Player.Reputation[i].Type] = Player.Reputation[i].Value;
+			clubStanding.reputation[Player.Reputation[i].Type] = Player.Reputation[i].Value;
 	
 	if(Player.Ownership)
-		clubRep.owner = {id:Player.Ownership.MemberNumber, name:Player.Ownership.Name};
+		clubStanding.owner = {id:Player.Ownership.MemberNumber, name:Player.Ownership.Name};
 	
 	if(Player.Lovership)
-		clubRep.lover = {id:Player.Lovership.MemberNumber, name:Player.Lovership.Name};
+		clubStanding.lover = {id:Player.Lovership.MemberNumber, name:Player.Lovership.Name};
 	
-	player.clubRep = clubRep;
+	player.clubStanding = clubStanding;
 }
 
 
 function ConvertPlayerInventory(Player, player){
 	var Inventory = Array.isArray(Player.Inventory) ? Player.Inventory : JSON.parse(LZString.decompressFromUTF16(Player.Inventory));
-	var inventory = {locksKeys:[], clothes:[], accessories:[], bondageToys:[], bondageToysBlocked:[]}
+	var inventory = {locksKeys:[], clothes:[], accessories:[], bondageToys:[]}
 	
 	for(var i = 0; i < Inventory.length; i++){
 		var itemName = Inventory[i][0], groupName = Inventory[i][1];
-		if(groupName == "ItemMisc" && itemName.includes("Padlock"))
+		
+		if(F3dcgAssets.UNIMPLEMENTED_ITEMS.includes(itemName)) continue;
+		
+		if(groupName == "ItemMisc" && itemName.includes("Padlock")){
 			inventory.locksKeys.push(itemName);
-		else if(F3dcgAssets.BondageToyGroups.includes(groupName))
+			continue;
+		}
+		
+		itemName = convertItemName(itemName, groupName);
+		
+		if(F3dcgAssets.BondageToyGroups.includes(groupName))
 			inventory[F3dcgAssets.BONDAGE_TOY].push(itemName)
 		else if(F3dcgAssets.AccessoriesGroups.includes(groupName))
 			inventory[F3dcgAssets.ACCESSORY].push(itemName);//assuming all cloth items are unique -- atm, the only collision is rope items
 		else if(F3dcgAssets.ClothesGroups.includes(groupName))
 			inventory[F3dcgAssets.CLOTH].push(itemName);
 	}
-	
-	if(Player.BlockItems)
-		for(var i = 0; i < Player.BlockItems.length; i++)
-			inventory.bondageToysBlocked.push(Player.BlockItems[i].Name);
 	
 	player.inventory = inventory;
 }
@@ -168,6 +191,7 @@ function convertItem(groupTypeName, AppItem){
 
 function convertBondageToy(AppItem){
 	if(! AppItem) return null;
+	AppItem.Name = convertItemName(AppItem.Name, AppItem.Group);
 	var AssetItem = F3dcgAssets.AssetGroups[AppItem.Group].Items[AppItem.Name];
 	
 	var variant;
@@ -177,6 +201,18 @@ function convertBondageToy(AppItem){
 	
 	return F3dcgAssets.BuildBondageToyAppearanceItem(AppItem.Name, AppItem.Color, variant);
 }
+
+function convertItemName(AppItemName, AppItemGroup){
+	var AssetItem = F3dcgAssets.AssetGroups[AppItemGroup].Items[AppItemName];
+	
+	if(! AssetItem){
+		AppItemName = AppItemName + "_" + AppItemGroup;
+		AssetItem = F3dcgAssets.AssetGroups[AppItemGroup].Items[AppItemName];
+		if(! AssetItem) throw AppItemGroup + " " + AppItemName;
+	}
+	return AppItemName;
+}
+
 function convertBodyItem(AppItem){
 	if(! AppItem) return null;  //Wardrobe comes without certain items
 	var variantName = (AppItem.Group == "Mouth" || AppItem.Group == "Eyes") && AppItem.Property ? AppItem.Property.Expression : null;

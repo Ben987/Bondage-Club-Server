@@ -5,6 +5,7 @@ var Util = require("./util.js");
 var Serializer = require("./serializer.js"); 
 var Locations = require("./locations.js");
 var F3dcgAssets = require("./assets.js");
+var Account = require("./account.js");
 
 //session info by socket id
 //session info by player id
@@ -40,6 +41,10 @@ exports.GetPlayer = GetPlayer;
 
 //var CurrentAccounts = {};//key is the memberNumber
 
+var F = function(abc){
+	this.abc = abc;
+}
+
 var MainServer = {
 	databaseHandle:null
 	,socketIo:null
@@ -51,7 +56,7 @@ var MainServer = {
 		var mslNamespace = socketIo.of('/msl');
 		mslNamespace.on('connection', function(socket) {
 			socket.on("GetPlayerCharacter", 		data => {MainServer.Request(MainServer.GetPlayerCharacter, data, socket)});
-			socket.on("UpdatePlayerProfile", 		data => {MainServer.Request(MainServer.UpdatePlayerProfile, data, socket)});
+			socket.on("UpdateAccountSettings", 		data => {MainServer.Request(MainServer.UpdateAccountSettings, data, socket)});
 			socket.on("GetAvailableLocations",		data => {MainServer.Request(MainServer.GetAvailableLocations, data, socket)});
 			socket.on("GetAvailableLocationTypes",	data => {MainServer.Request(MainServer.GetAvailableLocationTypes, data, socket)});
 			socket.on("CreateLocation",				data => {MainServer.Request(MainServer.CreateLocation, data, socket)});
@@ -82,9 +87,12 @@ var MainServer = {
 		});
 	}
 	
-	,UpdatePlayerProfile(data, socket){
+	,UpdateAccountSettings(data, socket){
 		var session = GetSession(socket);
-		session.player.profileSettings = data;
+		//TODO sanitize
+		//TODO update other players
+		//TODO serialize for self and other players
+		Account.UpdateAccountSettings(session.player, data);
 	}
 	
 	

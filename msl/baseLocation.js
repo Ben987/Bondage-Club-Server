@@ -38,8 +38,8 @@ var ProgressAction = function(location, player, type, originSpot, targetSpot, ta
 var Location = function(id, type, settings, spots, screens){
 	this.id = id;
 	this.type = type;
-	this.settings = settings; //local, immutable
-	this.spots = spots;		//shared, immutable
+	this.settings = settings;	 //local, immutable
+	this.spots = spots;			//shared, immutable
 	this.screens = screens;		//shared, immutable
 	
 	this.spotContents = {};  
@@ -73,6 +73,7 @@ Location.prototype.GetPlayerIdList = function(playerId){
 Location.prototype.GetSpotNameForPlayer = function(playerId){
 	for(var spotName in this.spotContents) if(this.spotContents[spotName].playerId == playerId) return spotName;
 }
+
 
 Location.prototype.PlayerEnter = function(player, requestedSpotName){
 	if(! requestedSpotName) requestedSpotName = "random";
@@ -121,6 +122,7 @@ Location.prototype.ActionProgress = function(player, data){
 	return action;
 }
 
+
 Location.prototype.ActionStart_ChatMessage = function(player, data){
 	return new InstantAction(player, "ChatMessage", null, null, {content:data.content});
 }
@@ -131,6 +133,7 @@ Location.prototype.ActionStart_AppearanceUpdateOther = function(player, data){
 	Assets.UpdateAppearance(data.appearanceUpdate, targetPlayer);
 	return new InstantAction(player, "AppearanceUpdateOther", null, Msl.GetPlayer(data.targetPlayerId), data.appearanceUpdate);
 }
+
 
 Location.prototype.ActionStart_AppearanceUpdateSelf = function(player, data){
 	Assets.UpdateAppearance(data.appearanceUpdate, player);
