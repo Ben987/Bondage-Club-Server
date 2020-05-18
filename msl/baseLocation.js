@@ -130,7 +130,7 @@ Location.prototype.ActionStart_ChatMessage = function(player, data){
 
 Location.prototype.ActionStart_AppearanceUpdateOther = function(player, data){
 	var targetPlayer = Msl.GetPlayer(data.targetPlayerId);
-	Assets.UpdateAppearance(data.appearanceUpdate, targetPlayer);
+	Assets.UpdateAppearance(data.appearanceUpdate, targetPlayer, player);
 	return new InstantAction(player, "AppearanceUpdateOther", null, Msl.GetPlayer(data.targetPlayerId), data.appearanceUpdate);
 }
 

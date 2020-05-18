@@ -19,7 +19,8 @@ var FieldDef = function(type, addParams){
 			case FieldDefType.BOOLEAN: 		return !! data;//let the client get the type right
 			case FieldDefType.HEX_COLOR: 	return data.length > 7 ? "" : data;
 			case FieldDefType.STRING: 		return typeof(data) == "string" ? data : "";
-			case FieldDefType.LIST:			return Array.isArray(data) ? data : [];//TODO validate array contents
+			case FieldDefType.LIST_PLAYERS:	return Array.isArray(data) ? data : [];//TODO validate array contents
+			case FieldDefType.LIST_ITEMS:	return Array.isArray(data) ? data : [];//TODO validate array contents
 			
 			default:throw "MisconfiguredDefinition " + this.type;
 		
@@ -42,13 +43,13 @@ var AccountSettingsStructure = {
 			,poses:new FieldDef(FieldDefType.INT)
 		}
 		,playerLists:{
-			black:new FieldDef(FieldDefType.LIST)
-			,white:new FieldDef(FieldDefType.LIST)
-			,friend:new FieldDef(FieldDefType.LIST)
-			,ghost:new FieldDef(FieldDefType.LIST)
+			black:new FieldDef(FieldDefType.LIST_INTS)
+			,white:new FieldDef(FieldDefType.LIST_INTS)
+			,friend:new FieldDef(FieldDefType.LIST_INTS)
+			,ghost:new FieldDef(FieldDefType.LIST_INTS)
 		}
 		,itemLists:{
-			black:new FieldDef(FieldDefType.LIST)
+			black:new FieldDef(FieldDefType.LIST_ITEMS)
 		}
 	},	
 	gui:{

@@ -4,7 +4,7 @@ var LZString = require('lz-string');
 var fs = require('fs');
 
 eval(fs.readFileSync('../Bondage-College/BondageClub/Assets/Female3DCG/Female3DCG.js', 'utf8'));
-eval(fs.readFileSync('../Bondage-College/Msl/Scripts/F3dcgAssets/MainAssets.js', 'utf8'));
+eval(fs.readFileSync('../Bondage-College/Msl/Scripts/F3dcgAssets/Assets.js', 'utf8'));
 eval(fs.readFileSync('../Bondage-College/Msl/Scripts/F3dcgAssets/Import.js', 'utf8'));
 eval(fs.readFileSync('../Bondage-College/Msl/Scripts/F3dcgAssets/Validation.js', 'utf8'));
 //eval(fs.readFileSync('../Bondage-College/Msl/Scripts/F3dcgAssets/Inventory.js', 'utf8'));
@@ -12,8 +12,8 @@ eval(fs.readFileSync('../Bondage-College/Msl/Scripts/F3dcgAssets/Validation.js',
 F3dcgAssets.Init();
 
 
-exports.UpdateAppearance = function(appearance, appearanceUpdate){
-	return F3dcgAssets.UpdateAppearance(appearance, appearanceUpdate);
+exports.UpdateAppearance = function(appearanceUpdate, targetPlayer, player){
+	return F3dcgAssets.UpdateAppearance(appearanceUpdate, targetPlayer, player);
 }
 
 exports.ConvertPlayer = function(Player){
@@ -25,7 +25,7 @@ exports.ConvertPlayer = function(Player){
 	ConvertPlayerClubStanding(Player, player);
 	ConvertPlayerSkills(Player, player);
 	ConvertPlayerSettings(Player, player);
-
+	
 	return player;
 }
 
