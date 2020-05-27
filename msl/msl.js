@@ -34,16 +34,13 @@ var GetSession = function(socket){
 }
 
 var GetPlayer = function(playerId){
-	return PlayerSessions[playerId].player;
+	var session = PlayerSessions[playerId];
+	return session ? session.player : null;
 }
 exports.GetPlayer = GetPlayer;
 
 
 //var CurrentAccounts = {};//key is the memberNumber
-
-var F = function(abc){
-	this.abc = abc;
-}
 
 var MainServer = {
 	databaseHandle:null
@@ -56,59 +53,77 @@ var MainServer = {
 		var mslNamespace = socketIo.of('/msl');
 		mslNamespace.on('connection', function(socket) {
 			socket.on("GetPlayerCharacter", 		data => {MainServer.Request(MainServer.GetPlayerCharacter, data, socket)});
-			socket.on("UpdateAccountSettings", 		data => {MainServer.Request(MainServer.UpdateAccountSettings, data, socket)});
+			socket.on("GetOnlineFriendList", 		data => {MainServer.Request(MainServer.GetOnlineFriendList, data, socket)});
+			socket.on("UpdatePlayerProperty",		data => {MainServer.Request(MainServer.UpdatePlayerProperty, data, socket)});
 			socket.on("GetAvailableLocations",		data => {MainServer.Request(MainServer.GetAvailableLocations, data, socket)});
 			socket.on("GetAvailableLocationTypes",	data => {MainServer.Request(MainServer.GetAvailableLocationTypes, data, socket)});
 			socket.on("CreateLocation",				data => {MainServer.Request(MainServer.CreateLocation, data, socket)});
 			socket.on("EnterLocation", 				data => {MainServer.Request(MainServer.EnterLocation, data, socket)});
 			socket.on("ExitLocation", 				data => {MainServer.Request(MainServer.ExitLocation, data, socket)});
 			socket.on("ActionStart", 				data => {MainServer.Request(MainServer.ActionStart, data, socket)});
-			socket.on("ActionProgress", 			data => {MainServer.Request(MainServer.ActionProgress, data, socket)})		});
+			socket.on("ActionProgress", 			data => {MainServer.Request(MainServer.ActionProgress, data, socket)});
+		});
 	}
 	
-	,Request(serverFunction, data, socket){
+	,Request(serverFunction, data, socket,  messageId){
 		//var start = Date.now();
-		try{serverFunction(data, socket);}catch(e){socket.emit("GeneralError", MainServer.Error(e));}
+		try{serverFunction(data.data, socket, data.meta.messageId);}catch(e){socket.emit("GeneralError", MainServer.Error(e, data.meta.messageId));}
 		//console.log(serverFunction.name + " took " + (Date.now() - start) + "ms");
 	}
-	,Error(e){if(e.name && e.message) console.log(e); return {meta:{success:false,error:e.toString()}};}
-	,Success(data){return {meta:{success:true},data:data};}
+	,Error(e, messageId){if(e.name && e.message) console.log(e); return {meta:{success:false,error:e.toString(),messageId:messageId}};}
+	,Success(messageId, data){return {meta:{success:true, messageId:messageId},data:data};}
 	
-	,GetPlayerCharacter(data, socket){
+	,GetPlayerCharacter(data, socket,  messageId){
 		MainServer.databaseHandle.collection("Accounts").findOne({MemberNumber : data.memberNumber}, function(err, Player) {
 			if (err) throw err;
 			if (Player === null)
-				socket.emit("LoginResponse", MainServer.Error("InvalidNamePassword"));
+				socket.emit("AllOfThem", MainServer.Error("InvalidNamePassword"));
 			else{
 				var player = F3dcgAssets.ConvertPlayer(Player);				
 				player = StartOrRenewSession(socket, player);
-				socket.emit("GetPlayerCharacter", MainServer.Success({player:Serializer.PlayerGeneralInfo(player)}));
+				socket.emit("AllOfThem", MainServer.Success(messageId,{player:Serializer.PlayerGeneralInfo(player)}));
 			}
 		});
 	}
 	
-	,UpdateAccountSettings(data, socket){
+	,GetOnlineFriendList(data, socket,  messageId){
 		var session = GetSession(socket);
-		//TODO sanitize
+		var friends = [];
+		var friendIds = session.player.character.playerLists.friend;
+		for(var i = 0; i < friendIds.length; i++){
+			var friend = GetPlayer(friendIds[i]);
+			if(friend && friend.character.playerLists.friend.includes(session.player.id)){
+				var location = CurrentLocations[session.locationId];	
+				friends.push({id:friend.id, name:friend.character.name, locationId: (location ?  location.id : null)});
+			}
+		}
+		
+		socket.emit("AllOfThem", MainServer.Success(messageId,{friends:friends}));
+	}
+	
+	
+	,UpdatePlayerProperty(data, socket,  messageId){
+		var session = GetSession(socket);
 		//TODO update other players
 		//TODO serialize for self and other players
-		Account.UpdateAccountSettings(session.player, data);
+		Account.UpdatePlayer(session.player, data.property, data.value, data.operation);
+		socket.emit("AllOfThem", MainServer.Success(messageId,{}));
 	}
 	
 	
-	,GetAvailableLocationTypes(data, socket){
-		socket.emit("GetAvailableLocationTypes", MainServer.Success({locationTypes:Locations.LocationTypes}));
+	,GetAvailableLocationTypes(data, socket, messageId){
+		socket.emit("AllOfThem", MainServer.Success(messageId,{locationTypes:Locations.LocationTypes}));
 	}
 	
 	
-	,GetAvailableLocations(data, socket){
+	,GetAvailableLocations(data, socket,  messageId){
 		var locations = [];
 		for(var key in CurrentLocations) locations.push(Serializer.Location(CurrentLocations[key]));
-		socket.emit("GetAvailableLocations", MainServer.Success({locations:locations})); 
+		socket.emit("AllOfThem", MainServer.Success(messageId,{locations:locations})); 
 	}
 	
 	
-	,CreateLocation(data, socket){
+	,CreateLocation(data, socket,  messageId){
 		var session = GetSession(socket);
 		var location = Locations.Factory.Build(data.locationType, data.settings, session.player);
 		CurrentLocations[location.id] = location;
@@ -116,57 +131,57 @@ var MainServer = {
 		var action = location.PlayerEnter(session.player, data.entrySpotName);
 		session.locationId = location.id;
 		
-		socket.emit("EnterLocation", MainServer.Success(Serializer.LocationAtSpot(location, action.targetSpotName)));
+		socket.emit("AllOfThem", MainServer.Success(messageId,Serializer.LocationAtSpot(location, action.targetSpotName)));
 	}
 	
 	
-	,EnterLocation(data, socket){
+	,EnterLocation(data, socket,  messageId){
 		var session = GetSession(socket);
 		var location = CurrentLocations[data.locationId];
 		
 		var action = location.PlayerEnter(session.player);
 		session.locationId = location.id;
 		
-		socket.emit("EnterLocation", MainServer.Success(Serializer.LocationAtSpot(location, action.targetSpotName)));
+		socket.emit("AllOfThem", MainServer.Success(messageId,Serializer.LocationAtSpot(location, action.targetSpotName)));
 		location.GetPlayerIdList().forEach(existingPlayerId => {
 			if(existingPlayerId != session.player.id)
-				PlayerSessions[existingPlayerId].socket.emit("PlayerEnterLocation", MainServer.Success({spotName:action.targetSpotName, player:Serializer.PlayerLocationOther(session.player)}));
+				PlayerSessions[existingPlayerId].socket.emit("AllOfThem", MainServer.Success(messageId,{spotName:action.targetSpotName, player:Serializer.PlayerLocationOther(session.player)}));
 		});
 	}
 	
 	
-	,ExitLocation(data, socket){
+	,ExitLocation(data, socket,  messageId){
 		var session = GetSession(socket);
 		var location = CurrentLocations[session.locationId];
 		var action = location.PlayerExit(session.player, data.spotName);
 		session.locationId = null;
 		
-		socket.emit("ExitLocation", MainServer.Success({}));
+		socket.emit("ExitLocation", MainServer.Success(messageId,{}));
 		location.GetPlayerIdList().forEach(existingPlayerId => {
 			if(existingPlayerId != session.player.id)
-				PlayerSessions[existingPlayerId].socket.emit("PlayerExitLocation", MainServer.Success({playerId:session.player.id}));
+				PlayerSessions[existingPlayerId].socket.emit("AllOfThem", MainServer.Success(messageId,{playerId:session.player.id}));
 		});				
 	}
 	
 	
-	,ActionStart(data, socket){
+	,ActionStart(data, socket,  messageId){
 		var session = GetSession(socket);
 		var location = CurrentLocations[session.locationId];		
 		var action = location.ActionStart(session.player, data);
 		
 		location.GetPlayerIdList().forEach(existingPlayerId => {
-			PlayerSessions[existingPlayerId].socket.emit("LocationAction", MainServer.Success(Serializer.LocationAction(session.player.id, action)));
+			PlayerSessions[existingPlayerId].socket.emit("AllOfThem", MainServer.Success(messageId,Serializer.LocationAction(session.player.id, action)));
 		});
 	}
 	
 	
-	,ActionProgress(data, socket){
+	,ActionProgress(data, socket,  messageId){
 		var session = GetSession(socket);
 		var location = CurrentLocations[session.locationId];
 		var action = location.ActionProgress(session.player, data);
 		
 		location.GetPlayerIdList().forEach(existingPlayerId => {
-			PlayerSessions[existingPlayerId].socket.emit("LocationAction", MainServer.Success(Serializer.LocationAction(session.player.id, action)));
+			PlayerSessions[existingPlayerId].socket.emit("AllOfThem", MainServer.Success(messageId,Serializer.LocationAction(session.player.id, action)));
 		});
 	}
 }

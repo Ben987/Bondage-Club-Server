@@ -17,7 +17,7 @@ exports.UpdateAppearance = function(appearanceUpdate, targetPlayer, player){
 }
 
 exports.ConvertPlayer = function(Player){
-	var player = {id:Player.MemberNumber, name:Player.Name};
+	var player = {id:Player.MemberNumber};
 	
 	ConvertPlayerAppearance(Player, player);
 	ConvertPlayerWardrobe(Player, player);
@@ -25,24 +25,49 @@ exports.ConvertPlayer = function(Player){
 	ConvertPlayerClubStanding(Player, player);
 	ConvertPlayerSkills(Player, player);
 	ConvertPlayerSettings(Player, player);
+	ConvertPlayerCharacter(Player, player);
+	ConvertPlayerAccount(Player, player);
 	
 	return player;
 }
 
 
+function ConvertPlayerAccount(Player, player){
+	player.account = {
+		name:Player.AccountName
+	}
+}
+function ConvertPlayerCharacter(Player, player){
+	var character = {
+		number:Player.MemberNumber
+		,name:Player.Name
+		,title:Player.Title
+		,created:Player.Creation
+		,playerLists:{}
+	}
+	
+	if(Player.Ownership)
+		character.owner = {id:Player.Ownership.MemberNumber, name:Player.Ownership.Name, created: Player.Ownership.Start, stage: Player.Ownership.Stage};
+	
+	if(Player.Lovership)
+		character.lover = {id:Player.Lovership.MemberNumber, name:Player.Lovership.Name, created: Player.Lovership.Start, stage: Player.Lovership.Stage};
+	
+	character.playerLists.black = Player.BlackList ? Player.BlackList : [];
+	character.playerLists.white = Player.WhiteList ? Player.WhiteList : [];
+	character.playerLists.friend = Player.FriendList ? Player.FriendList : [];
+	character.playerLists.ghost = Player.GhostList ? Player.GhostList : [];
+	
+	player.character = character;
+	
+}
 function ConvertPlayerSettings(Player, player){
-	var settings = {gui:{chat:{}, focus:{}},permissions:{itemLists:{black:[]}, playerLists:{}, actions:{}}};
+	var settings = {gui:{chat:{}, focus:{}},permissions:{itemLists:{black:[]}, actions:{}}};
 
 	//body and accessories are self only
 	settings.permissions.actions.bondageToys = Player.ItemPermission;
 	settings.permissions.actions.clothes = Player.ItemPermission;
 	settings.permissions.actions.arousal = Player.ItemPermission;
 	settings.permissions.actions.poses = Player.ItemPermission;
-	
-	settings.permissions.playerLists.black = Player.BlackList ? Player.BlackList : [];
-	settings.permissions.playerLists.white = Player.WhiteList ? Player.WhiteList : [];
-	settings.permissions.playerLists.friend = Player.FriendList ? Player.FriendList : [];
-	settings.permissions.playerLists.ghost = Player.GhostList ? Player.GhostList : [];
 	
 	if(Player.BlockItems)
 		for(var i = 0; i < Player.BlockItems.length; i++)
@@ -60,13 +85,14 @@ function ConvertPlayerSkills(Player, player){
 	var skills = {}
 	if(Player.Skill)
 		for(var i = 0; i < Player.Skill.length; i ++)
-			skills[Player.Skill[i].Type] = Player.Skill[i].Value;
+			skills[Player.Skill[i].Type.toLowerCase()] = Player.Skill[i].Level * 1000 + Player.Skill[i].Progress;
 	
 	player.skills = skills;
 }
 
 function ConvertPlayerClubStanding(Player, player){
 	var clubStanding = {jobs:{}, reputation:{}};
+	clubStanding.description = Player.Description ? Player.Description : "";
 	
 	if(Player.Log){
 		for(var i = 0; i < Player.Log.length; i++){
@@ -81,13 +107,7 @@ function ConvertPlayerClubStanding(Player, player){
 	
 	if(Player.Reputation)
 		for(var i = 0; i < Player.Reputation.length; i ++)
-			clubStanding.reputation[Player.Reputation[i].Type] = Player.Reputation[i].Value;
-	
-	if(Player.Ownership)
-		clubStanding.owner = {id:Player.Ownership.MemberNumber, name:Player.Ownership.Name};
-	
-	if(Player.Lovership)
-		clubStanding.lover = {id:Player.Lovership.MemberNumber, name:Player.Lovership.Name};
+			clubStanding.reputation[Player.Reputation[i].Type.toLowerCase()] = Player.Reputation[i].Value;
 	
 	player.clubStanding = clubStanding;
 }
