@@ -11,6 +11,9 @@ eval(fs.readFileSync('../Bondage-College/Msl/Scripts/F3dcgAssets/Validation.js',
 
 F3dcgAssets.Init();
 
+exports.ItemIsSupported = function(itemName){
+	return !! F3dcgAssets.ItemNameToGroupNameMap[itemName];
+}
 
 exports.UpdateAppearance = function(appearanceUpdate, targetPlayer, player){
 	return F3dcgAssets.UpdateAppearance(appearanceUpdate, targetPlayer, player);
@@ -22,7 +25,7 @@ exports.ConvertPlayer = function(Player){
 	ConvertPlayerAppearance(Player, player);
 	ConvertPlayerWardrobe(Player, player);
 	ConvertPlayerInventory(Player, player);
-	ConvertPlayerClubStanding(Player, player);
+	ConvertPlayerClub(Player, player);
 	ConvertPlayerSkills(Player, player);
 	ConvertPlayerSettings(Player, player);
 	ConvertPlayerCharacter(Player, player);
@@ -90,26 +93,26 @@ function ConvertPlayerSkills(Player, player){
 	player.skills = skills;
 }
 
-function ConvertPlayerClubStanding(Player, player){
-	var clubStanding = {jobs:{}, reputation:{}};
-	clubStanding.description = Player.Description ? Player.Description : "";
+function ConvertPlayerClub(Player, player){
+	var club = {jobs:{}, reputation:{}};
+	club.description = Player.Description ? Player.Description : "";
 	
 	if(Player.Log){
 		for(var i = 0; i < Player.Log.length; i++){
 			var LogEntry = Player.Log[i];
 			if(LogEntry.Group == "Management" && LogEntry.Name == "ClubMistress"){
-				clubStanding.jobs.mistress = {active:true}
+				club.jobs.mistress = {active:true}
 			}else if(LogEntry.Group == "Management" && LogEntry.Name == "MistressWasPaid"){
-				clubStanding.jobs.mistress.paid = LogEntry.Value;
+				club.jobs.mistress.paid = LogEntry.Value;
 			}
 		}
 	}
 	
 	if(Player.Reputation)
 		for(var i = 0; i < Player.Reputation.length; i ++)
-			clubStanding.reputation[Player.Reputation[i].Type.toLowerCase()] = Player.Reputation[i].Value;
+			club.reputation[Player.Reputation[i].Type.toLowerCase()] = Player.Reputation[i].Value;
 	
-	player.clubStanding = clubStanding;
+	player.club = club;
 }
 
 

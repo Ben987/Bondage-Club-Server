@@ -67,7 +67,7 @@ var MainServer = {
 	
 	,Request(serverFunction, data, socket,  messageId){
 		//var start = Date.now();
-		try{serverFunction(data.data, socket, data.meta.messageId);}catch(e){socket.emit("GeneralError", MainServer.Error(e, data.meta.messageId));}
+		try{serverFunction(data.data, socket, data.meta.messageId);}catch(e){socket.emit("AllOfThem", MainServer.Error(e, data.meta.messageId));}
 		//console.log(serverFunction.name + " took " + (Date.now() - start) + "ms");
 	}
 	,Error(e, messageId){if(e.name && e.message) console.log(e); return {meta:{success:false,error:e.toString(),messageId:messageId}};}
@@ -107,7 +107,7 @@ var MainServer = {
 		//TODO update other players
 		//TODO serialize for self and other players
 		Account.UpdatePlayer(session.player, data.property, data.value, data.operation);
-		socket.emit("AllOfThem", MainServer.Success(messageId,{}));
+		socket.emit("AllOfThem", MainServer.Success(messageId,data));
 	}
 	
 	
@@ -156,7 +156,7 @@ var MainServer = {
 		var action = location.PlayerExit(session.player, data.spotName);
 		session.locationId = null;
 		
-		socket.emit("ExitLocation", MainServer.Success(messageId,{}));
+		socket.emit("AllOfThem", MainServer.Success(messageId,{}));
 		location.GetPlayerIdList().forEach(existingPlayerId => {
 			if(existingPlayerId != session.player.id)
 				PlayerSessions[existingPlayerId].socket.emit("AllOfThem", MainServer.Success(messageId,{playerId:session.player.id}));
