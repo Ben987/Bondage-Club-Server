@@ -137,8 +137,9 @@ var PlayerFieldDef = {
 			chat:{
 				labelColor:new FieldDef(FieldDefType.HEX_COLOR)
 			},
-			focus:{
+			dialog:{
 				transparentBackground:new FieldDef(FieldDefType.BOOLEAN)
+				,fullScreen:new FieldDef(FieldDefType.BOOLEAN)
 			}
 		}
 	}

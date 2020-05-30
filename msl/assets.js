@@ -64,7 +64,7 @@ function ConvertPlayerCharacter(Player, player){
 	
 }
 function ConvertPlayerSettings(Player, player){
-	var settings = {gui:{chat:{}, focus:{}},permissions:{itemLists:{black:[]}, actions:{}}};
+	var settings = {gui:{chat:{}, dialog:{}},permissions:{itemLists:{black:[]}, actions:{}}};
 
 	//body and accessories are self only
 	settings.permissions.actions.bondageToys = Player.ItemPermission;
@@ -77,7 +77,8 @@ function ConvertPlayerSettings(Player, player){
 			settings.permissions.itemLists.black.push(convertItemName(Player.BlockItems[i].Name, Player.BlockItems[i].Group));
 	
 	settings.gui.chat.labelColor = Player.LabelColor;
-	settings.gui.focus.transparentBackground = true;
+	settings.gui.dialog.transparentBackground = true;
+	settings.gui.dialog.fullScreen = true;
 	
 	//settings.forceFullHeight = Player.ForceFullHeight;
 	
@@ -117,6 +118,8 @@ function ConvertPlayerClub(Player, player){
 
 
 function ConvertPlayerInventory(Player, player){
+	if(! Player.Inventory) return;
+
 	var Inventory = Array.isArray(Player.Inventory) ? Player.Inventory : JSON.parse(LZString.decompressFromUTF16(Player.Inventory));
 	var inventory = {locksKeys:[], clothes:[], accessories:[], bondageToys:[]}
 	

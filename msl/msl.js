@@ -13,9 +13,10 @@ var Account = require("./account.js");
 var PlayerSessions = {} //key is player id, value is session data (player and socket)
 var SocketsPlayers = {} //key is socket id, value is playerId
 var CurrentLocations = {} // key is location id
+var MainSessions = {} //key is session id, value is player id //TODO -- move main session management to app.js (but that requires refactoring)
 
 var StartOrRenewSession = function(socket, player){
-	if(! PlayerSessions[player.id]){//new session
+	if(! PlayerSessions[player.id]){
 		PlayerSessions[player.id] = {player:player, socket:socket};
 		SocketsPlayers[socket.id] = player.id;
 		console.log("New session " + socket.id + " for " + player.id);
@@ -40,6 +41,7 @@ var GetPlayer = function(playerId){
 exports.GetPlayer = GetPlayer;
 
 
+
 //var CurrentAccounts = {};//key is the memberNumber
 
 var MainServer = {
@@ -52,7 +54,10 @@ var MainServer = {
 		
 		var mslNamespace = socketIo.of('/msl');
 		mslNamespace.on('connection', function(socket) {
-			socket.on("GetPlayerCharacter", 		data => {MainServer.Request(MainServer.GetPlayerCharacter, data, socket)});
+			socket.on("GetAllUserNames", 			data => {MainServer.Request(MainServer.GetAllUserNames, data, socket)});//TODO:  remove this before going to prod.
+			socket.on("GetPlayerCharacter", 		data => {MainServer.Request(MainServer.GetPlayerCharacter, data, socket)});//TODO: remove this before going to prod
+			socket.on("StartMainSession", 			data => {MainServer.StartMainSession(data, socket)});// Starts main session, TODO: should be moved one level up
+			socket.on("LoginWithSessionToken",		data => {MainServer.Request(MainServer.LoginWithSessionToken, data, socket)});
 			socket.on("GetOnlineFriendList", 		data => {MainServer.Request(MainServer.GetOnlineFriendList, data, socket)});
 			socket.on("UpdatePlayerProperty",		data => {MainServer.Request(MainServer.UpdatePlayerProperty, data, socket)});
 			socket.on("GetAvailableLocations",		data => {MainServer.Request(MainServer.GetAvailableLocations, data, socket)});
@@ -65,25 +70,57 @@ var MainServer = {
 		});
 	}
 	
-	,Request(serverFunction, data, socket,  messageId){
+	,Request(serverFunction, data, socket){
 		//var start = Date.now();
-		try{serverFunction(data.data, socket, data.meta.messageId);}catch(e){socket.emit("AllOfThem", MainServer.Error(e, data.meta.messageId));}
+		try{serverFunction(data.data, socket, data.meta.messageId);}catch(e){socket.emit("GeneralResponse", MainServer.Error(e, data.meta.messageId));}
 		//console.log(serverFunction.name + " took " + (Date.now() - start) + "ms");
 	}
 	,Error(e, messageId){if(e.name && e.message) console.log(e); return {meta:{success:false,error:e.toString(),messageId:messageId}};}
 	,Success(messageId, data){return {meta:{success:true, messageId:messageId},data:data};}
 	
+	//TODO remove before going into prod
+	,GetAllUserNames(data, socket, messageId){
+		MainServer.databaseHandle.collection("Accounts").find({}).project({ _id : 1, MemberNumber : 1, Name : 1 }).toArray().then((players) => {
+			var d = {}
+			for(var i = 0; i < players.length; i++) d[players[i].MemberNumber] = players[i].Name;
+			socket.emit("GeneralResponse", MainServer.Success(messageId,d));
+		});
+	}
+	
+	
+	//TODO remove before going into prod
 	,GetPlayerCharacter(data, socket,  messageId){
-		MainServer.databaseHandle.collection("Accounts").findOne({MemberNumber : data.memberNumber}, function(err, Player) {
+		MainServer.databaseHandle.collection("Accounts").findOne({MemberNumber : data.playerId}, function(err, Player) {
 			if (err) throw err;
 			if (Player === null)
-				socket.emit("AllOfThem", MainServer.Error("InvalidNamePassword"));
+				socket.emit("GeneralResponse", MainServer.Error("InvalidNamePassword", messageId));
 			else{
 				var player = F3dcgAssets.ConvertPlayer(Player);				
 				player = StartOrRenewSession(socket, player);
-				socket.emit("AllOfThem", MainServer.Success(messageId,{player:Serializer.PlayerGeneralInfo(player)}));
+				socket.emit("GeneralResponse", MainServer.Success(messageId,{player:Serializer.PlayerGeneralInfo(player)}));
 			}
 		});
+	}
+	
+	,StartMainSession(data, socket){
+		MainSessions[data.mainSessionId] = data.playerId;
+	}
+
+	,LoginWithSessionToken(data, socket,  messageId){	
+		if(MainSessions[data.mainSessionId] == data.playerId){
+			MainServer.databaseHandle.collection("Accounts").findOne({MemberNumber : data.playerId}, function(err, Player) {
+				if (err) throw err;
+				if (Player === null)
+					socket.emit("GeneralResponse", MainServer.Error("InvalidNamePassword", messageId));
+				else{
+					var player = F3dcgAssets.ConvertPlayer(Player);
+					player = StartOrRenewSession(socket, player);
+					socket.emit("GeneralResponse", MainServer.Success(messageId, {player:Serializer.PlayerGeneralInfo(player)}));
+				}
+			});	
+		}
+		else
+			socket.emit("GeneralResponse", MainServer.Error("InvalidNamePassword", messageId));		
 	}
 	
 	,GetOnlineFriendList(data, socket,  messageId){
@@ -98,7 +135,7 @@ var MainServer = {
 			}
 		}
 		
-		socket.emit("AllOfThem", MainServer.Success(messageId,{friends:friends}));
+		socket.emit("GeneralResponse", MainServer.Success(messageId,{friends:friends}));
 	}
 	
 	
@@ -107,19 +144,19 @@ var MainServer = {
 		//TODO update other players
 		//TODO serialize for self and other players
 		Account.UpdatePlayer(session.player, data.property, data.value, data.operation);
-		socket.emit("AllOfThem", MainServer.Success(messageId,data));
+		socket.emit("GeneralResponse", MainServer.Success(messageId,data));
 	}
 	
 	
 	,GetAvailableLocationTypes(data, socket, messageId){
-		socket.emit("AllOfThem", MainServer.Success(messageId,{locationTypes:Locations.LocationTypes}));
+		socket.emit("GeneralResponse", MainServer.Success(messageId,{locationTypes:Locations.LocationTypes}));
 	}
 	
 	
 	,GetAvailableLocations(data, socket,  messageId){
 		var locations = [];
 		for(var key in CurrentLocations) locations.push(Serializer.Location(CurrentLocations[key]));
-		socket.emit("AllOfThem", MainServer.Success(messageId,{locations:locations})); 
+		socket.emit("GeneralResponse", MainServer.Success(messageId,{locations:locations})); 
 	}
 	
 	
@@ -131,7 +168,7 @@ var MainServer = {
 		var action = location.PlayerEnter(session.player, data.entrySpotName);
 		session.locationId = location.id;
 		
-		socket.emit("AllOfThem", MainServer.Success(messageId,Serializer.LocationAtSpot(location, action.targetSpotName)));
+		socket.emit("GeneralResponse", MainServer.Success(messageId,Serializer.LocationAtSpot(location, action.targetSpotName)));
 	}
 	
 	
@@ -142,10 +179,10 @@ var MainServer = {
 		var action = location.PlayerEnter(session.player);
 		session.locationId = location.id;
 		
-		socket.emit("AllOfThem", MainServer.Success(messageId,Serializer.LocationAtSpot(location, action.targetSpotName)));
+		socket.emit("GeneralResponse", MainServer.Success(messageId,Serializer.LocationAtSpot(location, action.targetSpotName)));
 		location.GetPlayerIdList().forEach(existingPlayerId => {
 			if(existingPlayerId != session.player.id)
-				PlayerSessions[existingPlayerId].socket.emit("AllOfThem", MainServer.Success(messageId,{spotName:action.targetSpotName, player:Serializer.PlayerLocationOther(session.player)}));
+				PlayerSessions[existingPlayerId].socket.emit("PlayerEnterLocation", MainServer.Success(messageId,{spotName:action.targetSpotName, player:Serializer.PlayerLocationOther(session.player)}));
 		});
 	}
 	
@@ -153,13 +190,13 @@ var MainServer = {
 	,ExitLocation(data, socket,  messageId){
 		var session = GetSession(socket);
 		var location = CurrentLocations[session.locationId];
-		var action = location.PlayerExit(session.player, data.spotName);
+		var action = location.PlayerExit(session.player, data.originSpotName);
 		session.locationId = null;
 		
-		socket.emit("AllOfThem", MainServer.Success(messageId,{}));
+		socket.emit("GeneralResponse", MainServer.Success(messageId,{}));
 		location.GetPlayerIdList().forEach(existingPlayerId => {
 			if(existingPlayerId != session.player.id)
-				PlayerSessions[existingPlayerId].socket.emit("AllOfThem", MainServer.Success(messageId,{playerId:session.player.id}));
+				PlayerSessions[existingPlayerId].socket.emit("PlayerExitLocation", MainServer.Success(messageId,{playerId:session.player.id}));
 		});				
 	}
 	
@@ -170,7 +207,7 @@ var MainServer = {
 		var action = location.ActionStart(session.player, data);
 		
 		location.GetPlayerIdList().forEach(existingPlayerId => {
-			PlayerSessions[existingPlayerId].socket.emit("AllOfThem", MainServer.Success(messageId,Serializer.LocationAction(session.player.id, action)));
+			PlayerSessions[existingPlayerId].socket.emit("LocationAction", MainServer.Success(messageId,Serializer.LocationAction(session.player.id, action)));
 		});
 	}
 	
@@ -181,7 +218,7 @@ var MainServer = {
 		var action = location.ActionProgress(session.player, data);
 		
 		location.GetPlayerIdList().forEach(existingPlayerId => {
-			PlayerSessions[existingPlayerId].socket.emit("AllOfThem", MainServer.Success(messageId,Serializer.LocationAction(session.player.id, action)));
+			PlayerSessions[existingPlayerId].socket.emit("LocationAction", MainServer.Success(messageId,Serializer.LocationAction(session.player.id, action)));
 		});
 	}
 }
