@@ -50,18 +50,44 @@ var Location = function(id, type, settings, spots, screens){
 exports.Location = Location;
 
 
+Location.prototype.PlayerDisconnect = function(player, spotName){
+	console.log("disconnect", player.id, spotName);
+	var spotName = this.GetSpotNameForPlayer(player.id);
+	this.spotContents[spotName].disconnected = Date.now();
+	
+	return {type:"PlayerDisconnect",playerId:player.id};
+}
+
+
 Location.prototype.PlayerExit = function(player, spotName){
 	console.log(player.id, spotName);
 	this.ValidatePlayerInSpot(player, spotName);
 	if(! this.spotContents[spotName].playerId == player.id) throw "PlayerNotInLocation " + player.id;
 	
-	delete this.spotContents[player.id];
+	delete this.spotContents[spotName].playerId;
 	
-	return {type:"ExitLocation",playerId:player.id};
+	return {type:"PlayerExit",playerId:player.id};
 }
 
 
-Location.prototype.GetPlayerIdList = function(playerId){
+
+Location.prototype.GetCapacity = function(){
+	var count = 0;
+	for(var spotName in this.spotContents) 
+		count++;
+	return count;	
+}
+
+Location.prototype.GetPlayerCount = function(){
+	var count = 0;
+	for(var spotName in this.spotContents) 
+		if(this.spotContents[spotName].playerId)
+			count++;
+	return count;	
+}
+
+
+Location.prototype.GetPlayerIdList = function(){
 	var ids = [];
 	for(var spotName in this.spotContents) 
 		if(this.spotContents[spotName].playerId)
@@ -71,7 +97,9 @@ Location.prototype.GetPlayerIdList = function(playerId){
 
 
 Location.prototype.GetSpotNameForPlayer = function(playerId){
-	for(var spotName in this.spotContents) if(this.spotContents[spotName].playerId == playerId) return spotName;
+	for(var spotName in this.spotContents) 
+		if(this.spotContents[spotName].playerId == playerId) 
+			return spotName;
 }
 
 
@@ -87,7 +115,7 @@ Location.prototype.PlayerEnter = function(player, requestedSpotName){
 		//assemble list of entrance spots available
 		if(! spotContent.playerId && this.spots[spotName].entrance) freeEntrySpotNames.push(spotName); 
 		
-		//case or reconnection, return immediately
+		// reconnect detected
 		if(spotContent.playerId == player.id) return {type:"PlayerReconnect", playerId:player.id, targetSpotName:spotName};
 		
 		//if the requested spot is occupied, grab a random spot;

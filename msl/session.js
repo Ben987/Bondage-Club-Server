@@ -45,8 +45,7 @@ exports.OnPlayerLoad = function(session, player){
 
 exports.ReplaceSessionAndEndPrevious = function(next, previous){
 	next.playerId = previous.playerId;
-	next.player = previous.player;		
-	next.locationId = previous.locationId;
+	next.player = previous.player;
 	
 	EndSession(previous);
 	
@@ -66,7 +65,6 @@ var Session = function(id){
 	this.socket = null;
 	this.playerId = null;
 	this.player = null;
-	this.locationId = null;
 	
 	this.created = Date.now();
 	this.updated = Date.now();
@@ -108,7 +106,7 @@ exports.StartSessionWithoutSocket = function(sessionId, playerId){
 
 var disconnectedSessionTtl = 1000*60;
 var halfMinMaintenance = function(){
-	console.log("half min main running, session gc");
+	//console.log("half min main running, session gc");
 	var now = Date.now();
 	for(var sessionId in CurrentSessions){
 		var session = CurrentSessions[sessionId];

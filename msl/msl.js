@@ -9,11 +9,18 @@ var Account = require("./account.js");
 var Session = require("./session.js");
 
 var CurrentLocations = {} // key is location id
+var PlayersLocations = {} // key is playerId, value is location id
 
 
 var GetPlayer = function(playerId){
-	return Session.GetSessionForPlayer(playerId).player;
+	var session = Session.GetSessionForPlayer(playerId);
+	return session ? session.player : null;
 }
+
+var GetLocationForPlayer = function(playerId){
+	return playerId ? CurrentLocations[PlayersLocations[playerId]] : null;
+}
+
 exports.GetPlayer = GetPlayer;
 
 
@@ -72,15 +79,16 @@ var MainServer = {
 	
 	//TODO remove before going into prod
 	,GetAllUserNames(data, session, messageId){
-		MainServer.databaseHandle.collection("Accounts").find({}).project({ _id : 1, MemberNumber : 1, Name : 1 }).toArray().then((players) => {
+		MainServer.databaseHandle.collection("Accounts").find({}, {projection:{MemberNumber:1, Name:1}}).toArray().then((players) => {
 			var d = {}
 			for(var i = 0; i < players.length; i++) d[players[i].MemberNumber] = players[i].Name;
 			session.socket.emit("GeneralResponse", MainServer.Success(messageId,d));
 		});
 	}
 	
-	//TODO reimplement one level higher
+	//TODO reimplement one level higher, cache player
 	,PreCreateSession(data, socket){
+		console.log("Precreating session, ", data);
 		Session.StartSessionWithoutSocket(data.sessionId, data.playerId);
 	}
 	
@@ -88,6 +96,16 @@ var MainServer = {
 		var session = Session.GetSessionForSocket(socket.id);
 		session.disconnected = Date.now();
 		console.log("Disconnected " + session.id);
+		
+		var location = GetLocationForPlayer(session.playerId);
+		if(location){
+			var action = location.PlayerDisconnect(session.player);
+			
+			location.GetPlayerIdList().forEach(existingPlayerId => {
+				if(existingPlayerId != session.player.id)
+					Session.GetSessionForPlayer(existingPlayerId).socket.emit("LocationAction", MainServer.Success(null,action));
+			});		
+		}
 		//Update the room, set the per session disconnect time 
 	}
 
@@ -97,8 +115,9 @@ var MainServer = {
 		var prevPlayerId = prevSession ? prevSession.playerId : null;	
 		if(prevPlayerId == data.playerId){
 			Session.ReplaceSessionAndEndPrevious(session, prevSession);
-			console.log("player " + session.playerId + " reconnected, " + prevSession.id + " => " + session.id);					
-			session.socket.emit("GeneralResponse", MainServer.Success(messageId, {sessionId:session.id}));
+			var prevLocationId = PlayersLocations[session.playerId];
+			console.log("player " + session.playerId + " reconnected, " + prevSession.id + " => " + session.id + ", location " + prevLocationId);
+			session.socket.emit("GeneralResponse", MainServer.Success(messageId, {sessionId:session.id, locationId:prevLocationId}));
 		}else{
 			session.socket.emit("GeneralResponse", MainServer.Error("MissingMainSessionId", messageId));		
 		}
@@ -114,14 +133,16 @@ var MainServer = {
 				if((prevSession.playerId != data.playerId)){
 					console.error("ERROR " + data.sessionId + " " + prevSession.playerId + " " + playerId);
 				}else{
-					console.log("player " + playerId + " reconnected, " + prevSession.id + " => " + session.id);
+					var prevLocationId = PlayersLocations[session.playerId];				
+					console.log("player " + playerId + " reconnected, " + prevSession.id + " => " + session.id + ", location " + prevLocationId);
 					Session.ReplaceSessionAndEndPrevious(session, prevSession);
-					session.socket.emit("GeneralResponse", MainServer.Success(messageId, {sessionId:session.id, playerId:playerId}));
+					session.socket.emit("GeneralResponse", MainServer.Success(messageId, {sessionId:session.id, playerId:playerId, locationId:prevLocationId}));
 				}
 			}else{
 				Session.OnLogin(session, playerId);
 				
-				session.socket.emit("GeneralResponse", MainServer.Success(messageId, {sessionId:session.id, playerId:playerId}));
+				var prevLocationId = PlayersLocations[session.playerId];
+				session.socket.emit("GeneralResponse", MainServer.Success(messageId, {sessionId:session.id, playerId:playerId, locationId:prevLocationId}));
 			}
 		}).catch((error) => {
 			console.log(error);
@@ -155,7 +176,7 @@ var MainServer = {
 		for(var i = 0; i < friendIds.length; i++){
 			var friend = GetPlayer(friendIds[i]);
 			if(friend && friend.character.playerLists.friend.includes(session.player.id)){
-				var location = CurrentLocations[session.locationId];	
+				var location = GetLocationForPlayer(session.playerId);
 				friends.push({id:friend.id, name:friend.character.name, locationId: (location ?  location.id : null)});
 			}
 		}
@@ -189,55 +210,58 @@ var MainServer = {
 		CurrentLocations[location.id] = location;
 		
 		var action = location.PlayerEnter(session.player, data.entrySpotName);
-		session.locationId = location.id;
+		PlayersLocations[session.player.id] = location.id; 
 		
 		session.socket.emit("GeneralResponse", MainServer.Success(messageId,Serializer.LocationAtSpot(location, action.targetSpotName)));
 	}
 	
 	
 	,EnterLocation(data, session, messageId){
+		var prevLocationId = PlayersLocations[session.playerId];
+		if(prevLocationId && data.locationId != prevLocationId) throw "PlayerAlreadyInLocation " + prevLocationId;
+		
 		var location = CurrentLocations[data.locationId];
 		
 		var action = location.PlayerEnter(session.player);
-		session.locationId = location.id;
+		PlayersLocations[session.playerId] = location.id; 
 		
 		session.socket.emit("GeneralResponse", MainServer.Success(messageId,Serializer.LocationAtSpot(location, action.targetSpotName)));
 		location.GetPlayerIdList().forEach(existingPlayerId => {
 			if(existingPlayerId != session.player.id)
-				PlayerSessions[existingPlayerId].session.socket.emit("PlayerEnterLocation", MainServer.Success(messageId,{spotName:action.targetSpotName, player:Serializer.PlayerLocationOther(session.player)}));
+				Session.GetSessionForPlayer(existingPlayerId).socket.emit("PlayerEnterLocation", MainServer.Success(null,{spotName:action.targetSpotName, player:Serializer.PlayerLocationOther(session.player)}));
 		});
 	}
 	
 	
 	,ExitLocation(data, session, messageId){
-		var location = CurrentLocations[session.locationId];
+		var location = GetLocationForPlayer(session.playerId);
 		var action = location.PlayerExit(session.player, data.originSpotName);
-		session.locationId = null;
+		delete PlayersLocations[session.playerId]
 		
 		session.socket.emit("GeneralResponse", MainServer.Success(messageId,{}));
 		location.GetPlayerIdList().forEach(existingPlayerId => {
 			if(existingPlayerId != session.player.id)
-				PlayerSessions[existingPlayerId].session.socket.emit("PlayerExitLocation", MainServer.Success(messageId,{playerId:session.player.id}));
-		});				
+				Session.GetSessionForPlayer(existingPlayerId).socket.emit("PlayerExitLocation", MainServer.Success(null,{playerId:session.player.id}));
+		});
 	}
 	
 	
 	,ActionStart(data, session, messageId){
-		var location = CurrentLocations[session.locationId];		
+		var location = GetLocationForPlayer(session.playerId);	
 		var action = location.ActionStart(session.player, data);
 		
 		location.GetPlayerIdList().forEach(existingPlayerId => {
-			PlayerSessions[existingPlayerId].session.socket.emit("LocationAction", MainServer.Success(messageId,Serializer.LocationAction(session.player.id, action)));
+			Session.GetSessionForPlayer(existingPlayerId).socket.emit("LocationAction", MainServer.Success(null,Serializer.LocationAction(session.player.id, action)));
 		});
 	}
 	
 	
 	,ActionProgress(data, session, messageId){
-		var location = CurrentLocations[session.locationId];
+		var location = GetLocationForPlayer(session.playerId);
 		var action = location.ActionProgress(session.player, data);
 		
 		location.GetPlayerIdList().forEach(existingPlayerId => {
-			PlayerSessions[existingPlayerId].session.socket.emit("LocationAction", MainServer.Success(messageId,Serializer.LocationAction(session.player.id, action)));
+			Session.GetSessionForPlayer(existingPlayerId).socket.emit("LocationAction", MainServer.Success(null,Serializer.LocationAction(session.player.id, action)));
 		});
 	}
 }

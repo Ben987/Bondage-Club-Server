@@ -84,5 +84,7 @@ exports.Location = function(location){
 	return{
 		id:location.id
 		,type:location.type
+		,capacity:location.GetCapacity()
+		,playerCount:location.GetPlayerCount()
 	};
 }
