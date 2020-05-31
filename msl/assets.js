@@ -125,6 +125,10 @@ function ConvertPlayerInventory(Player, player){
 	
 	for(var i = 0; i < Inventory.length; i++){
 		var itemName = Inventory[i][0], groupName = Inventory[i][1];
+		if(! itemName) {
+			itemName = Inventory[i].Name;
+			groupName = Inventory[i].Group;
+		}
 		
 		if(F3dcgAssets.UNIMPLEMENTED_ITEMS.includes(itemName)) continue;
 		
