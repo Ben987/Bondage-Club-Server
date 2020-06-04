@@ -1,6 +1,7 @@
 'use strict'
 
 var Util = require("./util.js"); 
+var Msl = require("./msl.js"); 
 
 var CurrentSessions = {};
 var SocketsSessions = {} //key is socket id, value is sessionId
@@ -43,11 +44,12 @@ exports.OnPlayerLoad = function(session, player){
 }
 
 
-exports.ReplaceSessionAndEndPrevious = function(next, previous){
+exports.ReplaceSessionAndDiscardPrevious = function(next, previous){
 	next.playerId = previous.playerId;
 	next.player = previous.player;
 	
-	EndSession(previous);
+	delete CurrentSessions[previous.id];	
+	delete SocketsSessions[previous.socket.id];
 	
 	if(next.playerId) 
 		PlayersSessions[next.playerId] = next.id;
@@ -89,9 +91,10 @@ var EndSession = function(session){
 	
 	if(session.player)
 		delete PlayersSessions[session.player.id];
-		
 	
 	delete CurrentSessions[session.id];
+	
+	Msl.OnSessionEnd(session);
 }
 //exports.EndSession = EndSession;
 
@@ -104,7 +107,7 @@ exports.StartSessionWithoutSocket = function(sessionId, playerId){
 	session.disconnected = Date.now();
 }
 
-var disconnectedSessionTtl = 1000*60;
+var disconnectedSessionTtl = 1000*15;
 var halfMinMaintenance = function(){
 	//console.log("half min main running, session gc");
 	var now = Date.now();
@@ -116,7 +119,7 @@ var halfMinMaintenance = function(){
 	console.log("session counts: total " + Object.keys(CurrentSessions).length + ", sockets " + Object.keys(SocketsSessions).length + ", players " + Object.keys(PlayersSessions).length);
 }
 
-var halfMinMaintenanceInterval = setInterval(halfMinMaintenance,  1000*30);
+var halfMinMaintenanceInterval = setInterval(halfMinMaintenance,  1000*10);
 
 
 /*exports.CurrentSessions = CurrentSessions;

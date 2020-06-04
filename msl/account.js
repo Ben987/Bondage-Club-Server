@@ -15,6 +15,7 @@ var FieldDef = function(type, params){
 	this.type = type;//primitive, arrayNum, arrayStr 
 	this.params = params;
 }
+
 	
 var Update = function(fieldDef, containingObject, fieldName, value, operation){
 	switch(fieldDef.type){

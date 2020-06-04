@@ -49,24 +49,32 @@ var Location = function(id, type, settings, spots, screens){
 }
 exports.Location = Location;
 
+//TODO:  Rooms should be the ones to decide when to evict players.  But too much for alpha
+Location.prototype.PlayerSessionEnd = function(playerId){
+	console.log("session end", playerId, spotName);
+	var spotName = this.GetSpotNameForPlayer(playerId);
+	
+	delete this.spotContents[spotName].playerId;
+	
+	return {type:"PlayerDisconnectTimeout",playerId:playerId};
+}
 
-Location.prototype.PlayerDisconnect = function(player, spotName){
-	console.log("disconnect", player.id, spotName);
+
+Location.prototype.PlayerDisconnect = function(player,){
 	var spotName = this.GetSpotNameForPlayer(player.id);
-	this.spotContents[spotName].disconnected = Date.now();
+	//this.spotContents[spotName].disconnected = Date.now();
 	
 	return {type:"PlayerDisconnect",playerId:player.id};
 }
 
 
 Location.prototype.PlayerExit = function(player, spotName){
-	console.log(player.id, spotName);
 	this.ValidatePlayerInSpot(player, spotName);
 	if(! this.spotContents[spotName].playerId == player.id) throw "PlayerNotInLocation " + player.id;
 	
 	delete this.spotContents[spotName].playerId;
 	
-	return {type:"PlayerExit",playerId:player.id};
+	return {type:"PlayerExitTimeout",playerId:player.id};
 }
 
 
@@ -108,7 +116,7 @@ Location.prototype.PlayerEnter = function(player, requestedSpotName){
 	if(requestedSpotName != "random" && this.spots[spotName]) throw "SpotNotFound " + spotName; 
 
 	var freeEntrySpotNames = [];
-
+	
 	for(var spotName in this.spots){
 		var spotContent = this.spotContents[spotName];
 		
