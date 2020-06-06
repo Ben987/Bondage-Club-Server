@@ -75,6 +75,7 @@ var MainServer = {
 			
 			socket.on("GetPlayerAccount", 			data => {MainServer.Request(MainServer.GetPlayerAccount, data, socket)});
 			socket.on("GetOnlineFriendList", 		data => {MainServer.Request(MainServer.GetOnlineFriendList, data, socket)});
+			socket.on("SendMessageToFriend", 		data => {MainServer.Request(MainServer.SendMessageToFriend, data, socket)});
 			socket.on("UpdatePlayerProperty",		data => {MainServer.Request(MainServer.UpdatePlayerProperty, data, socket)});
 			socket.on("GetAvailableLocations",		data => {MainServer.Request(MainServer.GetAvailableLocations, data, socket)});
 			socket.on("GetAvailableLocationTypes",	data => {MainServer.Request(MainServer.GetAvailableLocationTypes, data, socket)});
@@ -191,14 +192,38 @@ var MainServer = {
 		else{
 			MainServer.databaseHandle.collection("Accounts").findOne({MemberNumber : session.playerId}).then((Player) => {		
 				var player = F3dcgAssets.ConvertPlayer(Player);
-				
 				Session.OnPlayerLoad(session, player);
-				
 				session.socket.emit("GeneralResponse", MainServer.Success(messageId,{player:Serializer.PlayerGeneralInfo(session.player)}));
 			}).catch((error) => {
 				session.socket.emit("GeneralResponse", MainServer.Error(error, messageId));	
 			});	
 		}
+	}
+	
+	
+	,SendMessageToFriend(data, session, messageId){
+		var friendPlayerSession = Session.GetSessionForPlayer(data.targetPlayerId);
+		
+		if(! typeof(data.message) == "number"){
+			console.erroer("message not number");
+			return;
+		}
+		
+		if(! friendPlayerSession.player.character.playerLists.friend.includes(session.player.id)){
+			console.erroer("sending message to non-mutual friend");
+			return;
+		}
+		
+		var location = GetLocationForPlayer(session.playerId);
+		var data = {
+			message:data.message
+			,originPlayerId:session.playerId
+			,originPlayerName:session.player.character.name
+			,locationId:location ? location.id : this.undef
+			,locationName:location ? location.name : this.undef
+		}
+		
+		friendPlayerSession.socket.emit("FriendMessage", MainServer.Success(null, data));	
 	}
 	
 	
