@@ -126,6 +126,12 @@ var MainServer = {
 	
 	,Disconnect(socket){
 		var session = Session.GetSessionForSocket(socket.id);
+		
+		if(! session){
+			console.error("session not found for socket " + socket.id + ", session should be present for all sockets");
+			return;
+		}
+		
 		session.disconnected = Date.now();
 		console.log("Disconnected " + session.id);
 		
@@ -221,6 +227,7 @@ var MainServer = {
 			,originPlayerName:session.player.character.name
 			,locationId:location ? location.id : this.undef
 			,locationName:location ? location.name : this.undef
+			,locationType:location ? location.type : this.undef
 		}
 		
 		friendPlayerSession.socket.emit("FriendMessage", MainServer.Success(null, data));	
