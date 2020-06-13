@@ -330,6 +330,11 @@ function AccountUpdate(data, socket) {
 					if (!isLoverPresent) {
 						Account[P].Lovership.push({Name: data.Lover});
 						data.Lovership = Account[P].Lovership;
+						for (var L = 0; L < data.Lovership.length; L++) {
+							delete data.Lovership[L].BeginEngagementOfferedByMemberNumber;
+							delete data.Lovership[L].BeginWeddingOfferedByMemberNumber;
+							if (data.Lovership[L].BeginDatingOfferedByMemberNumber) data.Lovership.splice(L, 1);
+						}
 						socket.emit("AccountLovership", { Lovership: data.Lovership });
 					}
 					delete data.Lover;
