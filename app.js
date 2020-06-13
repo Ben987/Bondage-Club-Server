@@ -1176,6 +1176,17 @@ function AccountOwnership(data, socket) {
 function AccountLovership(data, socket) {
 	if ((data != null) && (typeof data === "object") && (data.MemberNumber != null) && (typeof data.MemberNumber === "number")) {
 
+		// Update the lovership and delete all unnecessary information
+		function AccountUpdateLovership(Lovership, MemberNumber, CurrentSocket = socket, Emit = true) {
+			for (var L = 0; L < Lovership.length; L++) {
+				delete Lovership[L].BeginEngagementOfferedByMemberNumber;
+				delete Lovership[L].BeginWeddingOfferedByMemberNumber;
+				if (Lovership[L].BeginDatingOfferedByMemberNumber) Lovership.splice(L, 1);
+			}
+			var L = { Lovership: Lovership };
+			Database.collection("Accounts").updateOne({ MemberNumber : MemberNumber}, { $set: L }, function(err, res) { if (err) throw err; });
+			if (Emit) CurrentSocket.emit("AccountLovership", L);
+		}
 
         // A Lover can break her relationship any time if not wed, or after a delay if official
 		var Acc = AccountGet(socket.id);
@@ -1214,14 +1225,11 @@ function AccountLovership(data, socket) {
 								if (Account[A].ChatRoom != null) ChatRoomSync(Account[A].ChatRoom, Account[A].MemberNumber);
 							}
 
-						Database.collection("Accounts").updateOne({ MemberNumber : data.MemberNumber}, { $set: { Lovership: P }}, function(err, res) { if (err) throw err; });
+						AccountUpdateLovership(P, data.MemberNumber, null,false);
 
 						// Updates the account that triggered the break up
 						Acc.Lovership.splice(AL, 1);
-						var O = { Lovership: Acc.Lovership };
-
-						Database.collection("Accounts").updateOne({ AccountName : Acc.AccountName }, { $set: O }, function(err, res) { if (err) throw err; });
-						socket.emit("AccountLovership", O);
+						AccountUpdateLovership(Acc.Lovership, Acc.MemberNumber)
 					}
 				});
 				return;
@@ -1229,9 +1237,7 @@ function AccountLovership(data, socket) {
 			// breaking with NPC
 			else if ((Acc.Lovership != null) && (data.MemberNumber < 0) && (data.Name != null)) {
 				Acc.Lovership.splice(AccLoversNumbers.indexOf(data.Name), 1);
-				var O = { Lovership: Acc.Lovership };
-				Database.collection("Accounts").updateOne({ AccountName : Acc.AccountName }, { $set: O }, function(err, res) { if (err) throw err; });
-				socket.emit("AccountLovership", O);
+				AccountUpdateLovership(Acc.Lovership, Acc.MemberNumber);
 				return;
 			}
 		}
@@ -1310,12 +1316,8 @@ function AccountLovership(data, socket) {
 								Acc.Lovership[AL] = { MemberNumber: data.MemberNumber, Name: Acc.ChatRoom.Account[A].Name, Start: CommonTime(), Stage: 0 };
 								if (TL >= 0) { Acc.ChatRoom.Account[A].Lovership[TL] = { MemberNumber: Acc.MemberNumber, Name: Acc.Name, Start: CommonTime(), Stage: 0 }; }
 								else { Acc.ChatRoom.Account[A].Lovership.push({ MemberNumber: Acc.MemberNumber, Name: Acc.Name, Start: CommonTime(), Stage: 0 }); }
-								var O = { Lovership: Acc.Lovership };
-								var P = { Lovership: Acc.ChatRoom.Account[A].Lovership }
-                                Database.collection("Accounts").updateOne({ AccountName : Acc.AccountName }, { $set: O }, function(err, res) { if (err) throw err; });
-                                Database.collection("Accounts").updateOne({ MemberNumber : Acc.Lovership[AL].MemberNumber}, { $set: P }, function(err, res) { if (err) throw err; });
-                                socket.emit("AccountLovership", O);
-								Acc.ChatRoom.Account[A].Socket.emit("AccountLovership", P);
+								AccountUpdateLovership( Acc.Lovership, Acc.MemberNumber);
+								AccountUpdateLovership( Acc.ChatRoom.Account[A].Lovership, Acc.Lovership[AL].MemberNumber, Acc.ChatRoom.Account[A].Socket);
 								var Dictionary = [];
 								Dictionary.push({ Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber });
 								Dictionary.push({ Tag: "TargetCharacter", Text: Acc.Lovership[AL].Name, MemberNumber: Acc.Lovership[AL].MemberNumber });
@@ -1330,12 +1332,8 @@ function AccountLovership(data, socket) {
 							if ((data.Action != null) && (data.Action === "Accept")) {
 								Acc.Lovership[AL] = { MemberNumber: data.MemberNumber, Name: Acc.ChatRoom.Account[A].Name, Start: CommonTime(), Stage: 1 };
 								Acc.ChatRoom.Account[A].Lovership[TL] = { MemberNumber: Acc.MemberNumber, Name: Acc.Name, Start: CommonTime(), Stage: 1 };
-								var O = { Lovership: Acc.Lovership };
-								var P = { Lovership: Acc.ChatRoom.Account[A].Lovership }
-								Database.collection("Accounts").updateOne({ AccountName : Acc.AccountName }, { $set: O }, function(err, res) { if (err) throw err; });
-								Database.collection("Accounts").updateOne({ MemberNumber : Acc.Lovership[AL].MemberNumber }, { $set: P }, function(err, res) { if (err) throw err; });
-								socket.emit("AccountLovership", O);
-								Acc.ChatRoom.Account[A].Socket.emit("AccountLovership", P);
+								AccountUpdateLovership( Acc.Lovership, Acc.MemberNumber);
+								AccountUpdateLovership( Acc.ChatRoom.Account[A].Lovership, Acc.Lovership[AL].MemberNumber, Acc.ChatRoom.Account[A].Socket);
 								var Dictionary = [];
 								Dictionary.push({ Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber });
 								Dictionary.push({ Tag: "TargetCharacter", Text: Acc.Lovership[AL].Name, MemberNumber: Acc.Lovership[AL].MemberNumber });
@@ -1350,12 +1348,8 @@ function AccountLovership(data, socket) {
 							if ((data.Action != null) && (data.Action === "Accept")) {
 								Acc.Lovership[AL] = { MemberNumber: data.MemberNumber, Name: Acc.ChatRoom.Account[A].Name, Start: CommonTime(), Stage: 2 };
 								Acc.ChatRoom.Account[A].Lovership[TL] = { MemberNumber: Acc.MemberNumber, Name: Acc.Name, Start: CommonTime(), Stage: 2 };
-								var O = { Lovership: Acc.Lovership };
-								var P = { Lovership: Acc.ChatRoom.Account[A].Lovership }
-								Database.collection("Accounts").updateOne({ AccountName : Acc.AccountName }, { $set: O }, function(err, res) { if (err) throw err; });
-								Database.collection("Accounts").updateOne({ MemberNumber : Acc.Lovership[AL].MemberNumber }, { $set: P }, function(err, res) { if (err) throw err; });
-								socket.emit("AccountLovership", O);
-								Acc.ChatRoom.Account[A].Socket.emit("AccountLovership", P);
+								AccountUpdateLovership( Acc.Lovership, Acc.MemberNumber);
+								AccountUpdateLovership( Acc.ChatRoom.Account[A].Lovership, Acc.Lovership[AL].MemberNumber, Acc.ChatRoom.Account[A].Socket);
 								var Dictionary = [];
 								Dictionary.push({ Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber });
 								Dictionary.push({ Tag: "TargetCharacter", Text: Acc.Lovership[AL].Name, MemberNumber: Acc.Lovership[AL].MemberNumber });
