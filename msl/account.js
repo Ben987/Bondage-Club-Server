@@ -130,8 +130,12 @@ var PlayerFieldDef = {
 				,arousal:new FieldDef(FieldDefType.INT, {min:0, max:5})
 				,poses:new FieldDef(FieldDefType.INT, {min:0, max:5})
 			}
-			,itemLists:{
-				black:new FieldDef(FieldDefType.LIST_ITEMS, {maxLength:15})
+			,items:{
+				black:new FieldDef(FieldDefType.LIST_ITEMS, {maxLength:16})
+			}
+			,players:{
+				black:new FieldDef(FieldDefType.LIST_PLAYERS, {maxLength:8})
+				,white:new FieldDef(FieldDefType.LIST_PLAYERS, {maxLength:4})
 			}
 		}
 		,gui:{
@@ -148,11 +152,8 @@ var PlayerFieldDef = {
 		description:new FieldDef(FieldDefType.STRING, {maxLength:10})
 	}
 	,character:{
-		playerLists:{
-			black:new FieldDef(FieldDefType.LIST_PLAYERS, {maxLength:8})
-			,white:new FieldDef(FieldDefType.LIST_PLAYERS, {maxLength:4})
-			,friend:new FieldDef(FieldDefType.LIST_PLAYERS, {maxLength:8})
-			,ghost:new FieldDef(FieldDefType.LIST_PLAYERS, {maxLength:4})
-		}
+		friends:new FieldDef(FieldDefType.LIST_PLAYERS, {maxLength:8})
+		,ghosts:new FieldDef(FieldDefType.LIST_PLAYERS, {maxLength:4})
+		
 	}		
 }

@@ -15,9 +15,18 @@ exports.ItemIsSupported = function(itemName){
 	return !! F3dcgAssets.ItemNameToGroupNameMap[itemName];
 }
 
-exports.UpdateAppearance = function(appearanceUpdate, targetPlayer, player){
-	return F3dcgAssets.UpdateAppearance(appearanceUpdate, targetPlayer, player);
+exports.UpdatePose = function(player, pose){
+	if(F3dcgAssets.POSE_NONE != pose && F3dcgAssets.POSE_KNEEL != pose) throw "IllegalPose " + pose;
+	var error = F3dcgAssets.ValidateCanChangePose(F3dcgAssets.BuildPosesEffectsBlocks(player));
+	if(error) throw error;
+	player.activePose = pose;
 }
+
+exports.UpdateAppearance = function(appearanceUpdate, targetPlayer, player){
+	F3dcgAssets.ValidateUpdateAppearanceOrThrow(appearanceUpdate, targetPlayer, player);
+	F3dcgAssets.UpdateAppearance(appearanceUpdate, targetPlayer, player);
+}
+
 
 exports.ConvertPlayer = function(Player){
 	var player = {id:Player.MemberNumber};
@@ -40,6 +49,8 @@ function ConvertPlayerAccount(Player, player){
 		name:Player.AccountName
 	}
 }
+
+//Currently, Server publishes white lists -- why?
 function ConvertPlayerCharacter(Player, player){
 	var character = {
 		number:Player.MemberNumber
@@ -54,17 +65,15 @@ function ConvertPlayerCharacter(Player, player){
 	
 	if(Player.Lovership)
 		character.lover = {id:Player.Lovership.MemberNumber, name:Player.Lovership.Name, created: Player.Lovership.Start, stage: Player.Lovership.Stage};
-	
-	character.playerLists.black = Player.BlackList ? Player.BlackList : [];
-	character.playerLists.white = Player.WhiteList ? Player.WhiteList : [];
-	character.playerLists.friend = Player.FriendList ? Player.FriendList : [];
-	character.playerLists.ghost = Player.GhostList ? Player.GhostList : [];
+
+	character.friends = Player.FriendList ? Player.FriendList : [];
+	character.ghosts = Player.GhostList ? Player.GhostList : [];
 	
 	player.character = character;
 	
 }
 function ConvertPlayerSettings(Player, player){
-	var settings = {gui:{chat:{}, dialog:{}},permissions:{itemLists:{black:[]}, actions:{}}};
+	var settings = {gui:{chat:{}, dialog:{}},permissions:{players:{}, items:{black:[]}, actions:{}}};
 
 	//body and accessories are self only
 	settings.permissions.actions.bondageToys = Player.ItemPermission;
@@ -74,7 +83,10 @@ function ConvertPlayerSettings(Player, player){
 	
 	if(Player.BlockItems)
 		for(var i = 0; i < Player.BlockItems.length; i++)
-			settings.permissions.itemLists.black.push(convertItemName(Player.BlockItems[i].Name, Player.BlockItems[i].Group));
+			settings.permissions.items.black.push(convertItemName(Player.BlockItems[i].Name, Player.BlockItems[i].Group));
+	
+	settings.permissions.players.black = Player.BlackList ? Player.BlackList : [];
+	settings.permissions.players.white = Player.WhiteList ? Player.WhiteList : [];
 	
 	settings.gui.chat.labelColor = Player.LabelColor;
 	settings.gui.dialog.transparentBackground = true;
@@ -226,8 +238,8 @@ function convertBondageToy(AppItem){
 	
 	var variant;
 	if(AssetItem.Variant) variant = Object.values(AssetItem.Variant)[0].Name;
-	if(AppItem.Property && AppItem.Property.Type)		variantName = AppItem.Property.Type;
-	if(AppItem.Property && AppItem.Property.Restrain)	variantName = AppItem.Property.Restrain;
+	if(AppItem.Property && AppItem.Property.Type)		variant = AppItem.Property.Type;
+	if(AppItem.Property && AppItem.Property.Restrain)	variant = AppItem.Property.Restrain;
 	
 	return F3dcgAssets.BuildBondageToyAppearanceItem(AppItem.Name, AppItem.Color, variant);
 }
@@ -238,7 +250,7 @@ function convertItemName(AppItemName, AppItemGroup){
 	if(! AssetItem){
 		AppItemName = AppItemName + "_" + AppItemGroup;
 		AssetItem = F3dcgAssets.AssetGroups[AppItemGroup].Items[AppItemName];
-		if(! AssetItem) throw AppItemGroup + " " + AppItemName;
+		if(! AssetItem) throw new Error(AppItemGroup + " " + AppItemName);
 	}
 	return AppItemName;
 }

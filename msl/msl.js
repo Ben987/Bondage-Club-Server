@@ -14,7 +14,7 @@ var PlayersLocations = {} // key is playerId, value is location id
 
 var GetPlayerOnlineMutualFriends = function(player){
 	var mutualFriends = [];
-	var friendIds = player.character.playerLists.friend;
+	var friendIds = player.character.friends;
 	
 	for(var i = 0; i < friendIds.length; i++){
 		var friend = GetPlayer(friendIds[i]);
@@ -201,7 +201,7 @@ var MainServer = {
 				Session.OnPlayerLoad(session, player);
 				session.socket.emit("GeneralResponse", MainServer.Success(messageId,{player:Serializer.PlayerGeneralInfo(session.player)}));
 			}).catch((error) => {
-				session.socket.emit("GeneralResponse", MainServer.Error(error, messageId));	
+				session.socket.emit("GeneralResponse", MainServer.Error(error.toString(), messageId));	
 			});	
 		}
 	}
@@ -307,6 +307,7 @@ var MainServer = {
 		var action = location.PlayerEnter(session.player);
 		PlayersLocations[session.playerId] = location.id; 
 		
+		console.log("LocationAtSpot");
 		session.socket.emit("GeneralResponse", MainServer.Success(messageId,Serializer.LocationAtSpot(location, action.targetSpotName)));
 		
 		var roomPlayerIds = location.GetPlayerIdList();

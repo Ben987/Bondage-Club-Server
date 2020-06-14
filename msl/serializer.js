@@ -8,7 +8,7 @@ var MSl = require("./msl.js");
 //Appearance Inventory Lovership
 
 var playerAccountDataFields = ["Name", "Log", "Inventory", "profileSettings", "Wardrobe", "WardrobeCharacterNames"];
-var playerLocationDataFieldsOther = ["AppearanceGrouped", "Inventory", "Lovership", "Ownership", "Lover", "Owner", "ItemPermission", "Reputation", "Skill", "Description"];
+var playerLocationDataFieldsOther = ["AppearanceGrouped", "Inventory", "Lovership", "Ownership", "Lover", "Owner", "ItemPermission", "Reputation", "Skill", "Description", "activePose"];
 var playerLocationDataFieldsSelf = playerLocationDataFieldsOther.slice();
 playerLocationDataFieldsSelf.push("AudioSettings", "ChatSettings", "GameplaySettings");
 
@@ -72,6 +72,8 @@ exports.LocationAtSpot = function(location, atSpotName){
 		var spotContents = location.spotContents[spotName];
 		if(spotContents.playerId) {
 			var player = MSl.GetPlayer(spotContents.playerId);
+			
+			console.log(player.id, player.activePose, atSpotName, spotName);
 			data.players[spotName] = atSpotName == spotName ? PlayerLocationSelf(player) : PlayerLocationOther(player);
 		}
 	}

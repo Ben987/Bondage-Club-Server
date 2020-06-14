@@ -144,7 +144,6 @@ Location.prototype.PlayerEnter = function(player, requestedSpotName){
 
 
 Location.prototype.ActionStart = function(player, data){
-	if(data.originSpotName)	this.ValidatePlayerInSpot(player, data.originSpotName);
 	var action = this["ActionStart_" + data.type](player, data);
 	return action;
 }
@@ -159,12 +158,19 @@ Location.prototype.ActionProgress = function(player, data){
 }
 
 
+Location.prototype.ActionStart_ChangePose = function(player, data){
+	Assets.UpdatePose(player, data.pose);
+	return new InstantAction(player, "ChangePose", player, null, data.pose);
+	
+}
+
 Location.prototype.ActionStart_ChatMessage = function(player, data){
 	return new InstantAction(player, "ChatMessage", null, null, {content:data.content});
 }
 
 
 Location.prototype.ActionStart_AppearanceUpdateOther = function(player, data){
+	this.ValidatePlayerNotActing(player, data.type);
 	var targetPlayer = Msl.GetPlayer(data.targetPlayerId);
 	Assets.UpdateAppearance(data.appearanceUpdate, targetPlayer, player);
 	return new InstantAction(player, "AppearanceUpdateOther", null, Msl.GetPlayer(data.targetPlayerId), data.appearanceUpdate);
@@ -172,43 +178,11 @@ Location.prototype.ActionStart_AppearanceUpdateOther = function(player, data){
 
 
 Location.prototype.ActionStart_AppearanceUpdateSelf = function(player, data){
+	this.ValidatePlayerNotActing(player, data.type);
 	Assets.UpdateAppearance(data.appearanceUpdate, player);
 	return new InstantAction(player, "AppearanceUpdateSelf", null, null, data.appearanceUpdate);
 }
-/*
-Location.prototype.ActionStart_Restrain = function(player, data){
-	this.ValidatePlayerInactive(player);
-	
-	var targetPlayer = this.players[data.targetPlayerId].player;
-	this.ValidatePlayerInSpot(targetPlayer, data.targetSpotName);
-	var connection = this.FindConnection(player, data.originSpotName, data.targetSpotName);
-	
-	if(connection.Restrain) return connection.Restrain(player, targetPlayer);
-	
-	var challenges = {[targetPlayer.id]:{type:"ComplyRefuse",autoProgress:1}};
-	return new ProgressAction(this, player, "Restrain", connection.origin, connection.target, targetPlayer, challenges, 20000
-			,function(senderPlayer, data){
-				if(data.result){
-					if(! targetPlayer.appClothBond.ItemNeck)
-						targetPlayer.appClothBond.ItemNeck = {name:"ShockCollar",color:""};
-					else
-						targetPlayer.appClothBond.ItemNeck = null;
-					
-					this.result = [
-						{playerId:targetPlayer.id, type:"AppClothBond", group:"ItemNeck", item:targetPlayer.appClothBond.ItemNeck}
-					]
-				}
-				
-				this.success = data.result;
-				this.finished = true;
-				this.location.players[player.id].action = null;
-				delete this.location.currentActions[this.id];
-			}
-	);
-		
-	return new ProgressAction(this, player, "Restrain", "ExplicitConsent", 10000, null, targetPlayer, null);
-}
-*/
+
 
 Location.prototype.ActionStart_SpotInfo = function(player, data){
 	var targetSpot = this.spots[data.targetSpotName];
@@ -218,6 +192,8 @@ Location.prototype.ActionStart_SpotInfo = function(player, data){
 
 
 Location.prototype.ActionStart_MoveToSpot = function(player, data){
+	this.ValidatePlayerNotActing(player, data.type);
+	this.ValidatePlayerInSpot(player, data.originSpotName);
 	this.ValidateSpotOccupiable(data.targetSpotName);
 	var connection = this.FindConnection(player, data.originSpotName, data.targetSpotName);
 	
@@ -226,7 +202,7 @@ Location.prototype.ActionStart_MoveToSpot = function(player, data){
 	var challenges = {[player.id]:{type:"AbCancel",autoProgress:.5,mashProgress:10}};
 	return new ProgressAction(this, player, "MoveToSpot", data.originSpotName, data.targetSpotName, null, challenges, 20000
 			,function(senderPlayer, data){
-				if(senderPlayer != player) throw "SenderPlayerIsNotOrigin";
+				if(senderPlayer.id != player.id) throw "SenderPlayerIsNotOrigin";
 				this.location.ValidateSpotOccupiable(this.targetSpotName);
 				this.location.ValidatePlayerInSpot(this.player, this.originSpotName);
 				this.success = true;
@@ -238,6 +214,13 @@ Location.prototype.ActionStart_MoveToSpot = function(player, data){
 	)
 }
 
+
+
+Location.prototype.ValidatePlayerNotActing = function(player, data){
+	for(var actionId in this.actions)
+		if(this.actions[actionId].player.id == player.id)
+			throw "ActionInProgress " + actionId + " " + this.actions[actionId].type;
+}
 
 Location.prototype.ValidatePlayerInactive = function(player){
 	//var currentAction = this.players[player.id].action;
