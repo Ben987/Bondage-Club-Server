@@ -550,7 +550,7 @@ function ChatRoomCreate(data, socket) {
 					Creator: Acc.Name,
 					Creation: CommonTime(),
 					Account: [],
-					Ban: [],
+					Ban: Array.isArray(data.Ban) ? data.Ban.filter(N => Number.isInteger(N)) : [],
 					Admin: [Acc.MemberNumber]
 				}
 				ChatRoom.push(NewRoom);
