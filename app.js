@@ -1183,12 +1183,13 @@ function AccountLovership(data, socket) {
 
 		// Update the lovership and delete all unnecessary information
 		function AccountUpdateLovership(Lovership, MemberNumber, CurrentSocket = socket, Emit = true) {
-			for (var L = 0; L < Lovership.length; L++) {
-				delete Lovership[L].BeginEngagementOfferedByMemberNumber;
-				delete Lovership[L].BeginWeddingOfferedByMemberNumber;
-				if (Lovership[L].BeginDatingOfferedByMemberNumber) Lovership.splice(L, 1);
+			var newLovership = Lovership.slice();
+			for (var L = newLovership.length - 1; L >= 0; L--) {
+				delete newLovership[L].BeginEngagementOfferedByMemberNumber;
+				delete newLovership[L].BeginWeddingOfferedByMemberNumber;
+				if (newLovership[L].BeginDatingOfferedByMemberNumber) newLovership.splice(L, 1);
 			}
-			var L = { Lovership: Lovership };
+			var L = { Lovership: newLovership };
 			Database.collection("Accounts").updateOne({ MemberNumber : MemberNumber}, { $set: L }, function(err, res) { if (err) throw err; });
 			if (Emit) CurrentSocket.emit("AccountLovership", L);
 		}
@@ -1221,7 +1222,8 @@ function AccountLovership(data, socket) {
 							TargetLoversNumbers.push(P[L].MemberNumber ? P[L].MemberNumber : -1);
 						}
 
-						P.splice(TargetLoversNumbers.indexOf(Acc.MemberNumber), 1);
+						if (Array.isArray(P)) P.splice(TargetLoversNumbers.indexOf(Acc.MemberNumber), 1);
+						else P = [];
 
 						for (var A = 0; A < Account.length; A++)
 							if (Account[A].MemberNumber == data.MemberNumber) {
@@ -1233,8 +1235,9 @@ function AccountLovership(data, socket) {
 						AccountUpdateLovership(P, data.MemberNumber, null,false);
 
 						// Updates the account that triggered the break up
-						Acc.Lovership.splice(AL, 1);
-						AccountUpdateLovership(Acc.Lovership, Acc.MemberNumber)
+						if (Array.isArray(Acc.Lovership)) Acc.Lovership.splice(AL, 1);
+						else Acc.Lovership = [];
+						AccountUpdateLovership(Acc.Lovership, Acc.MemberNumber);
 					}
 				});
 				return;
