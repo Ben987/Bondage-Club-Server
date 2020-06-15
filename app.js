@@ -831,7 +831,10 @@ function ChatRoomAdmin(data, socket) {
 
 		// Validates that the current account is a room administrator
 		var Acc = AccountGet(socket.id);
-		if ((Acc != null) && (Acc.MemberNumber != data.MemberNumber) && (Acc.ChatRoom != null) && (Acc.ChatRoom.Admin.indexOf(Acc.MemberNumber) >= 0)) {
+		if ((Acc != null) && (Acc.ChatRoom != null) && (Acc.ChatRoom.Admin.indexOf(Acc.MemberNumber) >= 0)) {
+
+			// Only certain actions can be performed by the administrator on themselves
+			if (Acc.MemberNumber == data.MemberNumber && data.Action != "Swap" && data.Action != "MoveLeft" && data.Action != "MoveRight") return;
 
 			// An administrator can update lots of room data.  The room values are sent back to the clients.
 			if (data.Action == "Update")
