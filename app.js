@@ -319,7 +319,7 @@ function AccountUpdate(data, socket) {
 				if ((data.WhiteList != null) && Array.isArray(data.WhiteList)) Account[P].WhiteList = data.WhiteList;
 				if ((data.BlackList != null) && Array.isArray(data.BlackList)) Account[P].BlackList = data.BlackList;
 				if ((data.FriendList != null) && Array.isArray(data.FriendList)) Account[P].FriendList = data.FriendList;
-				if ((data.Lover != null) && (Array.isArray(Account[P].Lovership)) && (Account[P].Lovership.length < 5)) {
+				if ((data.Lover != null) && (Array.isArray(Account[P].Lovership)) && (Account[P].Lovership.length < 5) && data.Lover.startsWith("NPC-")) {
 					var isLoverPresent = false;
 					for (var L = 0; L < Account[P].Lovership.length; L++) {
 						if ((Account[P].Lovership[L].Name != null) && (Account[P].Lovership[L].Name == data.Lover)) {
