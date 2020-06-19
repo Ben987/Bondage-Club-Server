@@ -14,12 +14,12 @@ var PlayersLocations = {} // key is playerId, value is location id
 
 var GetPlayerOnlineMutualFriends = function(player){
 	var mutualFriends = [];
-	var friendIds = player.character.friends;
+	var friendIds = player.profile.friends;
 	
 	for(var i = 0; i < friendIds.length; i++){
 		var friend = GetPlayer(friendIds[i]);
-		if(friend && friend.character.playerLists.friend.includes(player.id))
-			mutualFriends.push({id:friend.id, name:friend.character.name});
+		if(friend && friend.profile.friends.includes(player.id))
+			mutualFriends.push({id:friend.id, name:friend.profile.name});
 	}
 	
 	return mutualFriends;
@@ -215,7 +215,7 @@ var MainServer = {
 			return;
 		}
 		
-		if(! friendPlayerSession.player.character.playerLists.friend.includes(session.player.id)){
+		if(! friendPlayerSession.player.profile.friends.includes(session.player.id)){
 			console.erroer("sending message to non-mutual friend");
 			return;
 		}
@@ -224,7 +224,7 @@ var MainServer = {
 		var data = {
 			message:data.message
 			,originPlayerId:session.playerId
-			,originPlayerName:session.player.character.name
+			,originPlayerName:session.player.profile.name
 			,locationId:location ? location.id : this.undef
 			,locationName:location ? location.name : this.undef
 			,locationType:location ? location.type : this.undef
@@ -307,7 +307,6 @@ var MainServer = {
 		var action = location.PlayerEnter(session.player);
 		PlayersLocations[session.playerId] = location.id; 
 		
-		console.log("LocationAtSpot");
 		session.socket.emit("GeneralResponse", MainServer.Success(messageId,Serializer.LocationAtSpot(location, action.targetSpotName)));
 		
 		var roomPlayerIds = location.GetPlayerIdList();

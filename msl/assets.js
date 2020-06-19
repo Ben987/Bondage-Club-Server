@@ -31,14 +31,15 @@ exports.UpdateAppearance = function(appearanceUpdate, targetPlayer, player){
 exports.ConvertPlayer = function(Player){
 	var player = {id:Player.MemberNumber};
 	
+	ConvertPlayerAccount(Player, player);//private account settings such as email
+	ConvertPlayerProfile(Player, player);//profile and social such as name, title, friends
 	ConvertPlayerAppearance(Player, player);
 	ConvertPlayerWardrobe(Player, player);
 	ConvertPlayerInventory(Player, player);
-	ConvertPlayerClub(Player, player);
+	ConvertPlayerClub(Player, player);//clab standing, such as job info and mistress status
 	ConvertPlayerSkills(Player, player);
-	ConvertPlayerSettings(Player, player);
-	ConvertPlayerCharacter(Player, player);
-	ConvertPlayerAccount(Player, player);
+	ConvertPlayerSettings(Player, player);//ui settings and permissions
+	ConvertPlayerPermissions(Player, player);//ui settings and permissions
 	
 	return player;
 }
@@ -51,8 +52,8 @@ function ConvertPlayerAccount(Player, player){
 }
 
 //Currently, Server publishes white lists -- why?
-function ConvertPlayerCharacter(Player, player){
-	var character = {
+function ConvertPlayerProfile(Player, player){
+	var profile = {
 		number:Player.MemberNumber
 		,name:Player.Name
 		,title:Player.Title
@@ -61,36 +62,45 @@ function ConvertPlayerCharacter(Player, player){
 	}
 	
 	if(Player.Ownership)
-		character.owner = {id:Player.Ownership.MemberNumber, name:Player.Ownership.Name, created: Player.Ownership.Start, stage: Player.Ownership.Stage};
+		profile.owner = {id:Player.Ownership.MemberNumber, name:Player.Ownership.Name, created: Player.Ownership.Start, stage: Player.Ownership.Stage};
 	
-	if(Player.Lovership)
-		character.lover = {id:Player.Lovership.MemberNumber, name:Player.Lovership.Name, created: Player.Lovership.Start, stage: Player.Lovership.Stage};
+	
+	//TODO: with the multiple lovers, this is going to be an array
+	//if(Player.Lovership)
+		//profile.lover = {id:Player.Lovership.MemberNumber, name:Player.Lovership.Name, created: Player.Lovership.Start, stage: Player.Lovership.Stage};
 
-	character.friends = Player.FriendList ? Player.FriendList : [];
-	character.ghosts = Player.GhostList ? Player.GhostList : [];
+	profile.friends = Player.FriendList ? Player.FriendList : [];
+	profile.ghosts = Player.GhostList ? Player.GhostList : [];
 	
-	player.character = character;
+	player.profile = profile;
 	
 }
-function ConvertPlayerSettings(Player, player){
-	var settings = {gui:{chat:{}, dialog:{}},permissions:{players:{}, items:{black:[]}, actions:{}}};
-
+function ConvertPlayerPermissions(Player, player){
+	var permissions = {players:{}, items:{black:[]}, actions:{}}
+	
 	//body and accessories are self only
-	settings.permissions.actions.bondageToys = Player.ItemPermission;
-	settings.permissions.actions.clothes = Player.ItemPermission;
-	settings.permissions.actions.arousal = Player.ItemPermission;
-	settings.permissions.actions.poses = Player.ItemPermission;
+	permissions.actions.bondageToys = Player.ItemPermission;
+	permissions.actions.clothes = Player.ItemPermission;
+	permissions.actions.arousal = Player.ItemPermission;
+	permissions.actions.poses = Player.ItemPermission;
 	
 	if(Player.BlockItems)
 		for(var i = 0; i < Player.BlockItems.length; i++)
-			settings.permissions.items.black.push(convertItemName(Player.BlockItems[i].Name, Player.BlockItems[i].Group));
+			permissions.items.black.push(convertItemName(Player.BlockItems[i].Name, Player.BlockItems[i].Group));
 	
-	settings.permissions.players.black = Player.BlackList ? Player.BlackList : [];
-	settings.permissions.players.white = Player.WhiteList ? Player.WhiteList : [];
+	permissions.players.black = Player.BlackList ? Player.BlackList : [];
+	permissions.players.white = Player.WhiteList ? Player.WhiteList : [];
 	
-	settings.gui.chat.labelColor = Player.LabelColor;
-	settings.gui.dialog.transparentBackground = true;
-	settings.gui.dialog.fullScreen = true;
+	player.permissions = permissions;
+}
+
+
+function ConvertPlayerSettings(Player, player){
+	var settings = {chat:{}, dialog:{}};
+	
+	settings.chat.labelColor = Player.LabelColor;
+	settings.dialog.transparentBackground = true;
+	settings.dialog.fullScreen = true;
 	
 	//settings.forceFullHeight = Player.ForceFullHeight;
 	
@@ -164,12 +174,12 @@ function ConvertPlayerInventory(Player, player){
 
 function ConvertPlayerWardrobe(Player, player){
 	player.wardrobe = [];
-	if(! Player.WardrobeCharacterNames) return;
-	for(var j = 0; j < Player.WardrobeCharacterNames.length; j++){
+	if(! Player.WardrobeProfileNames) return;
+	for(var j = 0; j < Player.WardrobeProfileNames.length; j++){
 		if(Player.Wardrobe[j]){
 			var Appearance = Player.Wardrobe[j];
 			var appearance = {frame:{}};
-			player.wardrobe.push({name : Player.WardrobeCharacterNames[j], appearance:appearance});
+			player.wardrobe.push({name : Player.WardrobeProfileNames[j], appearance:appearance});
 			
 			var AppearanceGrouped = {};
 			for(var i = 0; i < Appearance.length; i++)

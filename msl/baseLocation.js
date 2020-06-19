@@ -10,6 +10,7 @@ var InstantAction = function(player, type, targetSpot, targetPlayer, result){
 	this.targetSpot = targetSpot;
 	this.targetPlayer = targetPlayer;
 	this.result = result;
+	this.name = "Sample Location Name";
 }
 
 

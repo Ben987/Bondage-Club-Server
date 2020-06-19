@@ -40,8 +40,6 @@ var Update = function(fieldDef, containingObject, fieldName, value, operation){
 		break;
 		
 		case FieldDefType.HEX_COLOR:
-			console.log(value);
-			console.log(typeof(value));
 			if(typeof(value) != "string")
 				throw "ValueNotString "  + fieldName;
 			if((value.length != 3 && value.length != 4  && value.length != 6 && value.length != 7))
@@ -123,35 +121,33 @@ exports.UpdatePlayer = function(player, property, value, operation){
 
 var PlayerFieldDef = {
 	settings:{
-		permissions:{
-			actions:{
-				bondageToys:new FieldDef(FieldDefType.INT, {min:0, max:5})
-				,clothes:new FieldDef(FieldDefType.INT, {min:0, max:5})
-				,arousal:new FieldDef(FieldDefType.INT, {min:0, max:5})
-				,poses:new FieldDef(FieldDefType.INT, {min:0, max:5})
-			}
-			,items:{
-				black:new FieldDef(FieldDefType.LIST_ITEMS, {maxLength:16})
-			}
-			,players:{
-				black:new FieldDef(FieldDefType.LIST_PLAYERS, {maxLength:8})
-				,white:new FieldDef(FieldDefType.LIST_PLAYERS, {maxLength:4})
-			}
-		}
-		,gui:{
-			chat:{
-				labelColor:new FieldDef(FieldDefType.HEX_COLOR)
-			},
-			dialog:{
-				transparentBackground:new FieldDef(FieldDefType.BOOLEAN)
-				,fullScreen:new FieldDef(FieldDefType.BOOLEAN)
-			}
+		chat:{
+			labelColor:new FieldDef(FieldDefType.HEX_COLOR)
+		},
+		dialog:{
+			transparentBackground:new FieldDef(FieldDefType.BOOLEAN)
+			,fullScreen:new FieldDef(FieldDefType.BOOLEAN)
 		}
 	}
+	,permissions:{
+		actions:{
+			bondageToys:new FieldDef(FieldDefType.INT, {min:0, max:5})
+			,clothes:new FieldDef(FieldDefType.INT, {min:0, max:5})
+			,arousal:new FieldDef(FieldDefType.INT, {min:0, max:5})
+			,poses:new FieldDef(FieldDefType.INT, {min:0, max:5})
+		}
+		,items:{
+			black:new FieldDef(FieldDefType.LIST_ITEMS, {maxLength:16})
+		}
+		,players:{
+			black:new FieldDef(FieldDefType.LIST_PLAYERS, {maxLength:8})
+			,white:new FieldDef(FieldDefType.LIST_PLAYERS, {maxLength:4})
+		}
+	}	
 	,club:{
 		description:new FieldDef(FieldDefType.STRING, {maxLength:10})
 	}
-	,character:{
+	,profile:{
 		friends:new FieldDef(FieldDefType.LIST_PLAYERS, {maxLength:8})
 		,ghosts:new FieldDef(FieldDefType.LIST_PLAYERS, {maxLength:4})
 		
