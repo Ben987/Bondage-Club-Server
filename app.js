@@ -1308,7 +1308,7 @@ function AccountLovership(data, socket) {
 					}
 
 			// A player can accept a proposal from another one
-			if (((Acc.Lovership.length < 5)) && (AL >= 0)) // No possible interaction if the player has reached the number of possible lovership or if isn't already a lover
+			if (((Acc.Lovership.length <= 5)) && (AL >= 0)) // No possible interaction if the player has reached the number of possible lovership or if isn't already a lover
 				for (var A = 0; ((Acc.ChatRoom != null) && (A < Acc.ChatRoom.Account.length)); A++)
 					if ((Acc.ChatRoom.Account[A].MemberNumber == data.MemberNumber) && (Acc.ChatRoom.Account[A].BlackList.indexOf(Acc.MemberNumber) < 0)) { // Cannot accept if on blacklist
 
