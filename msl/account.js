@@ -133,6 +133,7 @@ var PlayerFieldDef = {
 		actions:{
 			bondageToys:new FieldDef(FieldDefType.INT, {min:0, max:5})
 			,clothes:new FieldDef(FieldDefType.INT, {min:0, max:5})
+			,accessories:new FieldDef(FieldDefType.INT, {min:0, max:5})
 			,arousal:new FieldDef(FieldDefType.INT, {min:0, max:5})
 			,poses:new FieldDef(FieldDefType.INT, {min:0, max:5})
 		}

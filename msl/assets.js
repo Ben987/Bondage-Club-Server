@@ -22,6 +22,28 @@ exports.UpdatePose = function(player, pose){
 	player.activePose = pose;
 }
 
+
+
+exports.ClearPlayerAppearanceGroup = function(player, groupName){
+	var AssetGroup = F3dcgAssets.AssetGroups[groupName];
+	player.appearance[AssetGroup.type][groupName] = null;
+}
+
+exports.GetRemoveRestraintDifficulty = function(player, groupName){
+	var AssetGroup = F3dcgAssets.AssetGroups[groupName];
+	var currentItem = player.appearance[AssetGroup.type][groupName];
+	var AssetItem = AssetGroup.Items[currentItem.name]
+	
+	var difficulty;
+	if(currentItem.variant) 	difficulty = AssetItem.Variant[currentItem.variant].Difficulty;
+	if(typeof(difficulty) == "undefined")	difficulty = AssetItem.Difficulty;
+	if(currentItem.tightness)	difficulty += currentItem.tightness;
+	if(currentItem.lock)		difficulty += 4;
+	
+	return difficulty;
+}
+
+
 exports.UpdateAppearance = function(appearanceUpdate, targetPlayer, player){
 	F3dcgAssets.ValidateUpdateAppearanceOrThrow(appearanceUpdate, targetPlayer, player);
 	F3dcgAssets.UpdateAppearance(appearanceUpdate, targetPlayer, player);
@@ -38,8 +60,8 @@ exports.ConvertPlayer = function(Player){
 	ConvertPlayerInventory(Player, player);
 	ConvertPlayerClub(Player, player);//clab standing, such as job info and mistress status
 	ConvertPlayerSkills(Player, player);
-	ConvertPlayerSettings(Player, player);//ui settings and permissions
-	ConvertPlayerPermissions(Player, player);//ui settings and permissions
+	ConvertPlayerSettings(Player, player);//ui settings 
+	ConvertPlayerPermissions(Player, player);//permissions
 	
 	return player;
 }
@@ -79,8 +101,9 @@ function ConvertPlayerPermissions(Player, player){
 	var permissions = {players:{}, items:{black:[]}, actions:{}}
 	
 	//body and accessories are self only
-	permissions.actions.bondageToys = Player.ItemPermission;
-	permissions.actions.clothes = Player.ItemPermission;
+	permissions.actions[F3dcgAssets.BONDAGE_TOY] = Player.ItemPermission;
+	permissions.actions[F3dcgAssets.CLOTH] = Player.ItemPermission;
+	permissions.actions[F3dcgAssets.ACCESSORY] = Player.ItemPermission;
 	permissions.actions.arousal = Player.ItemPermission;
 	permissions.actions.poses = Player.ItemPermission;
 	
@@ -93,7 +116,6 @@ function ConvertPlayerPermissions(Player, player){
 	
 	player.permissions = permissions;
 }
-
 
 function ConvertPlayerSettings(Player, player){
 	var settings = {chat:{}, dialog:{}};
@@ -108,7 +130,7 @@ function ConvertPlayerSettings(Player, player){
 }
 
 function ConvertPlayerSkills(Player, player){
-	var skills = {}
+	var skills = {evasion:0, bondage:0};
 	if(Player.Skill)
 		for(var i = 0; i < Player.Skill.length; i ++)
 			skills[Player.Skill[i].Type.toLowerCase()] = Player.Skill[i].Level * 1000 + Player.Skill[i].Progress;
@@ -174,12 +196,12 @@ function ConvertPlayerInventory(Player, player){
 
 function ConvertPlayerWardrobe(Player, player){
 	player.wardrobe = [];
-	if(! Player.WardrobeProfileNames) return;
-	for(var j = 0; j < Player.WardrobeProfileNames.length; j++){
+	if(! Player.WardrobeCharacterNames) return;
+	for(var j = 0; j < Player.WardrobeCharacterNames.length; j++){
 		if(Player.Wardrobe[j]){
 			var Appearance = Player.Wardrobe[j];
 			var appearance = {frame:{}};
-			player.wardrobe.push({name : Player.WardrobeProfileNames[j], appearance:appearance});
+			player.wardrobe.push({name : Player.WardrobeCharacterNames[j], appearance:appearance});
 			
 			var AppearanceGrouped = {};
 			for(var i = 0; i < Appearance.length; i++)
@@ -251,7 +273,24 @@ function convertBondageToy(AppItem){
 	if(AppItem.Property && AppItem.Property.Type)		variant = AppItem.Property.Type;
 	if(AppItem.Property && AppItem.Property.Restrain)	variant = AppItem.Property.Restrain;
 	
-	return F3dcgAssets.BuildBondageToyAppearanceItem(AppItem.Name, AppItem.Color, variant);
+	var item = F3dcgAssets.BuildBondageToyAppearanceItem(AppItem.Name, AppItem.Color, variant);
+	
+	if(AppItem.Property && AppItem.Property.LockedBy){
+		item.lock = {name:AppItem.Property.LockedBy,originPlayerId:AppItem.Property.LockMemberNumber}
+		
+		item.lock.combination = AppItem.Property.CombinationNumber
+		
+		if(AppItem.Property.RemoveTimer){
+			item.lock.timer = {
+				time:AppItem.Property.RemoveTimer
+				,showTimer: item.lock.name == "TimerPadlock" || AppItem.Property.ShowTimer
+				,removeItem:AppItem.Property.RemoveItem
+				,enableInput:AppItem.Property.EnableRandomInput
+			}
+		}
+	}
+	
+	return item;
 }
 
 function convertItemName(AppItemName, AppItemGroup){

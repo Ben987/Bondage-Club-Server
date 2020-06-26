@@ -162,7 +162,6 @@ Location.prototype.ActionProgress = function(player, data){
 Location.prototype.ActionStart_ChangePose = function(player, data){
 	Assets.UpdatePose(player, data.pose);
 	return new InstantAction(player, "ChangePose", player, null, data.pose);
-	
 }
 
 Location.prototype.ActionStart_ChatMessage = function(player, data){
@@ -202,18 +201,54 @@ Location.prototype.ActionStart_MoveToSpot = function(player, data){
 
 	var challenges = {[player.id]:{type:"AbCancel",autoProgress:.5,mashProgress:10}};
 	return new ProgressAction(this, player, "MoveToSpot", data.originSpotName, data.targetSpotName, null, challenges, 20000
-			,function(senderPlayer, data){
+			,function(senderPlayer, status){
 				if(senderPlayer.id != player.id) throw "SenderPlayerIsNotOrigin";
 				this.location.ValidateSpotOccupiable(this.targetSpotName);
 				this.location.ValidatePlayerInSpot(this.player, this.originSpotName);
-				this.success = true;
+				
+				this.success = ! status.canceled;
 				this.finished = true;
-				this.location.spotContents[this.targetSpotName].playerId = player.id;
-				this.location.spotContents[this.originSpotName].playerId = null;
-				delete this.location.actions[this.id];
+				
+				if(this.success){
+					this.location.spotContents[this.targetSpotName].playerId = player.id;
+					this.location.spotContents[this.originSpotName].playerId = null;
+				}
+				
+				if(this.finished){
+					delete this.location.actions[this.id];
+				}
 			}
 	)
 }
+
+Location.prototype.ActionStart_StruggleRemoveSelf = function(player, data){
+	var groupName = data.groupName;
+	var difficulty = Assets.GetRemoveRestraintDifficulty(player, groupName);
+	var evasion = player.skills.Evasion ? player.skills.Evasion : 0; 
+	var extraChallenge = ((evasion/100 - difficulty) + 20) * 10; //the more, the easier
+	console.log(difficulty, player.skills.Evasion, extraChallenge);
+	//var challenges = {[player.id]:{type:"AbCancel",autoProgress:difficulty,mashProgress:4 + player.skills.evasion}};
+	
+	var challenges = {[player.id]:{type:"AbCancel",autoProgress:-0.5,mashProgress:10, extraChallenge:extraChallenge}};
+	return new ProgressAction(this, player, data.type, null, null, null, challenges, 20000
+			,function(senderPlayer, status){
+				if(senderPlayer.id != player.id) throw "SenderPlayerIsNotOrigin";
+				
+				this.success = ! status.canceled;
+				this.finished = true;
+				
+				if(this.success){
+					Assets.ClearPlayerAppearanceGroup(player, groupName);
+					this.result = {[groupName]:null};
+				}
+				
+				if(this.finished){
+					delete this.location.actions[this.id];
+				}
+			}
+	)
+}
+
 
 
 
