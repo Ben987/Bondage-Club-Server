@@ -278,7 +278,7 @@ function convertBondageToy(AppItem){
 	if(AppItem.Property && AppItem.Property.LockedBy){
 		item.lock = {name:AppItem.Property.LockedBy,originPlayerId:AppItem.Property.LockMemberNumber}
 		
-		item.lock.combination = AppItem.Property.CombinationNumber
+		item.lock.code = AppItem.Property.CombinationNumber;
 		
 		if(AppItem.Property.RemoveTimer){
 			item.lock.timer = {
@@ -317,6 +317,8 @@ function convertCloth(AppItem){
 	return AppItem ? F3dcgAssets.BuildClothAppearanceItem(AppItem.Name, AppItem.Color) : null;
 }
 function convertAccessory(AppItem){
-	return AppItem ? F3dcgAssets.BuildAccessoryAppearanceItem(AppItem.Name, AppItem.Color) : null;
+	if(! AppItem) return null;
+	var itemName = convertItemName(AppItem.Name, AppItem.Group);
+	return AppItem ? F3dcgAssets.BuildAccessoryAppearanceItem(itemName, AppItem.Color) : null;
 }
 
