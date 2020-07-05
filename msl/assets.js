@@ -83,9 +83,33 @@ function ConvertPlayerProfile(Player, player){
 		,playerLists:{}
 	}
 	
-	if(Player.Ownership)
-		profile.owner = {id:Player.Ownership.MemberNumber, name:Player.Ownership.Name, created: Player.Ownership.Start, stage: Player.Ownership.Stage};
-	
+	if(Player.Ownership){
+		profile.owner = {
+			id:Player.Ownership.MemberNumber
+			,name:Player.Ownership.Name
+			,created:Player.Ownership.Start
+			,stage:Player.Ownership.Stage
+		};
+		
+		if(Player.Log){
+			var rules = {};
+			for(var i = 0; i < Player.Log.length; i++){
+				var LogEntry = Player.Log[i];
+				switch(LogEntry.Name){
+					case "BlockChange":
+						rules.blockClothes = {active:true,expiration:LogEntry.Value};	break;
+					break;
+					case "BlockOwnerLockSelf":
+						rules.blockOwnerLockSelf = {active:true,expiration:LogEntry.Value};	break;
+					break;
+					case "BlockRemoteSelf":
+						rules.blockRemoteSelf = {active:true,expiration:LogEntry.Value};	break;
+					break;
+				}
+			}
+			profile.owner.rules = rules;
+		}	
+	}
 	
 	//TODO: with the multiple lovers, this is going to be an array
 	//if(Player.Lovership)
@@ -165,7 +189,7 @@ function ConvertPlayerInventory(Player, player){
 	if(! Player.Inventory) return;
 
 	var Inventory = Array.isArray(Player.Inventory) ? Player.Inventory : JSON.parse(LZString.decompressFromUTF16(Player.Inventory));
-	var inventory = {locksKeys:[], clothes:[], accessories:[], bondageToys:[]}
+	var inventory = {locksKeys:[], remotes:[], clothes:[], accessories:[], bondageToys:[]}
 	
 	for(var i = 0; i < Inventory.length; i++){
 		var itemName = Inventory[i][0], groupName = Inventory[i][1];
@@ -174,12 +198,17 @@ function ConvertPlayerInventory(Player, player){
 			groupName = Inventory[i].Group;
 		}
 		
-		if(F3dcgAssets.UNIMPLEMENTED_ITEMS.includes(itemName)) continue;
-		
 		if(groupName == "ItemMisc" && itemName.includes("Padlock")){
-			inventory.locksKeys.push(itemName);
+			if(! inventory.locksKeys.includes("itemName"))  inventory.locksKeys.push(itemName);
 			continue;
 		}
+		
+		if(itemName == "VibratorRemote"){
+			if(! inventory.remotes.includes("itemName")) inventory.remotes.push(itemName);
+			continue;
+		}
+		
+		if(F3dcgAssets.UNIMPLEMENTED_ITEMS.includes(itemName)) continue;
 		
 		itemName = convertItemName(itemName, groupName);
 		
