@@ -128,7 +128,6 @@ function ConvertPlayerPermissions(Player, player){
 	permissions.actions[F3dcgAssets.BONDAGE_TOY] = Player.ItemPermission;
 	permissions.actions[F3dcgAssets.CLOTH] = Player.ItemPermission;
 	permissions.actions[F3dcgAssets.ACCESSORY] = Player.ItemPermission;
-	permissions.actions.arousal = Player.ItemPermission;
 	permissions.actions.poses = Player.ItemPermission;
 	
 	if(Player.BlockItems)
@@ -137,6 +136,12 @@ function ConvertPlayerPermissions(Player, player){
 	
 	permissions.players.black = Player.BlackList ? Player.BlackList : [];
 	permissions.players.white = Player.WhiteList ? Player.WhiteList : [];
+	
+	var activity = {};
+	
+	//	permissions.actions.activity = Player.ItemPermission;
+	
+	permissions.actions.activity = activity;
 	
 	player.permissions = permissions;
 }
@@ -208,7 +213,7 @@ function ConvertPlayerInventory(Player, player){
 			continue;
 		}
 		
-		if(F3dcgAssets.UNIMPLEMENTED_ITEMS.includes(itemName)) continue;
+		if(F3dcgAssets.IgnoreItems.includes(itemName)) continue;
 		
 		itemName = convertItemName(itemName, groupName);
 		
