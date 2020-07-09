@@ -224,7 +224,7 @@ Location.prototype.ActionStart_MoveToSpot = function(player, data){
 Location.prototype.ActionStart_Activity = function(player, data){
 	var targetPlayer = Msl.GetPlayer(data.targetPlayerId);
 	this.ValidatePlayerNotActing(player, data.type);
-	return new InstantAction(player, "Activity", null, targetPlayer, {activityName:data.activityName, groupName:data.groupName});
+	return new InstantAction(player, "Activity", null, targetPlayer, {activityName:data.activityName, groupName:data.groupName, itemName:data.itemName});
 }
 
 

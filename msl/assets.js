@@ -327,6 +327,7 @@ function convertBondageToy(AppItem){
 	return item;
 }
 
+
 function convertItemName(AppItemName, AppItemGroup){
 	var AssetItem = F3dcgAssets.AssetGroups[AppItemGroup].Items[AppItemName];
 	
@@ -337,11 +338,10 @@ function convertItemName(AppItemName, AppItemGroup){
 	}
 	return AppItemName;
 }
-
 function convertBodyItem(AppItem){
 	if(! AppItem) return null;  //Wardrobe comes without certain items
 	var variantName = (AppItem.Group == "Mouth" || AppItem.Group == "Eyes") && AppItem.Property ? AppItem.Property.Expression : null;
-	return F3dcgAssets.BuildBodyAppearanceItem(AppItem.Name, AppItem.Color);
+	return F3dcgAssets.BuildBodyAppearanceItem(AppItem.Name, AppItem.Color, variantName);
 }
 function convertExpression(AppItem){
 	var itemName = AppItem.Property && AppItem.Property.Expression ? AppItem.Property.Expression : AppItem.Group ;
