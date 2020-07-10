@@ -2,6 +2,7 @@
 
 var Env = require("./environment.js");
 
+var BCrypt = require("bcrypt");
 var Util = require("./util.js"); 
 var Serializer = require("./serializer.js"); 
 var Locations = require("./locations.js");
@@ -111,11 +112,15 @@ var MainServer = {
 	
 	//TODO remove before going into prod
 	,GetAllUserNames(data, session, messageId){
-		MainServer.databaseHandle.collection("Accounts").find({}, {projection:{MemberNumber:1, Name:1}}).toArray().then((players) => {
-			var d = {}
-			for(var i = 0; i < players.length; i++) d[players[i].MemberNumber] = players[i].Name;
-			session.socket.emit("GeneralResponse", MainServer.Success(messageId,d));
-		});
+		if(!Env.LoginWithNumberOnly){
+			session.socket.emit("GeneralResponse", MainServer.Success(messageId, {}));
+		}else{
+			MainServer.databaseHandle.collection("Accounts").find({}, {projection:{MemberNumber:1, Name:1}}).toArray().then((players) => {
+				var d = {}
+				for(var i = 0; i < players.length; i++) d[players[i].MemberNumber] = players[i].Name;
+				session.socket.emit("GeneralResponse", MainServer.Success(messageId,d));
+			});
+		}
 	}
 	
 	//TODO reimplement one level higher, cache player
@@ -158,15 +163,15 @@ var MainServer = {
 			console.log("player " + session.playerId + " reconnected, " + prevSession.id + " => " + session.id + ", location " + prevLocationId);
 			session.socket.emit("GeneralResponse", MainServer.Success(messageId, {sessionId:session.id, locationId:prevLocationId}));
 		}else{
-			session.socket.emit("GeneralResponse", MainServer.Error("MissingMainSessionId", messageId));		
+			session.socket.emit("GeneralResponse", MainServer.Error("MissingMainSessionId", messageId));
 		}
 	}
 	
 	//Rewrite to use login credentials	
 	,Login(data, session, messageId){
-		MainServer.databaseHandle.collection("Accounts").findOne({MemberNumber : data.playerId}, {projection:{MemberNumber:1}}).then((PlayerHeader) => {	
+		var func = function(PlayerHeader){
 			var playerId = PlayerHeader.MemberNumber;
-			
+				
 			if(Session.IsPlayerInSession(playerId)){
 				var prevSession = Session.GetSessionForPlayer(playerId);
 				if((prevSession.playerId != data.playerId)){
@@ -182,12 +187,31 @@ var MainServer = {
 				
 				var prevLocationId = PlayersLocations[session.playerId];
 				session.socket.emit("GeneralResponse", MainServer.Success(messageId, {sessionId:session.id, playerId:playerId, locationId:prevLocationId}));
-			}
-		}).catch((error) => {
-			console.log(error);
-			session.socket.emit("GeneralResponse", MainServer.Error("InvalidNamePassword", messageId));	
-		});	
-		
+			}		
+		}
+	
+		if(Env.LoginWithNumberOnly){
+			MainServer.databaseHandle.collection("Accounts").findOne({MemberNumber : data.playerId}, {projection:{MemberNumber:1, Password:1}}).then((PlayerHeader) => {
+				func(PlayerHeader);
+			}).catch((error) => {
+				console.log(error);
+				session.socket.emit("GeneralResponse", MainServer.Error("InvalidNamePassword", messageId));	
+			});	
+		}else{
+			MainServer.databaseHandle.collection("Accounts").findOne({AccountName:data.AccountName}, {projection:{MemberNumber:1, Password:1}}).then((PlayerHeader) => {
+				BCrypt.compare(data.Password.toUpperCase(), PlayerHeader.Password, function( err, res ) {
+					if (res) {
+						func(PlayerHeader);
+					}else{
+						console.log(err);
+						session.socket.emit("GeneralResponse", MainServer.Error("InvalidNamePassword", messageId));	
+					}
+				});				
+			}).catch((error) => {
+				console.log(error);
+				session.socket.emit("GeneralResponse", MainServer.Error("InvalidNamePassword", messageId));	
+			});	
+		}
 	}
 	
 	

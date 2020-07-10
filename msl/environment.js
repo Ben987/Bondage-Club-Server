@@ -5,3 +5,5 @@ exports.ServerPort = 4288;
 
 exports.DatabaseURL = "mongodb://localhost:27017/BondageClubDatabase";
 exports.DatabaseName = "BondageClubDatabase";
+
+exports.LoginWithNumberOnly = true;
