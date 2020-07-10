@@ -1,6 +1,7 @@
 "use strict";
 
-var MainApp = require("../app.js");
+var Env = require("./environment.js");
+
 var Util = require("./util.js"); 
 var Serializer = require("./serializer.js"); 
 var Locations = require("./locations.js");
@@ -10,7 +11,6 @@ var Session = require("./session.js");
 
 var CurrentLocations = {} // key is location id
 var PlayersLocations = {} // key is playerId, value is location id
-
 
 var GetPlayerOnlineMutualFriends = function(player){
 	var mutualFriends = [];
@@ -365,4 +365,28 @@ var MainServer = {
 	}
 }
 
-exports.Init = MainServer.Init;
+if(Env.StandAlone){
+	var App = require("http").createServer();
+	var IO = require("socket.io")(App, { origins: process.env.ORIGINS || Env.DefaultOrigins, maxHttpBufferSize: 200000 } );
+	
+	var Database;
+	var DatabaseClient = require('mongodb').MongoClient;
+	
+	var DatabaseURL = process.env.DATABASE_URL || Env.DatabaseURL;
+	var DatabaseName = process.env.DATABASE_NAME || Env.DatabaseName;
+	
+	DatabaseClient.connect(DatabaseURL, { useUnifiedTopology: true, useNewUrlParser: true }, function(err, db) {
+		// Keeps the database object
+		if (err) throw err;
+		Database = db.db(DatabaseName);
+		console.log("Database: " + DatabaseName + " connected");
+		
+		var ServerPort = process.env.PORT || Env.ServerPort;
+		App.listen(ServerPort, function () {
+			console.log("Msl server is listening on " + (ServerPort).toString());
+			MainServer.Init(Database, IO);
+		});
+	});
+}else{
+	exports.Init = MainServer.Init;
+}
