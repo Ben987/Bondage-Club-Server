@@ -47,6 +47,8 @@ var Location = function(id, type, settings, spots, screens){
 	for(var spotName in spots) this.spotContents[spotName] = {};
 	
 	this.actions = {};
+	
+	this.lastExitTime = Date.now();
 }
 exports.Location = Location;
 
@@ -74,6 +76,8 @@ Location.prototype.PlayerExit = function(player, spotName){
 	if(! this.spotContents[spotName].playerId == player.id) throw "PlayerNotInLocation " + player.id;
 	
 	delete this.spotContents[spotName].playerId;
+	
+	this.lastExitTime = Date.now();
 	
 	return {type:"PlayerExitTimeout",playerId:player.id};
 }

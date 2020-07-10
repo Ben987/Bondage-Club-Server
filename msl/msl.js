@@ -167,9 +167,8 @@ var MainServer = {
 		}
 	}
 	
-	//Rewrite to use login credentials	
 	,Login(data, session, messageId){
-		var func = function(PlayerHeader){
+		var func = function(PlayerHeader){//Because nodejs
 			var playerId = PlayerHeader.MemberNumber;
 				
 			if(Session.IsPlayerInSession(playerId)){
@@ -414,3 +413,26 @@ if(Env.StandAlone){
 }else{
 	exports.Init = MainServer.Init;
 }
+
+
+var emptyRoomTtl = 1000*20;
+var halfMinMaintenance = function(){
+	//console.log("half min main running, session gc");
+	var now = Date.now();
+	var countTotal = 0, countDeleted = 0;
+
+	for(var locationId in CurrentLocations){
+		var location = CurrentLocations[locationId];
+		var playerCount = location.GetPlayerCount();
+		console.log(location.id + " has " + playerCount + " players");
+		
+		if(playerCount == 0 && now - location.lastExitTime > emptyRoomTtl){
+			delete CurrentLocations[locationId];
+			countDeleted++;
+		}else
+			countTotal++;
+	}
+	console.log("Room counts: deleted " + countDeleted + ", current " + countTotal); ;
+}
+
+var halfMinMaintenanceInterval = setInterval(halfMinMaintenance,  1000*10);

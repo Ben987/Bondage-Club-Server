@@ -107,7 +107,7 @@ exports.StartSessionWithoutSocket = function(sessionId, playerId){
 	session.disconnected = Date.now();
 }
 
-var disconnectedSessionTtl = 1000*15;
+var disconnectedSessionTtl = 1000*60;
 var halfMinMaintenance = function(){
 	//console.log("half min main running, session gc");
 	var now = Date.now();
@@ -119,7 +119,7 @@ var halfMinMaintenance = function(){
 	console.log("session counts: total " + Object.keys(CurrentSessions).length + ", sockets " + Object.keys(SocketsSessions).length + ", players " + Object.keys(PlayersSessions).length);
 }
 
-var halfMinMaintenanceInterval = setInterval(halfMinMaintenance,  1000*10);
+var halfMinMaintenanceInterval = setInterval(halfMinMaintenance,  1000*30);
 
 
 /*exports.CurrentSessions = CurrentSessions;
