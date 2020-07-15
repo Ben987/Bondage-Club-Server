@@ -123,8 +123,9 @@ var MainServer = {
 		}
 	}
 	
-	//TODO reimplement one level higher, cache player
+	//TODO more security
 	,PreCreateSession(data, socket){
+		if(Env.StandAlone) return;
 		console.log("Precreating session, ", data);
 		Session.StartSessionWithoutSocket(data.sessionId, data.playerId);
 	}
