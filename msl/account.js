@@ -144,6 +144,14 @@ var PlayerFieldDef = {
 			black:new FieldDef(FieldDefType.LIST_PLAYERS, {maxLength:8})
 			,white:new FieldDef(FieldDefType.LIST_PLAYERS, {maxLength:4})
 		}
+		,themes:{
+			shock:new FieldDef(FieldDefType.INT, {min:0, max:2})
+			,piercing:new FieldDef(FieldDefType.INT, {min:0, max:2})
+			,abdl:new FieldDef(FieldDefType.INT, {min:0, max:2})
+			,vags:new FieldDef(FieldDefType.INT, {min:0, max:2})
+			,ans:new FieldDef(FieldDefType.INT, {min:0, max:2})
+			,chastity:new FieldDef(FieldDefType.INT, {min:0, max:2})
+		}
 	}	
 	,club:{
 		description:new FieldDef(FieldDefType.STRING, {maxLength:10})

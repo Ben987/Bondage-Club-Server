@@ -122,13 +122,14 @@ function ConvertPlayerProfile(Player, player){
 	
 }
 function ConvertPlayerPermissions(Player, player){
-	var permissions = {players:{}, items:{black:[]}, actions:{}}
+	var permissions = {players:{}, items:{black:[]}, actions:{}, themes:{}}
 	
 	//body and accessories are self only
 	permissions.actions[F3dcgAssets.BONDAGE_TOY] = Player.ItemPermission;
 	permissions.actions[F3dcgAssets.CLOTH] = Player.ItemPermission;
 	permissions.actions[F3dcgAssets.ACCESSORY] = Player.ItemPermission;
 	permissions.actions.poses = Player.ItemPermission;
+	permissions.actions.activity = Player.ItemPermission;
 	
 	if(Player.BlockItems)
 		for(var i = 0; i < Player.BlockItems.length; i++)
@@ -137,12 +138,7 @@ function ConvertPlayerPermissions(Player, player){
 	permissions.players.black = Player.BlackList ? Player.BlackList : [];
 	permissions.players.white = Player.WhiteList ? Player.WhiteList : [];
 	
-	var activity = {};
-	
-	//	permissions.actions.activity = Player.ItemPermission;
-	
-	permissions.actions.activity = activity;
-	
+	permissions.themes = {abdl:2,vags:0,ans:1,piercing:1,chastity:0,shock:0};
 	player.permissions = permissions;
 }
 
