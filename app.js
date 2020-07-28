@@ -796,12 +796,13 @@ function ChatRoomCharacterArousalUpdate(data, socket) {
 		var Acc = AccountGet(socket.id);
 		if ((Acc != null) && (Acc.ArousalSettings != null)) {
 			Acc.ArousalSettings.OrgasmTimer = data.OrgasmTimer;
+			Acc.ArousalSettings.OrgasmCount = data.OrgasmCount;
 			Acc.ArousalSettings.Progress = data.Progress;
 			Acc.ArousalSettings.ProgressTimer = data.ProgressTimer;
 		}
 		for (var A = 0; (Acc != null) && (Acc.ChatRoom != null) && (Acc.ChatRoom.Account != null) && (A < Acc.ChatRoom.Account.length); A++)
 			if (Acc.ChatRoom.Account[A].MemberNumber != Acc.MemberNumber)
-				Acc.ChatRoom.Account[A].Socket.emit("ChatRoomSyncArousal", { MemberNumber: Acc.MemberNumber, OrgasmTimer: data.OrgasmTimer, Progress: data.Progress, ProgressTimer: data.ProgressTimer });
+				Acc.ChatRoom.Account[A].Socket.emit("ChatRoomSyncArousal", { MemberNumber: Acc.MemberNumber, OrgasmTimer: data.OrgasmTimer, OrgasmCount: data.OrgasmCount, Progress: data.Progress, ProgressTimer: data.ProgressTimer });
 	}
 }
 
