@@ -339,6 +339,7 @@ function AccountUpdate(data, socket) {
 					}
 					delete data.Lover;
 				}
+				if ((data.Title != null)) Account[P].Title = data.Title;
 
 				// If we have data to push
 				if (!ObjectEmpty(data)) Database.collection("Accounts").updateOne({ AccountName : Account[P].AccountName }, { $set: data }, function(err, res) { if (err) throw err; });
