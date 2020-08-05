@@ -484,7 +484,7 @@ function ChatRoomSearch(data, socket) {
 			// Builds a list of all public rooms, the last rooms created are shown first
 			var CR = [];
 			var C = 0;
-			for (var C = (ChatRoom.length - 1 - StartingRoom); ((C >= 0) && (CR.length <= NbRooms)); C--)
+			for (var C = ChatRoom.length - 1; ((C >= StartingRoom) && (CR.length <= NbRooms)); C--)
 				if (ChatRoom[C] != null && ((ShowFullRooms) || (ChatRoom[C].Account.length < ChatRoom[C].Limit)))
 					if ((Acc.Environment == ChatRoom[C].Environment) && (Space == ChatRoom[C].Space)) // Must be in same environment (prod/dev) and same space (hall/asylum)
 						if (ChatRoom[C].Ban.indexOf(Acc.MemberNumber) < 0) // The player cannot be banned
