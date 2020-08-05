@@ -472,11 +472,20 @@ function ChatRoomSearch(data, socket) {
 			var Space = "";
 			if ((data.Space != null) && (typeof data.Space === "string") && (data.Space.length <= 100)) Space = data.Space;
 
+			// Gets the search query options
+			var ShowFullRooms = false;
+			if ((data.ShowFullRooms != null) && (typeof data.ShowFullRooms === "boolean")) ShowFullRooms = data.ShowFullRooms;
+			var NbRooms = 24;
+			if ((data.NbRooms != null) && (typeof data.NbRooms === "number") && (data.NbRooms <= 24) && (data.NbRooms > 0)) NbRooms = data.NbRooms;
+			var StartingRoom = 0;
+			// We get the first page if the query is for an empty page
+			if ((data.StartingRoom != null) && (typeof data.StartingRoom === "number") && (data.StartingRoom >= 0) && (data.StartingRoom < ChatRoom.length)) StartingRoom = data.StartingRoom;
+			
 			// Builds a list of all public rooms, the last rooms created are shown first
 			var CR = [];
 			var C = 0;
-			for (var C = ChatRoom.length - 1; ((C >= 0) && (CR.length <= 60)); C--)
-				if (ChatRoom[C] != null)
+			for (var C = ChatRoom.length - 1; ((C >= StartingRoom) && (CR.length <= NbRooms)); C--)
+				if (ChatRoom[C] != null && ((ShowFullRooms) || (ChatRoom[C].Account.length < ChatRoom[C].Limit)))
 					if ((Acc.Environment == ChatRoom[C].Environment) && (Space == ChatRoom[C].Space)) // Must be in same environment (prod/dev) and same space (hall/asylum)
 						if (ChatRoom[C].Ban.indexOf(Acc.MemberNumber) < 0) // The player cannot be banned
 							if ((data.Query == "") || (ChatRoom[C].Name.toUpperCase().indexOf(data.Query) >= 0)) // Room name must contain the searched name, if any
@@ -505,7 +514,7 @@ function ChatRoomSearch(data, socket) {
 									}
 
 			// Sends the list to the client
-			socket.emit("ChatRoomSearchResult", CR);
+			socket.emit("ChatRoomSearchResult", { Result: CR, Total: ChatRoom.length });
 
 		}
 
