@@ -491,12 +491,10 @@ function ChatRoomSearch(data, socket) {
 				if ((ChatRoom[C] != null) && ((FullRooms) || (ChatRoom[C].Account.length < ChatRoom[C].Limit)))
 					if ((Acc.Environment == ChatRoom[C].Environment) && (Space == ChatRoom[C].Space)) // Must be in same environment (prod/dev) and same space (hall/asylum)
 						if (ChatRoom[C].Ban.indexOf(Acc.MemberNumber) < 0) // The player cannot be banned
-							// Room name cannot be ignored
-							if (IgnoredRooms.indexOf(ChatRoom[C].Name.toUpperCase()) == -1)
-								if ((data.Query == "") || (ChatRoom[C].Name.toUpperCase().indexOf(data.Query) >= 0)) // Room name must contain the searched name, if any
-									if (!ChatRoom[C].Locked || (ChatRoom[C].Admin.indexOf(Acc.MemberNumber) >= 0)) // Must be unlocked, unless the player is an administrator
-										if (!ChatRoom[C].Private || (ChatRoom[C].Name.toUpperCase() == data.Query)) { // If it's private, must know the exact name
-
+							if ((data.Query == "") || (ChatRoom[C].Name.toUpperCase().indexOf(data.Query) >= 0)) // Room name must contain the searched name, if any
+								if (!ChatRoom[C].Locked || (ChatRoom[C].Admin.indexOf(Acc.MemberNumber) >= 0)) // Must be unlocked, unless the player is an administrator
+									if (!ChatRoom[C].Private || (ChatRoom[C].Name.toUpperCase() == data.Query)) // If it's private, must know the exact name
+										if (IgnoredRooms.indexOf(ChatRoom[C].Name.toUpperCase()) == -1) { // Room name cannot be ignored
 											// Builds the searching account friend list in the current room
 											var Friends = [];
 											for (var A = 0; A < ChatRoom[C].Account.length; A++)
