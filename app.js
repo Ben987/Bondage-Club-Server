@@ -208,6 +208,7 @@ function AccountPurgeInfo(A) {
 	delete A.Password;
 	delete A.LastLogin;
 	delete A.GhostList;
+	delete A.HiddenItems;
 }
 
 // Load a single account file
@@ -245,10 +246,8 @@ function AccountLogin(data, socket) {
 							Database.collection("Accounts").updateOne({ AccountName : result.AccountName }, { $set: { MemberNumber: result.MemberNumber } }, function(err, res) { if (err) throw err; });
 						}
 
-						//Updates lovership if needed
-						if (!Array.isArray(result.Lovership)) {
-							 result.Lovership = result.Lovership != undefined ? [result.Lovership] : [];
-						}
+						// Updates lovership to an array if needed for conversion
+						if (!Array.isArray(result.Lovership)) result.Lovership = (result.Lovership != undefined) ? [result.Lovership] : [];
 
 						// Sets the last login date
 						result.LastLogin = CommonTime();
@@ -266,6 +265,7 @@ function AccountLogin(data, socket) {
 						result.Socket = socket;
 						AccountSendServerInfo(socket);
 						AccountPurgeInfo(result);
+
 					} else socket.emit("LoginResponse", "InvalidNamePassword");
 				});
 
@@ -394,7 +394,6 @@ function AccountQuery(data, socket) {
 						Index.push(Account[A].MemberNumber);
 					}
 				}
-
 
 				// Builds the online friend list, both players must be friends to find each other
 				for (var F = 0; F < Acc.FriendList.length; F++)
