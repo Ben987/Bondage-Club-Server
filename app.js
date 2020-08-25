@@ -781,7 +781,8 @@ function ChatRoomCharacterExpressionUpdate(data, socket) {
 // Updates a character pose for a chat room, this does not update the database
 function ChatRoomCharacterPoseUpdate(data, socket) {
 	if ((data != null) && (typeof data === "object")) {
-		if (typeof data.Pose !== "string") data.Pose = null;
+		if (typeof data.Pose !== "string" && !Array.isArray(data.Pose)) data.Pose = null;
+		if (Array.isArray(data.Pose)) data.Pose = data.Pose.filter(P => typeof P === "string");
 		var Acc = AccountGet(socket.id);
 		if (Acc != null) Acc.ActivePose = data.Pose;
 		for (var A = 0; (Acc != null) && (Acc.ChatRoom != null) && (Acc.ChatRoom.Account != null) && (A < Acc.ChatRoom.Account.length); A++)
