@@ -15,7 +15,7 @@
     "cover": "nyc --cache npm test; nyc report --reporter=html"
   },
   "dependencies": {
-    "bcrypt": "^3.0.4",
+    "bcrypt": "^5.0.0",
     "heroku": "^7.35.1",
     "js-yaml": "^3.13.1",
     "lodash": "^4.17.19",
