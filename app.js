@@ -44,13 +44,23 @@ var MailTransporter = NodeMailer.createTransport({
     }
 });
 
-// If the server received an unhandled error, we log it through console for future review and exit so the application can restart
+// If the server received an unhandled error, we log it through console for future review, send an email and exit so the application can restart
 process.on('uncaughtException', function(error) {
 	console.log("*************************");
 	console.log("Unhandled error occurred:");
-	console.log(error);
+	console.log(error.stack);
 	console.log("*************************");
-	process.exit(1);
+	var mailOptions = {
+		from: "donotreply@bondageprojects.com",
+		to: process.env.EMAIL_ADMIN || "",
+		subject: "Bondage Club Server Crash",
+		html: "Unhandled error occurred:<br />" + error.stack
+	};
+	MailTransporter.sendMail(mailOptions, function (err, info) {
+		if (err) console.log("Error while sending error email: " + err);
+		else console.log("Error email was sent");
+		process.exit(1);
+	});
 });
 
 // Connects to the Mongo Database
