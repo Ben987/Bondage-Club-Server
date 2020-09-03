@@ -44,6 +44,15 @@ var MailTransporter = NodeMailer.createTransport({
     }
 });
 
+// If the server received an unhandled error, we log it through console for future review and exit so the application can restart
+process.on('uncaughtException', function(error) {
+	console.log("*************************");
+	console.log("Unhandled error occurred:");
+	console.log(error);
+	console.log("*************************");
+	process.exit(1);
+});
+
 // Connects to the Mongo Database
 DatabaseClient.connect(DatabaseURL, { useUnifiedTopology: true, useNewUrlParser: true }, function(err, db) {
 	
