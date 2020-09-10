@@ -328,6 +328,7 @@ function AccountUpdate(data, socket) {
 				if ((data.Inventory != null) && (typeof data.Inventory === "string")) Account[P].Inventory = data.Inventory;
 				if (data.ItemPermission != null) Account[P].ItemPermission = data.ItemPermission;
 				if (data.ArousalSettings != null) Account[P].ArousalSettings = data.ArousalSettings;
+				if (data.OnlineSharedSettings != null) Account[P].OnlineSharedSettings = data.OnlineSharedSettings;
 				if (data.Game != null) Account[P].Game = data.Game;
 				if (data.LabelColor != null) Account[P].LabelColor = data.LabelColor;
 				if (data.Appearance != null) Account[P].Appearance = data.Appearance;
@@ -739,6 +740,7 @@ function ChatRoomSyncGetCharSharedData(Account) {
 	A.BlockItems = Account.BlockItems;
 	A.LimitedItems = Account.LimitedItems;
 	A.ArousalSettings = Account.ArousalSettings;
+	A.OnlineSharedSettings = Account.OnlineSharedSettings;
 	A.WhiteList = ((Account.ItemPermission < 3) && (Account.LimitedItems != null) && Array.isArray(Account.LimitedItems) && (Account.LimitedItems.length > 0)) ? Account.WhiteList : [];
 	A.Game = Account.Game;
 	return A;
