@@ -565,6 +565,7 @@ function ChatRoomCreate(data, socket) {
 			// Gets the space of the chat room (empty for public, asylum, etc.)
 			var Space = "";
 			if ((data.Space != null) && (typeof data.Space === "string") && (data.Space.length <= 100)) Space = data.Space;
+			if ((data.BlockCategory == null) || !Array.isArray(data.BlockCategory)) data.BlockCategory = [];
 
 			// Finds the account and links it to the new room
 			var Acc = AccountGet(socket.id);
@@ -583,6 +584,7 @@ function ChatRoomCreate(data, socket) {
 					Creation: CommonTime(),
 					Account: [],
 					Ban: [],
+					BlockCategory: data.BlockCategory,
 					Admin: [Acc.MemberNumber]
 				}
 				ChatRoom.push(NewRoom);
@@ -763,6 +765,7 @@ function ChatRoomSync(CR, SourceMemberNumber) {
 	R.SourceMemberNumber = SourceMemberNumber;
 	R.Locked = CR.Locked;
 	R.Private = CR.Private;
+	R.BlockCategory = CR.BlockCategory;
 
 	// Adds the characters from the room
 	R.Character = [];
