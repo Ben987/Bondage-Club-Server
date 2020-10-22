@@ -531,6 +531,7 @@ function ChatRoomSearch(data, socket) {
 												MemberCount: ChatRoom[C].Account.length,
 												MemberLimit: ChatRoom[C].Limit,
 												Description: ChatRoom[C].Description,
+												BlockCategory: ChatRoom[C].BlockCategory,
 												Friends: Friends
 											});
 
@@ -888,6 +889,8 @@ function ChatRoomAdmin(data, socket) {
 						Acc.ChatRoom.Name = data.Room.Name;
 						Acc.ChatRoom.Background = data.Room.Background;
 						Acc.ChatRoom.Description = data.Room.Description;
+						if ((data.Room.BlockCategory == null) || !Array.isArray(data.Room.BlockCategory)) data.Room.BlockCategory = [];
+						Acc.ChatRoom.BlockCategory = data.Room.BlockCategory;
 						Acc.ChatRoom.Ban = data.Room.Ban;
 						Acc.ChatRoom.Admin = data.Room.Admin;
 						Acc.ChatRoom.Limit = ((data.Room.Limit == null) || (typeof data.Room.Limit !== "string") || isNaN(parseInt(data.Room.Limit)) || (parseInt(data.Room.Limit) < 2) || (parseInt(data.Room.Limit) > 10)) ? 10 : parseInt(data.Room.Limit);
