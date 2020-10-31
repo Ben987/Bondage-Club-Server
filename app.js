@@ -492,6 +492,10 @@ function ChatRoomSearch(data, socket) {
 			var Space = "";
 			if ((data.Space != null) && (typeof data.Space === "string") && (data.Space.length <= 100)) Space = data.Space;
 
+			// Gets the game name currently being played in the chat room (empty for all games and non-games rooms)
+			var Game = "";
+			if ((data.Game != null) && (typeof data.Game === "string") && (data.Game.length <= 100)) Game = data.Game;
+
 			// Checks if the user requested full rooms
 			var FullRooms = false;
 			if ((data.FullRooms != null) && (typeof data.FullRooms === "boolean")) FullRooms = data.FullRooms;
@@ -510,32 +514,35 @@ function ChatRoomSearch(data, socket) {
 			for (var C = ChatRoom.length - 1; ((C >= 0) && (CR.length <= 60)); C--)
 				if ((ChatRoom[C] != null) && ((FullRooms) || (ChatRoom[C].Account.length < ChatRoom[C].Limit)))
 					if ((Acc.Environment == ChatRoom[C].Environment) && (Space == ChatRoom[C].Space)) // Must be in same environment (prod/dev) and same space (hall/asylum)
-						if (ChatRoom[C].Ban.indexOf(Acc.MemberNumber) < 0) // The player cannot be banned
-							if ((data.Query == "") || (ChatRoom[C].Name.toUpperCase().indexOf(data.Query) >= 0)) // Room name must contain the searched name, if any
-								if (!ChatRoom[C].Locked || (ChatRoom[C].Admin.indexOf(Acc.MemberNumber) >= 0)) // Must be unlocked, unless the player is an administrator
-									if (!ChatRoom[C].Private || (ChatRoom[C].Name.toUpperCase() == data.Query)) // If it's private, must know the exact name
-										if (IgnoredRooms.indexOf(ChatRoom[C].Name.toUpperCase()) == -1) { // Room name cannot be ignored
-											// Builds the searching account friend list in the current room
-											var Friends = [];
-											for (var A = 0; A < ChatRoom[C].Account.length; A++)
-												if (ChatRoom[C].Account[A] != null)
-													if ((ChatRoom[C].Account[A].Ownership != null) && (ChatRoom[C].Account[A].Ownership.MemberNumber != null) && (ChatRoom[C].Account[A].Ownership.MemberNumber == Acc.MemberNumber))
-														Friends.push({ Type: "Submissive", MemberNumber: ChatRoom[C].Account[A].MemberNumber, MemberName: ChatRoom[C].Account[A].Name});
-													else if ((Acc.FriendList != null) && (ChatRoom[C].Account[A].FriendList != null) && (Acc.FriendList.indexOf(ChatRoom[C].Account[A].MemberNumber) >= 0) && (ChatRoom[C].Account[A].FriendList.indexOf(Acc.MemberNumber) >= 0))
-														Friends.push({ Type: "Friend", MemberNumber: ChatRoom[C].Account[A].MemberNumber, MemberName: ChatRoom[C].Account[A].Name});
+						if ((Game == "") || (Game == ChatRoom[C].Game)) // If we must filter for a specific game in a chat room
+							if (ChatRoom[C].Ban.indexOf(Acc.MemberNumber) < 0) // The player cannot be banned
+								if ((data.Query == "") || (ChatRoom[C].Name.toUpperCase().indexOf(data.Query) >= 0)) // Room name must contain the searched name, if any
+									if (!ChatRoom[C].Locked || (ChatRoom[C].Admin.indexOf(Acc.MemberNumber) >= 0)) // Must be unlocked, unless the player is an administrator
+										if (!ChatRoom[C].Private || (ChatRoom[C].Name.toUpperCase() == data.Query)) // If it's private, must know the exact name
+											if (IgnoredRooms.indexOf(ChatRoom[C].Name.toUpperCase()) == -1) { // Room name cannot be ignored
 
-											// Builds a room object with all data
-											CR.push({
-												Name: ChatRoom[C].Name,
-												Creator: ChatRoom[C].Creator,
-												MemberCount: ChatRoom[C].Account.length,
-												MemberLimit: ChatRoom[C].Limit,
-												Description: ChatRoom[C].Description,
-												BlockCategory: ChatRoom[C].BlockCategory,
-												Friends: Friends
-											});
+												// Builds the searching account friend list in the current room
+												var Friends = [];
+												for (var A = 0; A < ChatRoom[C].Account.length; A++)
+													if (ChatRoom[C].Account[A] != null)
+														if ((ChatRoom[C].Account[A].Ownership != null) && (ChatRoom[C].Account[A].Ownership.MemberNumber != null) && (ChatRoom[C].Account[A].Ownership.MemberNumber == Acc.MemberNumber))
+															Friends.push({ Type: "Submissive", MemberNumber: ChatRoom[C].Account[A].MemberNumber, MemberName: ChatRoom[C].Account[A].Name});
+														else if ((Acc.FriendList != null) && (ChatRoom[C].Account[A].FriendList != null) && (Acc.FriendList.indexOf(ChatRoom[C].Account[A].MemberNumber) >= 0) && (ChatRoom[C].Account[A].FriendList.indexOf(Acc.MemberNumber) >= 0))
+															Friends.push({ Type: "Friend", MemberNumber: ChatRoom[C].Account[A].MemberNumber, MemberName: ChatRoom[C].Account[A].Name});
 
-										}
+												// Builds a room object with all data
+												CR.push({
+													Name: ChatRoom[C].Name,
+													Creator: ChatRoom[C].Creator,
+													MemberCount: ChatRoom[C].Account.length,
+													MemberLimit: ChatRoom[C].Limit,
+													Description: ChatRoom[C].Description,
+													BlockCategory: ChatRoom[C].BlockCategory,
+													Game: ChatRoom[C].Game,
+													Friends: Friends
+												});
+
+											}
 
 			// Sends the list to the client
 			socket.emit("ChatRoomSearchResult", CR);
@@ -563,9 +570,11 @@ function ChatRoomCreate(data, socket) {
 					return;
 				}
 
-			// Gets the space of the chat room (empty for public, asylum, etc.)
+			// Gets the space (regular, asylum), game (none, LARP) and blocked categories of the chat room
 			var Space = "";
+			var Game = "";
 			if ((data.Space != null) && (typeof data.Space === "string") && (data.Space.length <= 100)) Space = data.Space;
+			if ((data.Game != null) && (typeof data.Game === "string") && (data.Game.length <= 100)) Game = data.Game;
 			if ((data.BlockCategory == null) || !Array.isArray(data.BlockCategory)) data.BlockCategory = [];
 
 			// Finds the account and links it to the new room
@@ -581,6 +590,7 @@ function ChatRoomCreate(data, socket) {
 					Locked : data.Locked || false,
 					Environment: Acc.Environment,
 					Space: Space,
+					Game: Game,
 					Creator: Acc.Name,
 					Creation: CommonTime(),
 					Account: [],
@@ -763,6 +773,7 @@ function ChatRoomSync(CR, SourceMemberNumber) {
 	R.Ban = CR.Ban;
 	R.Background = CR.Background;
 	R.Limit = CR.Limit;
+	R.Game = CR.Game;
 	R.SourceMemberNumber = SourceMemberNumber;
 	R.Locked = CR.Locked;
 	R.Private = CR.Private;
@@ -893,6 +904,7 @@ function ChatRoomAdmin(data, socket) {
 						Acc.ChatRoom.BlockCategory = data.Room.BlockCategory;
 						Acc.ChatRoom.Ban = data.Room.Ban;
 						Acc.ChatRoom.Admin = data.Room.Admin;
+						Acc.ChatRoom.Game = ((data.Room.Game == null) || (typeof data.Room.Game !== "string") || (data.Room.Game.length > 100)) ? "" : data.Room.Game;
 						Acc.ChatRoom.Limit = ((data.Room.Limit == null) || (typeof data.Room.Limit !== "string") || isNaN(parseInt(data.Room.Limit)) || (parseInt(data.Room.Limit) < 2) || (parseInt(data.Room.Limit) > 10)) ? 10 : parseInt(data.Room.Limit);
 						if ((data.Room.Private != null) && (typeof data.Room.Private === "boolean")) Acc.ChatRoom.Private = data.Room.Private;
 						if ((data.Room.Locked != null) && (typeof data.Room.Locked === "boolean")) Acc.ChatRoom.Locked = data.Room.Locked;
