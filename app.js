@@ -470,6 +470,64 @@ function AccountQuery(data, socket) {
 
 			}
 
+			// Friends query - returns all friends, lovers and submissives, including their room if they are online
+			// Response type: { Type: string; MemberNumber: number; MemberName: string; ChatRoomName: string; ChatRoomSpace?: string; }
+			// Types (first applies): "Owner" "Lover" "Submissive" "Friend"
+			// Special room names: "-Offline-" "-Private-" "-"
+			if (data.Query === "Friends") {
+				
+				// All membernumbers we would like to check for being friends
+				const numbersToCheck = [];
+				let owner = 0;
+				const lovers = [];
+
+				if (Acc.Ownership != null && typeof Acc.Ownership.MemberNumber === "number") {
+					owner = Acc.Ownership.MemberNumber;
+					numbersToCheck.push(Acc.Ownership.MemberNumber);
+				}
+				for (const lover of Acc.Lovership) {
+					if (lover.MemberNumber != null && !numbersToCheck.includes(lover.MemberNumber)) {
+						lovers.push(lover.MemberNumber);
+						numbersToCheck.push(lover.MemberNumber);
+					}
+				}
+				if (Array.isArray(Acc.FriendList)) {
+					for (const friend of Acc.FriendList) {
+						if (typeof friend === "number" && !numbersToCheck.includes(friend)) {
+							numbersToCheck.push(friend);
+						}
+					}
+				}
+
+				const result = [];
+				// Run the query: find all users we are interested in or that have us a an owner
+				Database.collection("Accounts").find({
+					$or: [
+						{ MemberNumber: { $in: numbersToCheck } },
+						{ "Ownership.MemberNumber": Acc.MemberNumber }
+					]
+				}).forEach((/** @type {Account} */ target) => {
+					// If the user trusts us (we are their lover or owner), than show room name even if it is private
+					const trusted = lovers.includes(target.MemberNumber) || target.Ownership != null && target.Ownership.MemberNumber === Acc.MemberNumber;
+					if (trusted || target.MemberNumber === owner || Array.isArray(target.FriendList) && target.FriendList.includes(Acc.MemberNumber)) {
+						const friendship = { MemberNumber: target.MemberNumber, MemberName: target.Name, ChatRoomName: "-Offline-" };
+						friendship.Type = target.MemberNumber === owner ? "Owner" : lovers.includes(target.MemberNumber) ? "Lover" : trusted ? "Submissive" : "Friend";
+						const onlineTarget = Account.find(i => i.MemberNumber === target.MemberNumber && i.Environment === Acc.Environment);
+						if (onlineTarget !== undefined) {
+							if (onlineTarget.ChatRoom != null) {
+								friendship.ChatRoomName = (trusted || !onlineTarget.ChatRoom.Private) ? onlineTarget.ChatRoom.Name : "-Private-";
+								friendship.ChatRoomSpace = onlineTarget.ChatRoom.Space;
+							} else {
+								friendship.ChatRoomName = "-";
+							}
+						}
+						result.push(friendship);
+					}
+				}).then(() => {
+					socket.emit("AccountQueryResult", { Query: data.Query, Result: result });
+				});
+			}
+
 			// EmailStatus query - returns true if an email is linked to the account
 			if (data.Query == "EmailStatus") {
 				Database.collection("Accounts").find({ AccountName : Acc.AccountName }).toArray(function(err, result) {
