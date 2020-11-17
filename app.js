@@ -888,7 +888,7 @@ function ChatRoomAdmin(data, socket) {
 
 			// An administrator can update lots of room data.  The room values are sent back to the clients.
 			if (data.Action == "Update")
-				if ((data.Room != null) && (typeof data.Room === "object") && (data.Room.Name != null) && (data.Room.Description != null) && (data.Room.Background != null) && (typeof data.Room.Name === "string") && (typeof data.Room.Description === "string") && (typeof data.Room.Background === "string") && (!data.Room.Admin.some(i => !Number.isInteger(i))) && (!data.Room.Ban.some(i => !Number.isInteger(i)))) {
+				if ((data.Room != null) && (typeof data.Room === "object") && (data.Room.Name != null) && (data.Room.Description != null) && (data.Room.Background != null) && (typeof data.Room.Name === "string") && (typeof data.Room.Description === "string") && (typeof data.Room.Background === "string") && (data.Room.Admin != null) && (Array.isArray(data.Room.Admin)) && (!data.Room.Admin.some(i => !Number.isInteger(i))) && (data.Room.Ban != null) && (Array.isArray(data.Room.Ban)) && (!data.Room.Ban.some(i => !Number.isInteger(i)))) {
 					data.Room.Name = data.Room.Name.trim();
 					var LN = /^[a-zA-Z0-9 ]+$/;
 					if (data.Room.Name.match(LN) && (data.Room.Name.length >= 1) && (data.Room.Name.length <= 20) && (data.Room.Description.length <= 100) && (data.Room.Background.length <= 100)) {
