@@ -475,7 +475,7 @@ function AccountQuery(data, socket) {
 			// Types (first applies): "Owner" "Lover" "Submissive" "Friend"
 			// Special room names: "-Offline-" "-Private-" "-"
 			if (data.Query === "Friends") {
-				
+
 				// All membernumbers we would like to check for being friends
 				const numbersToCheck = [];
 				let owner = 0;
@@ -486,9 +486,10 @@ function AccountQuery(data, socket) {
 					numbersToCheck.push(Acc.Ownership.MemberNumber);
 				}
 				for (const lover of Acc.Lovership) {
-					if (lover.MemberNumber != null && !numbersToCheck.includes(lover.MemberNumber)) {
+					if (lover.MemberNumber != null) {
 						lovers.push(lover.MemberNumber);
-						numbersToCheck.push(lover.MemberNumber);
+						if (!numbersToCheck.includes(lover.MemberNumber))
+							numbersToCheck.push(lover.MemberNumber);
 					}
 				}
 				if (Array.isArray(Acc.FriendList)) {
@@ -500,7 +501,7 @@ function AccountQuery(data, socket) {
 				}
 
 				const result = [];
-				// Run the query: find all users we are interested in or that have us a an owner
+				// Run the query: find all users we are interested in or that have us as an owner
 				Database.collection("Accounts").find({
 					$or: [
 						{ MemberNumber: { $in: numbersToCheck } },
