@@ -23,6 +23,7 @@ var ChatRoomProduction = [
 var NextMemberNumber = 1;
 var OwnershipDelay = 604800000; // 7 days delay for ownership events
 var LovershipDelay = 604800000; // 7 days delay for lovership events
+var DifficultyDelay = 604800000; // 7 days to activate the higher difficulty tiers
 
 // DB Access
 var Database;
@@ -97,6 +98,7 @@ DatabaseClient.connect(DatabaseURL, { useUnifiedTopology: true, useNewUrlParser:
 				socket.on("AccountBeep", function (data) { AccountBeep(data, socket) });
 				socket.on("AccountOwnership", function(data) { AccountOwnership(data, socket) });
 				socket.on("AccountLovership", function(data) { AccountLovership(data, socket) });
+				socket.on("AccountDifficulty", function(data) { AccountDifficulty(data, socket) });
 				socket.on("AccountDisconnect", function () { AccountRemove(socket.id) });
 				socket.on("disconnect", function() { AccountRemove(socket.id) });
 				socket.on("ChatRoomSearch", function(data) { ChatRoomSearch(data, socket) });
@@ -323,6 +325,7 @@ function AccountUpdate(data, socket) {
 				delete data.Environment;
 				delete data.Ownership;
 				delete data.Lovership;
+				delete data.Difficulty;
 
 				// Some data is kept for future use
 				if ((data.Inventory != null) && (typeof data.Inventory === "string")) Account[P].Inventory = data.Inventory;
@@ -756,6 +759,7 @@ function ChatRoomSyncGetCharSharedData(Account) {
 	A.OnlineSharedSettings = Account.OnlineSharedSettings;
 	A.WhiteList = ((Account.ItemPermission < 3) && (Account.LimitedItems != null) && Array.isArray(Account.LimitedItems) && (Account.LimitedItems.length > 0)) ? Account.WhiteList : [];
 	A.Game = Account.Game;
+	A.Difficulty = Account.Difficulty;
 	return A;
 }
 
@@ -1422,6 +1426,31 @@ function AccountLovership(data, socket) {
 							} else socket.emit("AccountLovership", { MemberNumber: data.MemberNumber, Result: "CanBeginWedding" });
 						}
 					}
+
+		}
+
+	}
+}
+
+// Sets a new account difficulty (0 is easy/roleplay, 1 is normal/regular, 2 is hard/hardcore, 3 is very hard/extreme)
+function AccountDifficulty(data, socket) {
+	if ((data != null) && (typeof data === "number") && (data >= 0) && (data <= 3)) {
+
+		// Gets the current account
+		var Acc = AccountGet(socket.id);
+		if (Acc != null) {
+
+			// Can only set to 2 or 3 if no change was done for 1 week
+			var LastChange = ((Acc.Difficulty == null) || (Acc.Difficulty.LastChange == null) || (typeof Acc.Difficulty.LastChange !== "number")) ? Acc.Creation : Acc.Difficulty.LastChange;
+			if ((data <= 1) || (LastChange + DifficultyDelay < CommonTime())) {
+
+				// Updates the account and the database
+				var NewDifficulty = { Difficulty: { Level: data, LastChange: CommonTime() } };
+				Acc.Difficulty = NewDifficulty.Difficulty;
+				console.log("Updating account " + Acc.AccountName + " difficulty to " + NewDifficulty.Difficulty.Level);
+				Database.collection("Accounts").updateOne({ AccountName : Acc.AccountName }, { $set: NewDifficulty }, function(err, res) { if (err) throw err; });
+
+			}
 
 		}
 
