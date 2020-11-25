@@ -1160,16 +1160,17 @@ function PasswordResetProcess(data, socket) {
 function AccountOwnership(data, socket) {
 	if ((data != null) && (typeof data === "object") && (data.MemberNumber != null) && (typeof data.MemberNumber === "number")) {
 	
-		// The submissive can flush it's owner at any time in the trial, or after a delay if collared
+		// The submissive can flush it's owner at any time in the trial, or after a delay if collared.  Players on Extreme mode cannot break the ownership.
 		var Acc = AccountGet(socket.id);
-		if ((Acc != null) && (Acc.Ownership != null) && (Acc.Ownership.Stage != null) && (Acc.Ownership.Start != null) && ((Acc.Ownership.Stage == 0) || (Acc.Ownership.Start + OwnershipDelay <= CommonTime())) && (data.Action != null) && (typeof data.Action === "string") && (data.Action == "Break")) {
-			Acc.Owner = "";
-			Acc.Ownership = null;
-			var O = { Ownership: Acc.Ownership, Owner: Acc.Owner };
-			Database.collection("Accounts").updateOne({ AccountName : Acc.AccountName }, { $set: O }, function(err, res) { if (err) throw err; });
-			socket.emit("AccountOwnership", { ClearOwnership: true });
-			return;
-		}
+		if ((Acc != null) && (Acc.Ownership != null) && (Acc.Ownership.Stage != null) && (Acc.Ownership.Start != null) && ((Acc.Ownership.Stage == 0) || (Acc.Ownership.Start + OwnershipDelay <= CommonTime())) && (data.Action != null) && (typeof data.Action === "string") && (data.Action == "Break"))
+			if ((Acc.Difficulty == null) || (Acc.Difficulty.Level == null) || (typeof Acc.Difficulty.Level !== "number") || (Acc.Difficulty.Level <= 2)) {
+				Acc.Owner = "";
+				Acc.Ownership = null;
+				var O = { Ownership: Acc.Ownership, Owner: Acc.Owner };
+				Database.collection("Accounts").updateOne({ AccountName : Acc.AccountName }, { $set: O }, function(err, res) { if (err) throw err; });
+				socket.emit("AccountOwnership", { ClearOwnership: true });
+				return;
+			}
 
 		// In a chatroom, the dominant and submissive can enter in a BDSM relationship (4 steps to complete)
 		if ((Acc != null) && (Acc.ChatRoom != null)) {
