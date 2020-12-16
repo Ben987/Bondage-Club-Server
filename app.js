@@ -457,7 +457,7 @@ function AccountBeep(data, socket) {
 		if (Acc != null)
 			for (var A = 0; A < Account.length; A++)
 				if (Account[A].MemberNumber == data.MemberNumber)
-					if ((Account[A].Environment == Acc.Environment) && (((Account[A].FriendList != null) && (Account[A].FriendList.indexOf(Acc.MemberNumber) >= 0)) || ((Account[A].Ownership != null) && (Account[A].Ownership.MemberNumber != null) && (Account[A].Ownership.MemberNumber == Acc.MemberNumber)) || ((data.BeepType === "Leash") && ChatRoomGetAllowItem(Acc, Account[A]))))
+					if ((Account[A].Environment == Acc.Environment) && AccountBeepIsAllowed(Acc, Account[A], data.BeepType))
 						Account[A].Socket.emit("AccountBeep", { MemberNumber: Acc.MemberNumber, MemberName: Acc.Name, ChatRoomSpace: (Acc.ChatRoom == null) ? null : Acc.ChatRoom.Space, ChatRoomName: (Acc.ChatRoom == null) ? null : Acc.ChatRoom.Name, BeepType: (data.BeepType) ? data.BeepType : null });
 
 	}
@@ -481,6 +481,23 @@ function AccountGet(ID) {
 		if (Account[P].ID == ID)
 			return Account[P];
 	return null;
+}
+
+// Returns TRUE if the source is allowed to beep the target
+function AccountBeepIsAllowed(source, target, beepType) {
+	if (beepType === "Leash") return ChatRoomGetAllowItem(source, target);
+	return AccountIsInFriendList(source, target) || AccountIsOwner(source, target);
+}
+
+// Returns TRUE if source account is in target account's friend list
+function AccountIsInFriendList(source, target) {
+	return (target.FriendList != null) && (target.FriendList.indexOf(source.MemberNumber) >= 0)
+}
+
+// Returns TRUE if source account is target account's owner
+function AccountIsOwner(source, target) {
+	const ownership = target.Ownership;
+	return (ownership != null) && (ownership.MemberNumber != null) && (ownership.MemberNumber == source.MemberNumber);
 }
 
 // When a user searches for a chat room
