@@ -457,7 +457,7 @@ function AccountBeep(data, socket) {
 		if (Acc != null)
 			for (var A = 0; A < Account.length; A++)
 				if (Account[A].MemberNumber == data.MemberNumber)
-					if ((Account[A].Environment == Acc.Environment) && AccountBeepIsAllowed(Acc, Account[A], data.BeepType))
+					if (AccountBeepIsAllowed(Acc, Account[A], data.BeepType))
 						Account[A].Socket.emit("AccountBeep", { MemberNumber: Acc.MemberNumber, MemberName: Acc.Name, ChatRoomSpace: (Acc.ChatRoom == null) ? null : Acc.ChatRoom.Space, ChatRoomName: (Acc.ChatRoom == null) ? null : Acc.ChatRoom.Name, BeepType: (data.BeepType) ? data.BeepType : null });
 
 	}
@@ -485,7 +485,13 @@ function AccountGet(ID) {
 
 // Returns TRUE if the source is allowed to beep the target
 function AccountBeepIsAllowed(source, target, beepType) {
+	// Accounts must be in same environment
+	if (target.Environment != source.Environment) return false;
+
+	// Leash beeps require item permissions
 	if (beepType === "Leash") return ChatRoomGetAllowItem(source, target);
+
+	// Other beeps can be performed by friends or owner
 	return AccountIsInFriendList(source, target) || AccountIsOwner(source, target);
 }
 
