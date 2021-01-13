@@ -360,6 +360,7 @@ function AccountUpdate(data, socket) {
 					delete data.Lover;
 				}
 				if ((data.Title != null)) Account[P].Title = data.Title;
+				if ((data.Conditions != null)) Account[P].Conditions = data.Conditions;
 
 				// If we have data to push
 				if (!ObjectEmpty(data)) Database.collection("Accounts").updateOne({ AccountName : Account[P].AccountName }, { $set: data }, function(err, res) { if (err) throw err; });
@@ -729,6 +730,7 @@ function ChatRoomSyncGetCharSharedData(Account) {
 	A.AssetFamily = Account.AssetFamily;
 	A.Title = Account.Title;
 	A.Appearance = Account.Appearance;
+	A.Conditions = Account.Conditions;
 	A.ActivePose = Account.ActivePose;
 	A.Reputation = Account.Reputation;
 	A.Creation = Account.Creation;
@@ -796,9 +798,14 @@ function ChatRoomCharacterUpdate(data, socket) {
 				for (var A = 0; ((Acc.ChatRoom != null) && (A < Acc.ChatRoom.Account.length)); A++)
 					if ((Acc.ChatRoom.Account[A].ID == data.ID) && ChatRoomGetAllowItem(Acc, Acc.ChatRoom.Account[A]))
 						if ((typeof data.Appearance === "object") && Array.isArray(data.Appearance) && (data.Appearance.length >= 5) && (JSON.stringify(data.Appearance).length < 180000)) {
-							Database.collection("Accounts").updateOne({ AccountName : Acc.ChatRoom.Account[A].AccountName }, { $set: { Appearance: data.Appearance } }, function(err, res) { if (err) throw err; });
+							Database.collection("Accounts").updateOne(
+								{ AccountName: Acc.ChatRoom.Account[A].AccountName },
+								{ $set: { Appearance: data.Appearance } },
+								{ $set: { Conditions: data.Conditions } },
+								function (err, res) { if (err) throw err; });
 							Acc.ChatRoom.Account[A].Appearance = data.Appearance;
 							Acc.ChatRoom.Account[A].ActivePose = data.ActivePose;
+							Acc.ChatRoom.Account[A].Conditions = data.Conditions;
 							ChatRoomSyncSingle(Acc.ChatRoom.Account[A], Acc.MemberNumber);
 						}
 	}
