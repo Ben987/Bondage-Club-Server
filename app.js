@@ -1295,11 +1295,11 @@ function AccountLovership(data, socket) {
 
 						AccountUpdateLovership(P, data.MemberNumber, null,false);
 
-						// Updates the account that triggered the break up
-						if (Array.isArray(Acc.Lovership)) Acc.Lovership.splice(AL, 1);
-						else Acc.Lovership = [];
-						AccountUpdateLovership(Acc.Lovership, Acc.MemberNumber);
 					}
+					// Updates the account that triggered the break up
+					if (Array.isArray(Acc.Lovership)) Acc.Lovership.splice(AL, 1);
+					else Acc.Lovership = [];
+					AccountUpdateLovership(Acc.Lovership, Acc.MemberNumber);
 				});
 				return;
 			}
