@@ -24,7 +24,8 @@ var NextMemberNumber = 1;
 var OwnershipDelay = 604800000; // 7 days delay for ownership events
 var LovershipDelay = 604800000; // 7 days delay for lovership events
 var DifficultyDelay = 604800000; // 7 days to activate the higher difficulty tiers
-const IP_CONNECTION_LIMIT = 64; // Limit of connections per IP address 
+const IP_CONNECTION_LIMIT = 64; // Limit of connections per IP address
+const IP_CONNECTION_PROXY_HEADER = "x-forwarded-for"; // Header with real IP, if set by trusted proxy (lowercase)
 
 // DB Access
 var Database;
@@ -90,7 +91,15 @@ DatabaseClient.connect(DatabaseURL, { useUnifiedTopology: true, useNewUrlParser:
 			console.log("Bondage Club server is listening on " + (DatabasePort).toString());
 			console.log("****************************************");
 			IO.on("connection", function (socket) {
-				const address = socket.conn.remoteAddress;
+				let address = socket.conn.remoteAddress;
+
+				// If there is trusted forward header set by proxy, use that instead
+				// But only trust the last hop!
+				if (IP_CONNECTION_PROXY_HEADER && typeof socket.handshake.headers[IP_CONNECTION_PROXY_HEADER] === "string") {
+					const hops = socket.handshake.headers[IP_CONNECTION_PROXY_HEADER].split(",");
+					address = hops[hops.length-1].trim();
+				}
+
 				const sameIPCount = IPConnectionCounts.get(address) || 0;
 
 				// Reject connection if over limit
