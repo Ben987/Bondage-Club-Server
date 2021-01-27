@@ -24,6 +24,8 @@ var NextMemberNumber = 1;
 var OwnershipDelay = 604800000; // 7 days delay for ownership events
 var LovershipDelay = 604800000; // 7 days delay for lovership events
 var DifficultyDelay = 604800000; // 7 days to activate the higher difficulty tiers
+const IP_CONNECTION_LIMIT = 64; // Limit of connections per IP address
+const IP_CONNECTION_PROXY_HEADER = "x-forwarded-for"; // Header with real IP, if set by trusted proxy (lowercase)
 
 // DB Access
 var Database;
@@ -64,6 +66,8 @@ process.on('uncaughtException', function(error) {
 	});
 });
 
+const IPConnectionCounts = new Map();
+
 // Connects to the Mongo Database
 DatabaseClient.connect(DatabaseURL, { useUnifiedTopology: true, useNewUrlParser: true }, function(err, db) {
 	
@@ -87,46 +91,81 @@ DatabaseClient.connect(DatabaseURL, { useUnifiedTopology: true, useNewUrlParser:
 			console.log("Bondage Club server is listening on " + (DatabasePort).toString());
 			console.log("****************************************");
 			IO.on("connection", function (socket) {
+				let address = socket.conn.remoteAddress;
+
+				// If there is trusted forward header set by proxy, use that instead
+				// But only trust the last hop!
+				if (IP_CONNECTION_PROXY_HEADER && typeof socket.handshake.headers[IP_CONNECTION_PROXY_HEADER] === "string") {
+					const hops = socket.handshake.headers[IP_CONNECTION_PROXY_HEADER].split(",");
+					address = hops[hops.length-1].trim();
+				}
+
+				const sameIPCount = IPConnectionCounts.get(address) || 0;
+
+				// Reject connection if over limit
+				if (sameIPCount >= IP_CONNECTION_LIMIT) {
+					console.log("Rejecting connection (IP connection limit reached) from", address);
+					socket.emit("ForceDisconnect", "ErrorRateLimited");
+					socket.disconnect(true);
+					return;
+				}
+
+				// Connection accepted, count it
+				IPConnectionCounts.set(address, sameIPCount + 1);
+				socket.once("disconnect", () => {
+					const sameIPCountDisconnect = IPConnectionCounts.get(address) || 0;
+					if (sameIPCountDisconnect <= 1) {
+						IPConnectionCounts.delete(address);
+					} else {
+						IPConnectionCounts.set(address, sameIPCountDisconnect - 1);
+					}
+				});
+
 				socket.id = Math.round(Math.random() * 1000000000000);
 				socket.emit("ServerMessage", "Connected to the Bondage Club Server.");
 				socket.emit("ServerMessage", "Warning!  Console scripts can break your account or steal your data.");
 				socket.on("AccountCreate", function (data) { AccountCreate(data, socket) });
 				socket.on("AccountLogin", function (data) { AccountLogin(data, socket) });
-				socket.on("AccountUpdate", function (data) { AccountUpdate(data, socket) });
-				socket.on("AccountUpdateEmail", function (data) { AccountUpdateEmail(data, socket) });
-				socket.on("AccountQuery", function (data) { AccountQuery(data, socket) });
-				socket.on("AccountBeep", function (data) { AccountBeep(data, socket) });
-				socket.on("AccountOwnership", function(data) { AccountOwnership(data, socket) });
-				socket.on("AccountLovership", function(data) { AccountLovership(data, socket) });
-				socket.on("AccountDifficulty", function(data) { AccountDifficulty(data, socket) });
-				socket.on("AccountDisconnect", function () { AccountRemove(socket.id) });
-				socket.on("disconnect", function() { AccountRemove(socket.id) });
-				socket.on("ChatRoomSearch", function(data) { ChatRoomSearch(data, socket) });
-				socket.on("ChatRoomCreate", function(data) { ChatRoomCreate(data, socket) });
-				socket.on("ChatRoomJoin", function(data) { ChatRoomJoin(data, socket) });
-				socket.on("ChatRoomLeave", function() { ChatRoomLeave(socket) });
-				socket.on("ChatRoomChat", function(data) { ChatRoomChat(data, socket) });
-				socket.on("ChatRoomCharacterUpdate", function(data) { ChatRoomCharacterUpdate(data, socket) });
-				socket.on("ChatRoomCharacterExpressionUpdate", function(data) { ChatRoomCharacterExpressionUpdate(data, socket) });
-				socket.on("ChatRoomCharacterPoseUpdate", function(data) { ChatRoomCharacterPoseUpdate(data, socket) });
-				socket.on("ChatRoomCharacterArousalUpdate", function(data) { ChatRoomCharacterArousalUpdate(data, socket) });
-				socket.on("ChatRoomCharacterItemUpdate", function(data) { ChatRoomCharacterItemUpdate(data, socket) });
-				socket.on("ChatRoomAdmin", function(data) { ChatRoomAdmin(data, socket) });
-				socket.on("ChatRoomAllowItem", function(data) { ChatRoomAllowItem(data, socket) });
-				socket.on("ChatRoomGame", function(data) { ChatRoomGame(data, socket) });
 				socket.on("PasswordReset", function(data) { PasswordReset(data, socket) });
 				socket.on("PasswordResetProcess", function(data) { PasswordResetProcess(data, socket) });
 				AccountSendServerInfo(socket);
 			});
-			
+
 			// Refreshes the server information to clients each 30 seconds
 			setInterval(AccountSendServerInfo, 30000);
-			
 		});
-	
 	});
-	
 });
+
+// Setups socket on successful login or account creation
+function OnLogin(socket) {
+	socket.removeAllListeners("AccountCreate");
+	socket.removeAllListeners("AccountLogin");
+	socket.removeAllListeners("PasswordReset");
+	socket.removeAllListeners("PasswordResetProcess");
+	socket.on("AccountUpdate", function(data) { AccountUpdate(data, socket) });
+	socket.on("AccountUpdateEmail", function(data) { AccountUpdateEmail(data, socket) });
+	socket.on("AccountQuery", function(data) { AccountQuery(data, socket) });
+	socket.on("AccountBeep", function(data) { AccountBeep(data, socket) });
+	socket.on("AccountOwnership", function(data) { AccountOwnership(data, socket) });
+	socket.on("AccountLovership", function(data) { AccountLovership(data, socket) });
+	socket.on("AccountDifficulty", function(data) { AccountDifficulty(data, socket) });
+	socket.on("AccountDisconnect", function() { AccountRemove(socket.id) });
+	socket.on("disconnect", function() { AccountRemove(socket.id) });
+	socket.on("ChatRoomSearch", function(data) { ChatRoomSearch(data, socket) });
+	socket.on("ChatRoomCreate", function(data) { ChatRoomCreate(data, socket) });
+	socket.on("ChatRoomJoin", function(data) { ChatRoomJoin(data, socket) });
+	socket.on("ChatRoomLeave", function() { ChatRoomLeave(socket) });
+	socket.on("ChatRoomChat", function(data) { ChatRoomChat(data, socket) });
+	socket.on("ChatRoomCharacterUpdate", function(data) { ChatRoomCharacterUpdate(data, socket) });
+	socket.on("ChatRoomCharacterExpressionUpdate", function(data) { ChatRoomCharacterExpressionUpdate(data, socket) });
+	socket.on("ChatRoomCharacterPoseUpdate", function(data) { ChatRoomCharacterPoseUpdate(data, socket) });
+	socket.on("ChatRoomCharacterArousalUpdate", function(data) { ChatRoomCharacterArousalUpdate(data, socket) });
+	socket.on("ChatRoomCharacterItemUpdate", function(data) { ChatRoomCharacterItemUpdate(data, socket) });
+	socket.on("ChatRoomAdmin", function(data) { ChatRoomAdmin(data, socket) });
+	socket.on("ChatRoomAllowItem", function(data) { ChatRoomAllowItem(data, socket) });
+	socket.on("ChatRoomGame", function(data) { ChatRoomGame(data, socket) });
+}
 
 // Sends the server info to all players or one specific player (socket)
 function AccountSendServerInfo(socket) {
@@ -182,6 +221,7 @@ function AccountCreate(data, socket) {
 						data.Socket = socket;
 						AccountValidData(data);
 						Account.push(data);
+						OnLogin(socket);
 						socket.emit("CreationResponse", { ServerAnswer: "AccountCreated", OnlineID: data.ID.toString(), MemberNumber: data.MemberNumber } );
 						AccountSendServerInfo(socket);
 						AccountPurgeInfo(data);
@@ -255,6 +295,7 @@ function AccountLogin(data, socket) {
 						for (var A = 0; A < Account.length; A++)
 							if (Account[A].AccountName == result.AccountName) {
 								Account[A].Socket.emit("ForceDisconnect", "ErrorDuplicatedLogin");
+								Account[A].Socket.disconnect(true);
 								if (Account[A] != null) AccountRemove(Account[A].ID);
 								break;
 							}
@@ -280,6 +321,7 @@ function AccountLogin(data, socket) {
 						console.log("Login account: " + result.AccountName + " ID: " + socket.id.toString() + " " + result.Environment);
 						AccountValidData(result);
 						Account.push(result);
+						OnLogin(socket);
 						result.Password = null;
 						result.Email = null;
 						socket.emit("LoginResponse", result);
