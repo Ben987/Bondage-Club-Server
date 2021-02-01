@@ -121,7 +121,6 @@ DatabaseClient.connect(DatabaseURL, { useUnifiedTopology: true, useNewUrlParser:
 					}
 				});
 
-				socket.id = Math.round(Math.random() * 1000000000000);
 				socket.emit("ServerMessage", "Connected to the Bondage Club Server.");
 				socket.emit("ServerMessage", "Warning!  Console scripts can break your account or steal your data.");
 				socket.on("AccountCreate", function (data) { AccountCreate(data, socket) });
@@ -216,13 +215,13 @@ function AccountCreate(data, socket) {
 						NextMemberNumber++;
 						Database.collection("Accounts").insertOne(data, function(err, res) { if (err) throw err; });
 						data.Environment = AccountGetEnvironment(socket);
-						console.log("Creating new account: " + data.AccountName + " ID: " + socket.id.toString() + " " + data.Environment);
+						console.log("Creating new account: " + data.AccountName + " ID: " + socket.id + " " + data.Environment);
 						data.ID = socket.id;
 						data.Socket = socket;
 						AccountValidData(data);
 						Account.push(data);
 						OnLogin(socket);
-						socket.emit("CreationResponse", { ServerAnswer: "AccountCreated", OnlineID: data.ID.toString(), MemberNumber: data.MemberNumber } );
+						socket.emit("CreationResponse", { ServerAnswer: "AccountCreated", OnlineID: data.ID, MemberNumber: data.MemberNumber } );
 						AccountSendServerInfo(socket);
 						AccountPurgeInfo(data);
 					});
@@ -318,7 +317,7 @@ function AccountLogin(data, socket) {
 						// Logs the account
 						result.ID = socket.id;
 						result.Environment = AccountGetEnvironment(socket);
-						console.log("Login account: " + result.AccountName + " ID: " + socket.id.toString() + " " + result.Environment);
+						console.log("Login account: " + result.AccountName + " ID: " + socket.id + " " + result.Environment);
 						AccountValidData(result);
 						Account.push(result);
 						OnLogin(socket);
@@ -511,7 +510,7 @@ function AccountRemove(ID) {
 		for (var P = 0; P < Account.length; P++)
 			if (Account[P].ID == ID) {
 				ChatRoomRemove(Account[P], "ServerDisconnect", []);
-				if (Account[P] != null) console.log("Disconnecting account: " + Account[P].AccountName + " ID: " + ID.toString());
+				if (Account[P] != null) console.log("Disconnecting account: " + Account[P].AccountName + " ID: " + ID);
 				Account.splice(P, 1);
 				break;
 			}
@@ -646,7 +645,7 @@ function ChatRoomCreate(data, socket) {
 				ChatRoom.push(NewRoom);
 				Acc.ChatRoom = NewRoom;
 				NewRoom.Account.push(Acc);
-				console.log("Chat room (" + ChatRoom.length.toString() + ") " + data.Name + " created by account " + Acc.AccountName + ", ID: " + socket.id.toString());
+				console.log("Chat room (" + ChatRoom.length.toString() + ") " + data.Name + " created by account " + Acc.AccountName + ", ID: " + socket.id);
 				socket.emit("ChatRoomCreateResponse", "ChatRoomCreated");
 				ChatRoomSync(NewRoom, Acc.MemberNumber);
 			} else socket.emit("ChatRoomCreateResponse", "AccountError");
