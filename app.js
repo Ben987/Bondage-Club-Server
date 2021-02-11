@@ -291,13 +291,15 @@ function AccountLogin(data, socket) {
 					if (res) {
 
 						// Disconnect duplicated logged accounts
-						for (var A = 0; A < Account.length; A++)
-							if (Account[A].AccountName == result.AccountName) {
-								Account[A].Socket.emit("ForceDisconnect", "ErrorDuplicatedLogin");
-								Account[A].Socket.disconnect(true);
-								if (Account[A] != null) AccountRemove(Account[A].ID);
+						for (let A = 0; A < Account.length; A++) {
+							const Acc = Account[A];
+							if (Acc.AccountName === result.AccountName) {
+								Acc.Socket.emit("ForceDisconnect", "ErrorDuplicatedLogin");
+								Acc.Socket.disconnect(true);
+								AccountRemove(Acc.ID);
 								break;
 							}
+						}
 
 						// Assigns a member number if there's none
 						if (result.MemberNumber == null) {
