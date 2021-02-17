@@ -149,6 +149,7 @@ function OnLogin(socket) {
 	socket.on("AccountOwnership", function(data) { AccountOwnership(data, socket) });
 	socket.on("AccountLovership", function(data) { AccountLovership(data, socket) });
 	socket.on("AccountDifficulty", function(data) { AccountDifficulty(data, socket) });
+	socket.on("AccountTamperLock", function(data) { AccountTamperLock(data, socket) });
 	socket.on("AccountDisconnect", function() { AccountRemove(socket.id) });
 	socket.on("disconnect", function() { AccountRemove(socket.id) });
 	socket.on("ChatRoomSearch", function(data) { ChatRoomSearch(data, socket) });
@@ -369,6 +370,7 @@ function AccountUpdate(data, socket) {
 				delete data.Ownership;
 				delete data.Lovership;
 				delete data.Difficulty;
+				delete data.TamperLock;
 
 				// Some data is kept for future use
 				if ((data.Inventory != null) && (typeof data.Inventory === "string")) Account[P].Inventory = data.Inventory;
@@ -803,6 +805,7 @@ function ChatRoomSyncGetCharSharedData(Account) {
 	A.WhiteList = ((Account.ItemPermission < 3) && (Account.LimitedItems != null) && Array.isArray(Account.LimitedItems) && (Account.LimitedItems.length > 0)) ? Account.WhiteList : [];
 	A.Game = Account.Game;
 	A.Difficulty = Account.Difficulty;
+	A.TamperLock = Account.TamperLock;
 	return A;
 }
 
@@ -1496,6 +1499,46 @@ function AccountDifficulty(data, socket) {
 
 			}
 
+		}
+
+	}
+}
+
+// Updates the information for when a body part was last tampered with
+// On the client, this should only ever be called in InventoryLock when a tamper-proof lock is applied
+function AccountTamperLock(data, socket) {
+	if ((data != null) && (typeof data === "object") && (data.TargetMemberNumber != null) && (typeof data.TargetMemberNumber === "number") && (data.Group != null) && (typeof data.Group === "string") && (data.LockType != null) && (typeof data.LockType === "string")) {
+		
+		// Gets the source account and target account to check if we allow or not
+		var Acc = AccountGet(socket.id);
+		var Target = null;
+		if ((Acc != null) && (Acc.ChatRoom != null))
+			for (var A = 0; ((Acc.ChatRoom != null) && (A < Acc.ChatRoom.Account.length)); A++)
+				if (Acc.ChatRoom.Account[A].MemberNumber == data.TargetMemberNumber) {
+					Target = Acc.ChatRoom.Account[A]
+					break;
+				}
+
+		
+		if (Acc != null && Target != null && ChatRoomGetAllowItem(Acc, Target)) {
+			// We check to make sure that the group exists in the item
+			//console.log(Target.Appearance.some(elem => data.Group === elem.Group));
+			//console.log(app.includes(data.Group))
+			if (Target.Appearance.some(elem => data.Group === elem.Group)) {
+				// Updates the account and the database
+				var NewTampering = (Target.TamperLock) ? {TamperLock: Target.TamperLock} : {TamperLock: {}};
+				NewTampering.TamperLock[data.Group] = { LastChange: CommonTime(), AppliedBy: Acc.MemberNumber, AppliedByName: Acc.AccountName, LockType: data.LockType }
+				Target.TamperLock = NewTampering.TamperLock
+				//console.log("Updating account " + Target.AccountName + " tampering to " + NewTampering + " by " + Acc.AccountName);
+				Database.collection("Accounts").updateOne({ AccountName : Target.AccountName }, { $set: NewTampering }, function(err, res) { if (err) throw err; });
+				
+				socket.emit("AccountTamperLock", { MemberNumber: Target.MemberNumber, TamperLock: Target.TamperLock});
+				for (var A = 0; ((Acc.ChatRoom != null) && (A < Acc.ChatRoom.Account.length)); A++)
+					if (Acc.ChatRoom.Account[A].MemberNumber != Acc.MemberNumber) {
+						Acc.ChatRoom.Account[A].Socket.emit("AccountTamperLock", { MemberNumber: Target.MemberNumber, TamperLock: Target.TamperLock});
+					}
+				
+			}
 		}
 
 	}
