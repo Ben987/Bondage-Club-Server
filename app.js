@@ -1527,7 +1527,7 @@ function AccountTamperLock(data, socket) {
 			if (Target.Appearance.some(elem => data.Group === elem.Group)) {
 				// Updates the account and the database
 				var NewTampering = (Target.TamperLock) ? {TamperLock: Target.TamperLock} : {TamperLock: {}};
-				NewTampering.TamperLock[data.Group] = { LastChange: CommonTime(), AppliedBy: Acc.MemberNumber, AppliedByName: Acc.AccountName, LockType: data.LockType }
+				NewTampering.TamperLock[data.Group] = { LastChange: CommonTime(), AppliedBy: Acc.MemberNumber, AppliedByName: Acc.Name, LockType: data.LockType }
 				Target.TamperLock = NewTampering.TamperLock
 				//console.log("Updating account " + Target.AccountName + " tampering to " + NewTampering + " by " + Acc.AccountName);
 				Database.collection("Accounts").updateOne({ AccountName : Target.AccountName }, { $set: NewTampering }, function(err, res) { if (err) throw err; });
