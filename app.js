@@ -409,6 +409,20 @@ function AccountUpdate(data, socket) {
 				}
 				if ((data.Title != null)) Account[P].Title = data.Title;
 
+				// Validate TamperLock, removing any group from TamperLock that isn't represented in Appearance
+				if (Account[P].TamperLock && data.Appearance) {
+					var TamperLocksTemp = {}
+					for (var A in Account[P].TamperLock) {
+						if (Account[P].TamperLock[A] && data.Appearance.some(elem => ((A == elem.Group)
+															&& (elem.Property && Account[P].TamperLock[A].LockType == elem.Property.LockedBy)))) {
+																TamperLocksTemp[A] = Account[P].TamperLock[A]
+															}
+					}
+				
+					Account[P].TamperLock = TamperLocksTemp
+					data.TamperLock = TamperLocksTemp
+				}
+
 				// If we have data to push
 				if (!ObjectEmpty(data)) Database.collection("Accounts").updateOne({ AccountName : Account[P].AccountName }, { $set: data }, function(err, res) { if (err) throw err; });
 				break;
