@@ -24,6 +24,7 @@ var NextMemberNumber = 1;
 var OwnershipDelay = 604800000; // 7 days delay for ownership events
 var LovershipDelay = 604800000; // 7 days delay for lovership events
 var DifficultyDelay = 604800000; // 7 days to activate the higher difficulty tiers
+var TamperLockTimeDelayBeforeValidation = 30000; // 30 seconds before we validate tamperlock items
 const IP_CONNECTION_LIMIT = 64; // Limit of connections per IP address
 const IP_CONNECTION_PROXY_HEADER = "x-forwarded-for"; // Header with real IP, if set by trusted proxy (lowercase)
 
@@ -413,12 +414,11 @@ function AccountUpdate(data, socket) {
 				if (Account[P].TamperLock && data.Appearance) {
 					var TamperLocksTemp = {}
 					for (var A in Account[P].TamperLock) {
-						if (Account[P].TamperLock[A] && data.Appearance.some(elem => ((A == elem.Group)
-															&& (elem.Property && Account[P].TamperLock[A].LockType == elem.Property.LockedBy)))) {
+						if (Account[P].TamperLock[A] && (CommonTime() - Account[P].TamperLock[A].LastChange < TamperLockTimeDelayBeforeValidation || data.Appearance.some(elem => ((A == elem.Group)
+															&& (elem.Property && Account[P].TamperLock[A].LockType == elem.Property.LockedBy))))) {
 																TamperLocksTemp[A] = Account[P].TamperLock[A]
 															}
 					}
-				
 					Account[P].TamperLock = TamperLocksTemp
 					data.TamperLock = TamperLocksTemp
 				}
@@ -1525,8 +1525,8 @@ function AccountTamperLock(data, socket) {
 		
 		// Gets the source account and target account to check if we allow or not
 		var Acc = AccountGet(socket.id);
-		var Target = null;
-		if ((Acc != null) && (Acc.ChatRoom != null))
+		var Target = (Acc && data.TargetMemberNumber == Acc.MemberNumber) ? Acc : null;
+		if ((Acc != null) && (Acc.ChatRoom != null) && Target == null)
 			for (var A = 0; ((Acc.ChatRoom != null) && (A < Acc.ChatRoom.Account.length)); A++)
 				if (Acc.ChatRoom.Account[A].MemberNumber == data.TargetMemberNumber) {
 					Target = Acc.ChatRoom.Account[A]
