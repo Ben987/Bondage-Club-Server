@@ -3,7 +3,12 @@
 // Main game objects
 var App = require("http").createServer();
 var DefaultOrigins = "http://www.bondageprojects.com:* https://www.bondageprojects.com:* http://bondageprojects.com:* https://bondageprojects.com:* http://www.bondageprojects.elementfx.com:* https://www.bondageprojects.elementfx.com:* http://bondageprojects.elementfx.com:* https://bondageprojects.elementfx.com:* http://127.0.0.1:* http://localhost:*";
-var IO = require("socket.io")(App, { origins: process.env.ORIGINS || DefaultOrigins, maxHttpBufferSize: 200000 } );
+var IO = require("socket.io")(App, {
+	origins: process.env.ORIGINS || DefaultOrigins,
+	maxHttpBufferSize: 200000,
+	httpCompression: true,
+	perMessageDeflate: true
+});
 var BCrypt = require("bcrypt");
 var Account = [];
 var ChatRoom = [];
@@ -371,7 +376,7 @@ function AccountUpdate(data, socket) {
 				delete data.Difficulty;
 
 				// Some data is kept for future use
-				if ((data.Inventory != null) && (typeof data.Inventory === "string")) Account[P].Inventory = data.Inventory;
+				if (data.Inventory != null) Account[P].Inventory = data.Inventory;
 				if (data.ItemPermission != null) Account[P].ItemPermission = data.ItemPermission;
 				if (data.ArousalSettings != null) Account[P].ArousalSettings = data.ArousalSettings;
 				if (data.OnlineSharedSettings != null) Account[P].OnlineSharedSettings = data.OnlineSharedSettings;
@@ -380,8 +385,8 @@ function AccountUpdate(data, socket) {
 				if (data.Appearance != null) Account[P].Appearance = data.Appearance;
 				if (data.Reputation != null) Account[P].Reputation = data.Reputation;
 				if (data.Description != null) Account[P].Description = data.Description;
-				if ((data.BlockItems != null) && Array.isArray(data.BlockItems)) Account[P].BlockItems = data.BlockItems;
-				if ((data.LimitedItems != null) && Array.isArray(data.LimitedItems)) Account[P].LimitedItems = data.LimitedItems;
+				if (data.BlockItems != null) Account[P].BlockItems = data.BlockItems;
+				if (data.LimitedItems != null) Account[P].LimitedItems = data.LimitedItems;
 				if ((data.WhiteList != null) && Array.isArray(data.WhiteList)) Account[P].WhiteList = data.WhiteList;
 				if ((data.BlackList != null) && Array.isArray(data.BlackList)) Account[P].BlackList = data.BlackList;
 				if ((data.FriendList != null) && Array.isArray(data.FriendList)) Account[P].FriendList = data.FriendList;
@@ -778,31 +783,41 @@ function ChatRoomGame(data, socket) {
 }
 
 // Builds the character packet to send over to the clients, white list is only sent if there are limited items and a low item permission
-function ChatRoomSyncGetCharSharedData(Account) {
-	var A = {};
-	A.ID = Account.ID;
-	A.Name = Account.Name;
-	A.AssetFamily = Account.AssetFamily;
-	A.Title = Account.Title;
-	A.Appearance = Account.Appearance;
-	A.ActivePose = Account.ActivePose;
-	A.Reputation = Account.Reputation;
-	A.Creation = Account.Creation;
-	A.Lovership = Account.Lovership;
-	A.Description = Account.Description;
-	A.Owner = Account.Owner;
-	A.MemberNumber = Account.MemberNumber;
-	A.LabelColor = Account.LabelColor;
-	A.ItemPermission = Account.ItemPermission;
-	A.Inventory = Account.Inventory;
-	A.Ownership = Account.Ownership;
-	A.BlockItems = Account.BlockItems;
-	A.LimitedItems = Account.LimitedItems;
-	A.ArousalSettings = Account.ArousalSettings;
-	A.OnlineSharedSettings = Account.OnlineSharedSettings;
-	A.WhiteList = ((Account.ItemPermission < 3) && (Account.LimitedItems != null) && Array.isArray(Account.LimitedItems) && (Account.LimitedItems.length > 0)) ? Account.WhiteList : [];
-	A.Game = Account.Game;
-	A.Difficulty = Account.Difficulty;
+function ChatRoomSyncGetCharSharedData(Acc) {
+	const Whitelist = [];
+	// We filter whitelist based on people in room
+	if (Array.isArray(Acc.WhiteList) && Acc.ChatRoom && Acc.ChatRoom.Account) {
+		for (const B of Acc.ChatRoom.Account) {
+			if (Acc.WhiteList.includes(B.MemberNumber)) {
+				Whitelist.push(B.MemberNumber);
+			}
+		}
+	}
+
+	const A = {};
+	A.ID = Acc.ID;
+	A.Name = Acc.Name;
+	A.AssetFamily = Acc.AssetFamily;
+	A.Title = Acc.Title;
+	A.Appearance = Acc.Appearance;
+	A.ActivePose = Acc.ActivePose;
+	A.Reputation = Acc.Reputation;
+	A.Creation = Acc.Creation;
+	A.Lovership = Acc.Lovership;
+	A.Description = Acc.Description;
+	A.Owner = Acc.Owner;
+	A.MemberNumber = Acc.MemberNumber;
+	A.LabelColor = Acc.LabelColor;
+	A.ItemPermission = Acc.ItemPermission;
+	A.Inventory = Acc.Inventory;
+	A.Ownership = Acc.Ownership;
+	A.BlockItems = Acc.BlockItems;
+	A.LimitedItems = Acc.LimitedItems;
+	A.ArousalSettings = Acc.ArousalSettings;
+	A.OnlineSharedSettings = Acc.OnlineSharedSettings;
+	A.WhiteList = Whitelist;
+	A.Game = Acc.Game;
+	A.Difficulty = Acc.Difficulty;
 	return A;
 }
 
