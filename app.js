@@ -52,7 +52,10 @@ var DatabaseURL = process.env.DATABASE_URL || "mongodb://localhost:27017/Bondage
 var DatabasePort = process.env.PORT || 4288;
 var DatabaseName = process.env.DATABASE_NAME || "BondageClubDatabase";
 
-// Email password reset
+/**
+ * Email password reset
+ * @type { { AccountName: string; ResetNumber: string; }[] }
+ */
 var PasswordResetProgress = [];
 var NodeMailer = require("nodemailer");
 var MailTransporter = NodeMailer.createTransport({
@@ -154,7 +157,10 @@ DatabaseClient.connect(DatabaseURL, { useUnifiedTopology: true, useNewUrlParser:
 	});
 });
 
-// Setups socket on successful login or account creation
+/**
+ * Setups socket on successful login or account creation
+ * @param {SocketIO.Socket} socket
+ */
 function OnLogin(socket) {
 	socket.removeAllListeners("AccountCreate");
 	socket.removeAllListeners("AccountLogin");
@@ -186,7 +192,7 @@ function OnLogin(socket) {
 
 /**
  * Sends the server info to all players or one specific player (socket)
- * @param {SocketIO.Socket|null} socket
+ * @param {SocketIO.Socket} [socket]
  */
 function AccountSendServerInfo(socket) {
 	var SI = {
@@ -444,7 +450,11 @@ async function AccountLoginProcess(socket, AccountName, Password) {
 	AccountPurgeInfo(result);
 }
 
-// Returns TRUE if the object is empty
+/**
+ * Returns TRUE if the object is empty
+ * @param {Record<any, any>} obj Object to check
+ * @returns {boolean}
+ */
 function ObjectEmpty(obj) {
 	for(var key in obj)
 		if (obj.hasOwnProperty(key))
@@ -454,7 +464,7 @@ function ObjectEmpty(obj) {
 
 /**
  * Updates any account data except the basic ones that cannot change
- * @param {Account} data
+ * @param {Partial<Account>} data
  * @param {SocketIO.Socket} socket
  */
 function AccountUpdate(data, socket) {
@@ -784,6 +794,7 @@ function ChatRoomCreate(data, socket) {
 			if (!Array.isArray(data.Admin) || data.Admin.some(i => !Number.isInteger(i))) data.Admin = [Acc.MemberNumber];
 
 			ChatRoomRemove(Acc, "ServerLeave", []);
+			/** @type {Chatroom} */
 			var NewRoom = {
 				ID: base64id.generateId(),
 				Name: data.Name,
@@ -924,7 +935,7 @@ function ChatRoomLeave(socket) {
 
 /**
  * Sends a text message to everyone in the room or a specific target
- * @param {Chatroom} CR
+ * @param {Chatroom|null|undefined} CR
  * @param {number} Sender Sender's MemberNumber
  * @param {string} Content
  * @param {string} Type
@@ -974,7 +985,7 @@ function ChatRoomGame(data, socket) {
 
 /**
  * Builds the character packet to send over to the clients
- * @param {Account} Account
+ * @param {Account} Acc
  * @returns {Partial<Account>}
  */
 function ChatRoomSyncGetCharSharedData(Acc) {
@@ -1817,7 +1828,7 @@ function AccountLovership(data, socket) {
 								}
 							}
 
-						AccountUpdateLovership(P, data.MemberNumber, null,false);
+						AccountUpdateLovership(P, data.MemberNumber, null, false);
 
 					}
 					// Updates the account that triggered the break up
@@ -2019,7 +2030,7 @@ function AccountDifficulty(data, socket) {
  * @property {Lovership[]} Lovership
  * *not updated from client*
  * @property {any} [Owner]
- * @property {Ownership} [Ownership]
+ * @property {Ownership|null} [Ownership]
  * *not updated from client*
  * @property { { Level: number, LastChange: number } } [Difficulty]
  * *not updated from client*
