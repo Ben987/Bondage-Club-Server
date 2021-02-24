@@ -1,4 +1,5 @@
 "use strict";
+require('newrelic');
 
 // Main game objects
 var App = require("http").createServer();
