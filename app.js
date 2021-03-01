@@ -1020,15 +1020,19 @@ function ChatRoomAdmin(data, socket) {
 					if (data.Action == "Ban") {
 						Acc.ChatRoom.Ban.push(data.MemberNumber);
 						Acc.ChatRoom.Account[A].Socket.emit("ChatRoomSearchResponse", "RoomBanned");
-						Dictionary.push({Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber});
-						Dictionary.push({Tag: "TargetCharacterName", Text: Acc.ChatRoom.Account[A].Name, MemberNumber: Acc.ChatRoom.Account[A].MemberNumber});
-						ChatRoomRemove(Acc.ChatRoom.Account[A], "ServerBan", Dictionary);
+						if ((Acc != null) && (Acc.ChatRoom != null) && (Acc.ChatRoom.Account[A] != null)) {
+							Dictionary.push({Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber});
+							Dictionary.push({Tag: "TargetCharacterName", Text: Acc.ChatRoom.Account[A].Name, MemberNumber: Acc.ChatRoom.Account[A].MemberNumber});
+							ChatRoomRemove(Acc.ChatRoom.Account[A], "ServerBan", Dictionary);
+						}
 					}
 					else if (data.Action == "Kick") {
 						Acc.ChatRoom.Account[A].Socket.emit("ChatRoomSearchResponse", "RoomKicked");
-						Dictionary.push({Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber});
-						Dictionary.push({Tag: "TargetCharacterName", Text: Acc.ChatRoom.Account[A].Name, MemberNumber: Acc.ChatRoom.Account[A].MemberNumber});
-						ChatRoomRemove(Acc.ChatRoom.Account[A], "ServerKick", Dictionary);
+						if ((Acc != null) && (Acc.ChatRoom != null) && (Acc.ChatRoom.Account[A] != null)) {
+							Dictionary.push({Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber});
+							Dictionary.push({Tag: "TargetCharacterName", Text: Acc.ChatRoom.Account[A].Name, MemberNumber: Acc.ChatRoom.Account[A].MemberNumber});
+							ChatRoomRemove(Acc.ChatRoom.Account[A], "ServerKick", Dictionary);
+						}
 					}
 					else if ((data.Action == "MoveLeft") && (A != 0)) {
 						var MovedAccount = Acc.ChatRoom.Account[A];
