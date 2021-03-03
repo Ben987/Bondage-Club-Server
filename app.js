@@ -10,6 +10,8 @@ var IO = new socketio.Server(App, {
 		credentials: true
 	},
 	maxHttpBufferSize: 200000,
+	pingTimeout: 15000,
+	serveClient: false,
 	httpCompression: true,
 	perMessageDeflate: true,
 	allowEIO3: true
@@ -183,7 +185,7 @@ function AccountSendServerInfo(socket) {
 		OnlinePlayers: Account.length
 	}
 	if (socket != null) socket.emit("ServerInfo", SI);
-	else IO.sockets.emit("ServerInfo", SI);
+	else IO.sockets.volatile.emit("ServerInfo", SI);
 }
 
 // Return the current time
