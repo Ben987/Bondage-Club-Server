@@ -3,12 +3,18 @@ require('newrelic');
 
 // Main game objects
 var App = require("http").createServer();
-var DefaultOrigins = "http://www.bondageprojects.com:* https://www.bondageprojects.com:* http://bondageprojects.com:* https://bondageprojects.com:* http://www.bondageprojects.elementfx.com:* https://www.bondageprojects.elementfx.com:* http://bondageprojects.elementfx.com:* https://bondageprojects.elementfx.com:* http://127.0.0.1:* http://localhost:*";
-var IO = require("socket.io")(App, {
-	origins: process.env.ORIGINS || DefaultOrigins,
+const socketio = require("socket.io");
+var IO = new socketio.Server(App, {
+	cors: {
+		origin: [/https?:\/\/(www\.)?bondageprojects(\.elementfx)?.com(:[0-9]+)?/, /http:\/\/127.0.0.1(:[0-9]+)?/, /http:\/\/localhost(:[0-9]+)?/ ],
+		credentials: true
+	},
 	maxHttpBufferSize: 200000,
+	pingTimeout: 15000,
+	serveClient: false,
 	httpCompression: true,
-	perMessageDeflate: true
+	perMessageDeflate: true,
+	allowEIO3: true
 });
 var BCrypt = require("bcrypt");
 var Account = [];
@@ -179,7 +185,7 @@ function AccountSendServerInfo(socket) {
 		OnlinePlayers: Account.length
 	}
 	if (socket != null) socket.emit("ServerInfo", SI);
-	else IO.sockets.emit("ServerInfo", SI);
+	else IO.sockets.volatile.emit("ServerInfo", SI);
 }
 
 // Return the current time
