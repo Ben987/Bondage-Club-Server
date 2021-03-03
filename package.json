@@ -15,13 +15,16 @@
     "cover": "nyc --cache npm test; nyc report --reporter=html"
   },
   "dependencies": {
-    "bcrypt": "^3.0.8",
-    "heroku": "^7.35.1",
-    "js-yaml": "^3.13.1",
-    "lodash": "^4.17.19",
-    "mongodb": "^3.4.1",
+    "bcrypt": "^5.0.1",
+    "heroku": "^7.50.0",
+    "js-yaml": "^3.14.1",
+    "lodash": "^4.17.21",
+    "mongodb": "^3.6.4",
+    "mongoose": "^5.11.18",
     "newrelic": "^7.1.2",
-    "nodemailer": "^6.4.2",
-    "socket.io": "^3.1.2"
+    "node-forge": "^0.10.0",
+    "nodemailer": "^6.5.0",
+    "socket.io": "^3.1.2",
+    "urijs": "^1.19.6"
   }
 }
