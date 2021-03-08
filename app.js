@@ -1,5 +1,5 @@
 "use strict";
-require('newrelic');
+const newrelic = require('newrelic');
 
 // Main game objects
 var App = require("http").createServer();
@@ -135,10 +135,10 @@ DatabaseClient.connect(DatabaseURL, { useUnifiedTopology: true, useNewUrlParser:
 
 				socket.emit("ServerMessage", "Connected to the Bondage Club Server.");
 				socket.emit("ServerMessage", "Warning!  Console scripts can break your account or steal your data.");
-				socket.on("AccountCreate", function (data) { AccountCreate(data, socket) });
-				socket.on("AccountLogin", function (data) { AccountLogin(data, socket) });
-				socket.on("PasswordReset", function(data) { PasswordReset(data, socket) });
-				socket.on("PasswordResetProcess", function(data) { PasswordResetProcess(data, socket) });
+				socket.on("AccountCreate", function (data) { newrelic.startWebTransaction("AccountCreate", () => AccountCreate(data, socket)); });
+				socket.on("AccountLogin", function (data) { newrelic.startWebTransaction("AccountLogin", () => AccountLogin(data, socket)); });
+				socket.on("PasswordReset", function(data) { newrelic.startWebTransaction("PasswordReset", () => PasswordReset(data, socket)); });
+				socket.on("PasswordResetProcess", function(data) { newrelic.startWebTransaction("PasswordResetProcess", () => PasswordResetProcess(data, socket)); });
 				AccountSendServerInfo(socket);
 			});
 
@@ -154,28 +154,28 @@ function OnLogin(socket) {
 	socket.removeAllListeners("AccountLogin");
 	socket.removeAllListeners("PasswordReset");
 	socket.removeAllListeners("PasswordResetProcess");
-	socket.on("AccountUpdate", function(data) { AccountUpdate(data, socket) });
-	socket.on("AccountUpdateEmail", function(data) { AccountUpdateEmail(data, socket) });
-	socket.on("AccountQuery", function(data) { AccountQuery(data, socket) });
-	socket.on("AccountBeep", function(data) { AccountBeep(data, socket) });
-	socket.on("AccountOwnership", function(data) { AccountOwnership(data, socket) });
-	socket.on("AccountLovership", function(data) { AccountLovership(data, socket) });
-	socket.on("AccountDifficulty", function(data) { AccountDifficulty(data, socket) });
-	socket.on("AccountDisconnect", function() { AccountRemove(socket.id) });
-	socket.on("disconnect", function() { AccountRemove(socket.id) });
-	socket.on("ChatRoomSearch", function(data) { ChatRoomSearch(data, socket) });
-	socket.on("ChatRoomCreate", function(data) { ChatRoomCreate(data, socket) });
-	socket.on("ChatRoomJoin", function(data) { ChatRoomJoin(data, socket) });
-	socket.on("ChatRoomLeave", function() { ChatRoomLeave(socket) });
-	socket.on("ChatRoomChat", function(data) { ChatRoomChat(data, socket) });
-	socket.on("ChatRoomCharacterUpdate", function(data) { ChatRoomCharacterUpdate(data, socket) });
-	socket.on("ChatRoomCharacterExpressionUpdate", function(data) { ChatRoomCharacterExpressionUpdate(data, socket) });
-	socket.on("ChatRoomCharacterPoseUpdate", function(data) { ChatRoomCharacterPoseUpdate(data, socket) });
-	socket.on("ChatRoomCharacterArousalUpdate", function(data) { ChatRoomCharacterArousalUpdate(data, socket) });
-	socket.on("ChatRoomCharacterItemUpdate", function(data) { ChatRoomCharacterItemUpdate(data, socket) });
-	socket.on("ChatRoomAdmin", function(data) { ChatRoomAdmin(data, socket) });
-	socket.on("ChatRoomAllowItem", function(data) { ChatRoomAllowItem(data, socket) });
-	socket.on("ChatRoomGame", function(data) { ChatRoomGame(data, socket) });
+	socket.on("AccountUpdate", function(data) { newrelic.startWebTransaction("AccountUpdate", () => AccountUpdate(data, socket)); });
+	socket.on("AccountUpdateEmail", function(data) { newrelic.startWebTransaction("AccountUpdateEmail", () => AccountUpdateEmail(data, socket)); });
+	socket.on("AccountQuery", function(data) { newrelic.startWebTransaction("AccountQuery", () => AccountQuery(data, socket)); });
+	socket.on("AccountBeep", function(data) { newrelic.startWebTransaction("AccountBeep", () => AccountBeep(data, socket)); });
+	socket.on("AccountOwnership", function(data) { newrelic.startWebTransaction("AccountOwnership", () => AccountOwnership(data, socket)); });
+	socket.on("AccountLovership", function(data) { newrelic.startWebTransaction("AccountLovership", () => AccountLovership(data, socket)); });
+	socket.on("AccountDifficulty", function(data) { newrelic.startWebTransaction("AccountDifficulty", () => AccountDifficulty(data, socket)); });
+	socket.on("AccountDisconnect", function() { newrelic.startWebTransaction("AccountRemove", () => AccountRemove(socket.id)); });
+	socket.on("disconnect", function() { AccountRemove(socket.id); });
+	socket.on("ChatRoomSearch", function(data) { newrelic.startWebTransaction("ChatRoomSearch", () => ChatRoomSearch(data, socket)); });
+	socket.on("ChatRoomCreate", function(data) { newrelic.startWebTransaction("ChatRoomCreate", () => ChatRoomCreate(data, socket)); });
+	socket.on("ChatRoomJoin", function(data) { newrelic.startWebTransaction("ChatRoomJoin", () => ChatRoomJoin(data, socket)); });
+	socket.on("ChatRoomLeave", function() { newrelic.startWebTransaction("ChatRoomLeave", () => ChatRoomLeave(socket)); });
+	socket.on("ChatRoomChat", function(data) { newrelic.startWebTransaction("ChatRoomChat", () => ChatRoomChat(data, socket)); });
+	socket.on("ChatRoomCharacterUpdate", function(data) { newrelic.startWebTransaction("ChatRoomCharacterUpdate", () => ChatRoomCharacterUpdate(data, socket)); });
+	socket.on("ChatRoomCharacterExpressionUpdate", function(data) { newrelic.startWebTransaction("ChatRoomCharacterExpressionUpdate", () => ChatRoomCharacterExpressionUpdate(data, socket)); });
+	socket.on("ChatRoomCharacterPoseUpdate", function(data) { newrelic.startWebTransaction("ChatRoomCharacterPoseUpdate", () => ChatRoomCharacterPoseUpdate(data, socket)); });
+	socket.on("ChatRoomCharacterArousalUpdate", function(data) { newrelic.startWebTransaction("ChatRoomCharacterArousalUpdate", () => ChatRoomCharacterArousalUpdate(data, socket)); });
+	socket.on("ChatRoomCharacterItemUpdate", function(data) { newrelic.startWebTransaction("ChatRoomCharacterItemUpdate", () => ChatRoomCharacterItemUpdate(data, socket)); });
+	socket.on("ChatRoomAdmin", function(data) { newrelic.startWebTransaction("ChatRoomAdmin", () => ChatRoomAdmin(data, socket)); });
+	socket.on("ChatRoomAllowItem", function(data) { newrelic.startWebTransaction("ChatRoomAllowItem", () => ChatRoomAllowItem(data, socket)); });
+	socket.on("ChatRoomGame", function(data) { newrelic.startWebTransaction("ChatRoomGame", () => ChatRoomGame(data, socket)); });
 }
 
 // Sends the server info to all players or one specific player (socket)
@@ -207,12 +207,14 @@ function AccountCreate(data, socket) {
 	
 			// Checks if the account already exists
 			data.AccountName = data.AccountName.toUpperCase();
+			const transaction = newrelic.getTransaction();
 			Database.collection("Accounts").findOne({ AccountName : data.AccountName }, function(err, result) {
 
 				// Makes sure the result is null so the account doesn't already exists
 				if (err) throw err;
 				if (result != null) {
 					socket.emit("CreationResponse", "Account already exists");			
+					transaction.end();
 				} else {
 				
 					// Creates a hashed password and saves it with the account info
@@ -236,6 +238,7 @@ function AccountCreate(data, socket) {
 						socket.emit("CreationResponse", { ServerAnswer: "AccountCreated", OnlineID: data.ID, MemberNumber: data.MemberNumber } );
 						AccountSendServerInfo(socket);
 						AccountPurgeInfo(data);
+						transaction.end();
 					});
 
 				}
@@ -291,10 +294,12 @@ function AccountLogin(data, socket) {
 
 		// Checks if there's an account that matches the name
 		data.AccountName = data.AccountName.toUpperCase();
+		const transaction = newrelic.getTransaction();
 		Database.collection("Accounts").findOne({ AccountName : data.AccountName}, function(err, result) {
 			if (err) throw err;
 			if (result === null) {
 				socket.emit("LoginResponse", "InvalidNamePassword");
+				transaction.end();
 			}
 			else {
 
@@ -343,6 +348,7 @@ function AccountLogin(data, socket) {
 						AccountPurgeInfo(result);
 
 					} else socket.emit("LoginResponse", "InvalidNamePassword");
+					transaction.end();
 				});
 
 			}			
@@ -420,9 +426,17 @@ function AccountUpdate(data, socket) {
 				if ((data.Title != null)) Account[P].Title = data.Title;
 
 				// If we have data to push
-				if (!ObjectEmpty(data)) Database.collection("Accounts").updateOne({ AccountName : Account[P].AccountName }, { $set: data }, function(err, res) { if (err) throw err; });
-				break;
-
+				if (!ObjectEmpty(data)) {
+					const transaction = newrelic.getTransaction();
+					Database.collection("Accounts").updateOne(
+						{ AccountName: Account[P].AccountName },
+						{ $set: data },
+						function (err, res) {
+							if (err) throw err;
+							transaction.end();
+						});
+				}
+				return;
 			}
 }
 
@@ -431,17 +445,21 @@ function AccountUpdateEmail(data, socket) {
 	if ((data != null) && (typeof data === "object") && (data.EmailOld != null) && (data.EmailNew != null) && (typeof data.EmailOld === "string") && (typeof data.EmailNew === "string")) {
 		var Acc = AccountGet(socket.id);
 		var E = /^[a-zA-Z0-9@.!#$%&'*+/=?^_`{|}~-]+$/;
-		if ((Acc != null) && (data.EmailNew.match(E) || (data.EmailNew == "")) && (data.EmailNew.length <= 100) && (data.EmailNew.match(E) || (data.EmailNew == "")) && (data.EmailNew.length <= 100))
+		if ((Acc != null) && (data.EmailNew.match(E) || (data.EmailNew == "")) && (data.EmailNew.length <= 100) && (data.EmailNew.match(E) || (data.EmailNew == "")) && (data.EmailNew.length <= 100)) {
+			const transaction = newrelic.getTransaction();
 			Database.collection("Accounts").find({ AccountName : Acc.AccountName }).sort({MemberNumber: -1}).limit(1).toArray(function(err, result) {
 				if (err) throw err;
 				if ((result != null) && (typeof result === "object") && (result.length > 0) && data.EmailOld == result[0].Email) {
 					socket.emit("AccountQueryResult", { Query: "EmailUpdate", Result: true });
-					Database.collection("Accounts").updateOne({ AccountName : Acc.AccountName }, { $set: { Email: data.EmailNew }}, function(err, res) { if (err) throw err; });
+					Database.collection("Accounts").updateOne({ AccountName : Acc.AccountName }, { $set: { Email: data.EmailNew }}, function(err, res) {
+						if (err) throw err;
+						transaction.end();
+					});
 					console.log("Account " + Acc.AccountName + " updated email from " + data.EmailOld + " to " + data.EmailNew);
 					return;
 				}
 			});
-
+		}
 		socket.emit("AccountQueryResult", { Query: "EmailUpdate", Result: false });
 	}
 }
@@ -491,11 +509,13 @@ function AccountQuery(data, socket) {
 
 			// EmailStatus query - returns true if an email is linked to the account
 			if (data.Query == "EmailStatus") {
+				const transaction = newrelic.getTransaction();
 				Database.collection("Accounts").find({ AccountName : Acc.AccountName }).toArray(function(err, result) {
 					if (err) throw err;
 					if ((result != null) && (typeof result === "object") && (result.length > 0)) {
 						socket.emit("AccountQueryResult", { Query: data.Query, Result: ((result[0].Email != null) && (result[0].Email != "")) });
 					}
+					transaction.end();
 				});
 			}
 		}
@@ -1160,6 +1180,7 @@ function PasswordReset(data, socket) {
 	if ((data != null) && (typeof data === "string") && (data != "") && data.match(/^[a-zA-Z0-9@.]+$/) && (data.length >= 5) && (data.length <= 100) && (data.indexOf("@") > 0) && (data.indexOf(".") > 0)) {
 
 		// Gets all accounts that matches the email
+		const transaction = newrelic.getTransaction();
 		Database.collection("Accounts").find({ Email : data }).toArray(function(err, result) {
 
 			// If we found accounts with that email
@@ -1196,7 +1217,7 @@ function PasswordReset(data, socket) {
 				});
 
 			} else socket.emit("PasswordResetResponse", "NoAccountOnEmail");
-
+			transaction.end();
 		});
 
 	}
