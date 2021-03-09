@@ -582,7 +582,7 @@ function ChatRoomSearch(data, socket) {
 						if ((Game == "") || (Game == ChatRoom[C].Game)) // If we must filter for a specific game in a chat room
 							if (ChatRoom[C].Ban.indexOf(Acc.MemberNumber) < 0) // The player cannot be banned
 								if ((data.Query == "") || (ChatRoom[C].Name.toUpperCase().indexOf(data.Query) >= 0)) // Room name must contain the searched name, if any
-									if (!ChatRoom[C].Locked || (ChatRoom[C].Admin.indexOf(Acc.MemberNumber) >= 0)) // Must be unlocked, unless the player is an administrator
+									if (!ChatRoom[C].Locked || (ChatRoom[C].Admin.indexOf(Acc.MemberNumber) >= 0) || (ChatRoom[C].Vip.indexOf(Acc.MemberNumber) >= 0)) // Must be unlocked, unless the player is an administrator or vip
 										if (!ChatRoom[C].Private || (ChatRoom[C].Name.toUpperCase() == data.Query)) // If it's private, must know the exact name
 											if (IgnoredRooms.indexOf(ChatRoom[C].Name.toUpperCase()) == -1) { // Room name cannot be ignored
 
@@ -660,6 +660,7 @@ function ChatRoomCreate(data, socket) {
 					Creation: CommonTime(),
 					Account: [],
 					Ban: [],
+					Vip: [],
 					BlockCategory: data.BlockCategory,
 					Admin: [Acc.MemberNumber]
 				}
@@ -697,8 +698,8 @@ function ChatRoomJoin(data, socket) {
 						if (ChatRoom[C].Account.length < ChatRoom[C].Limit) {
 							if (ChatRoom[C].Ban.indexOf(Acc.MemberNumber) < 0) {
 								
-								// If the room is unlocked or the player is an admin, we allow her inside
-								if (!ChatRoom[C].Locked || (ChatRoom[C].Admin.indexOf(Acc.MemberNumber) >= 0)) {
+								// If the room is unlocked or the player is an admin or vip, we allow her inside
+								if (!ChatRoom[C].Locked || (ChatRoom[C].Admin.indexOf(Acc.MemberNumber) >= 0) || (ChatRoom[C].Vip.indexOf(Acc.MemberNumber) >= 0)) {
 									Acc.ChatRoom = ChatRoom[C];
 									ChatRoom[C].Account.push(Acc);
 									socket.emit("ChatRoomSearchResponse", "JoinedRoom");
@@ -847,6 +848,7 @@ function ChatRoomSync(CR, SourceMemberNumber) {
 	R.Description = CR.Description;
 	R.Admin = CR.Admin;
 	R.Ban = CR.Ban;
+	R.Vip = CR.Vip;
 	R.Background = CR.Background;
 	R.Limit = CR.Limit;
 	R.Game = CR.Game;
@@ -980,6 +982,7 @@ function ChatRoomAdmin(data, socket) {
 						Acc.ChatRoom.BlockCategory = data.Room.BlockCategory;
 						Acc.ChatRoom.Ban = data.Room.Ban;
 						Acc.ChatRoom.Admin = data.Room.Admin;
+						Acc.ChatRoom.Vip = (Array.isArray(data.Room.Vip) ? data.Room.Vip : []);
 						Acc.ChatRoom.Game = ((data.Room.Game == null) || (typeof data.Room.Game !== "string") || (data.Room.Game.length > 100)) ? "" : data.Room.Game;
 						Acc.ChatRoom.Limit = ((data.Room.Limit == null) || (typeof data.Room.Limit !== "string") || isNaN(parseInt(data.Room.Limit)) || (parseInt(data.Room.Limit) < 2) || (parseInt(data.Room.Limit) > 10)) ? 10 : parseInt(data.Room.Limit);
 						if ((data.Room.Private != null) && (typeof data.Room.Private === "boolean")) Acc.ChatRoom.Private = data.Room.Private;
