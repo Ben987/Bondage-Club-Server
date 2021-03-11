@@ -15,6 +15,7 @@
     "cover": "nyc --cache npm test; nyc report --reporter=html"
   },
   "dependencies": {
+    "base64id": "^2.0.0",
     "bcrypt": "^5.0.1",
     "heroku": "^7.50.0",
     "mongodb": "^3.4.1",
