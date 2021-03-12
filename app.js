@@ -447,6 +447,7 @@ function AccountUpdateEmail(data, socket) {
 		var E = /^[a-zA-Z0-9@.!#$%&'*+/=?^_`{|}~-]+$/;
 		if ((Acc != null) && (data.EmailNew.match(E) || (data.EmailNew == "")) && (data.EmailNew.length <= 100) && (data.EmailNew.match(E) || (data.EmailNew == "")) && (data.EmailNew.length <= 100)) {
 			const transaction = newrelic.getTransaction();
+			newrelic.addCustomAttribute("MemberNumber", Acc.MemberNumber);
 			Database.collection("Accounts").find({ AccountName : Acc.AccountName }).sort({MemberNumber: -1}).limit(1).toArray(function(err, result) {
 				if (err) throw err;
 				if ((result != null) && (typeof result === "object") && (result.length > 0) && data.EmailOld == result[0].Email) {
@@ -471,6 +472,7 @@ function AccountQuery(data, socket) {
 		// Finds the current account
 		var Acc = AccountGet(socket.id);
 		if (Acc != null) {
+			newrelic.addCustomAttribute("MemberNumber", Acc.MemberNumber);
 
 			// OnlineFriends query - returns all friends that are online and the room name they are in
 			if ((data.Query == "OnlineFriends") && (Acc.FriendList != null)) {
@@ -529,7 +531,8 @@ function AccountBeep(data, socket) {
 
 		// Make sure both accounts are online, friends and sends the beep to the friend
 		var Acc = AccountGet(socket.id);
-		if (Acc != null)
+		if (Acc != null) {
+			newrelic.addCustomAttribute("MemberNumber", Acc.MemberNumber);
 			for (var A = 0; A < Account.length; A++)
 				if (Account[A].MemberNumber == data.MemberNumber)
 					if ((Account[A].Environment == Acc.Environment) && (((Account[A].FriendList != null) && (Account[A].FriendList.indexOf(Acc.MemberNumber) >= 0)) || ((Account[A].Ownership != null) && (Account[A].Ownership.MemberNumber != null) && (Account[A].Ownership.MemberNumber == Acc.MemberNumber)) || ((data.BeepType != null) && (typeof data.BeepType === "string") && (data.BeepType == "Leash"))))
@@ -541,7 +544,7 @@ function AccountBeep(data, socket) {
 							BeepType: (data.BeepType) ? data.BeepType : null,
 							Message: data.Message
 						});
-
+		}
 	}
 }
 
@@ -572,6 +575,7 @@ function ChatRoomSearch(data, socket) {
 		// Finds the current account
 		var Acc = AccountGet(socket.id);
 		if (Acc != null) {
+			newrelic.addCustomAttribute("MemberNumber", Acc.MemberNumber);
 
 			// Gets the space of the chat room (empty for public, asylum, etc.)
 			var Space = "";
@@ -665,6 +669,7 @@ function ChatRoomCreate(data, socket) {
 			// Finds the account and links it to the new room
 			var Acc = AccountGet(socket.id);
 			if (Acc != null) {
+				newrelic.addCustomAttribute("MemberNumber", Acc.MemberNumber);
 				ChatRoomRemove(Acc, "ServerLeave", []);
 				var NewRoom = {
 					Name: data.Name,
@@ -706,6 +711,7 @@ function ChatRoomJoin(data, socket) {
 		// Finds the current account
 		var Acc = AccountGet(socket.id);
 		if (Acc != null) {
+			newrelic.addCustomAttribute("MemberNumber", Acc.MemberNumber);
 
 			// Removes it from it's current room if needed
 			ChatRoomRemove(Acc, "ServerLeave", []);
@@ -802,7 +808,10 @@ function ChatRoomMessage(CR, Sender, Content, Type, Target, Dictionary) {
 function ChatRoomChat(data, socket) {
 	if ((data != null) && (typeof data === "object") && (data.Content != null) && (data.Type != null) && (typeof data.Content === "string") && (typeof data.Type === "string") && (ChatRoomMessageType.indexOf(data.Type) >= 0) && (data.Content.length <= 1000)) {
 		var Acc = AccountGet(socket.id);
-		if (Acc != null) ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, data.Content.trim(), data.Type, data.Target, data.Dictionary);
+		if (Acc != null) {
+			newrelic.addCustomAttribute("MemberNumber", Acc.MemberNumber);
+			ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, data.Content.trim(), data.Type, data.Target, data.Dictionary);
+		}
 	}
 }
 
@@ -811,8 +820,11 @@ function ChatRoomGame(data, socket) {
 	if ((data != null) && (typeof data === "object")) {
 		var R = Math.random();
 		var Acc = AccountGet(socket.id);
-		for (var A = 0; (Acc != null) && (Acc.ChatRoom != null) && (Acc.ChatRoom.Account != null) && (A < Acc.ChatRoom.Account.length); A++)
-			Acc.ChatRoom.Account[A].Socket.emit("ChatRoomGameResponse", { Sender: Acc.MemberNumber, Data: data, RNG: R } );
+		if (Acc != null) {
+			newrelic.addCustomAttribute("MemberNumber", Acc.MemberNumber);
+			for (var A = 0; (Acc.ChatRoom != null) && (Acc.ChatRoom.Account != null) && (A < Acc.ChatRoom.Account.length); A++)
+				Acc.ChatRoom.Account[A].Socket.emit("ChatRoomGameResponse", { Sender: Acc.MemberNumber, Data: data, RNG: R } );
+		}
 	}
 }
 
@@ -898,7 +910,8 @@ function ChatRoomSyncSingle(Acc, SourceMemberNumber) {
 function ChatRoomCharacterUpdate(data, socket) {
 	if ((data != null) && (typeof data === "object") && (data.ID != null) && (typeof data.ID === "string") && (data.ID != "") && (data.Appearance != null)) {
 		var Acc = AccountGet(socket.id);
-		if ((Acc != null) && (Acc.ChatRoom != null))
+		if ((Acc != null) && (Acc.ChatRoom != null)) {
+			newrelic.addCustomAttribute("MemberNumber", Acc.MemberNumber);
 			if (Acc.ChatRoom.Ban.indexOf(Acc.MemberNumber) < 0)
 				for (var A = 0; ((Acc.ChatRoom != null) && (A < Acc.ChatRoom.Account.length)); A++)
 					if ((Acc.ChatRoom.Account[A].ID == data.ID) && ChatRoomGetAllowItem(Acc, Acc.ChatRoom.Account[A]))
@@ -908,6 +921,7 @@ function ChatRoomCharacterUpdate(data, socket) {
 							Acc.ChatRoom.Account[A].ActivePose = data.ActivePose;
 							ChatRoomSyncSingle(Acc.ChatRoom.Account[A], Acc.MemberNumber);
 						}
+		}
 	}
 }
 
@@ -915,10 +929,13 @@ function ChatRoomCharacterUpdate(data, socket) {
 function ChatRoomCharacterExpressionUpdate(data, socket) {
 	if ((data != null) && (typeof data === "object") && (data.Group != null) && (typeof data.Group === "string") && (data.Group != "")) {
 		var Acc = AccountGet(socket.id);
-		if ((Acc != null) && (data.Appearance != null) && Array.isArray(data.Appearance) && (data.Appearance.length >= 5)) Acc.Appearance = data.Appearance;
-		for (var A = 0; (Acc != null) && (Acc.ChatRoom != null) && (Acc.ChatRoom.Account != null) && (A < Acc.ChatRoom.Account.length); A++)
-			if (Acc.ChatRoom.Account[A].MemberNumber != Acc.MemberNumber)
-				Acc.ChatRoom.Account[A].Socket.emit("ChatRoomSyncExpression", { MemberNumber: Acc.MemberNumber, Name: data.Name, Group: data.Group });
+		if (Acc != null) {
+			newrelic.addCustomAttribute("MemberNumber", Acc.MemberNumber);
+			if ((data.Appearance != null) && Array.isArray(data.Appearance) && (data.Appearance.length >= 5)) Acc.Appearance = data.Appearance;
+			for (var A = 0;(Acc.ChatRoom != null) && (Acc.ChatRoom.Account != null) && (A < Acc.ChatRoom.Account.length); A++)
+				if (Acc.ChatRoom.Account[A].MemberNumber != Acc.MemberNumber)
+					Acc.ChatRoom.Account[A].Socket.emit("ChatRoomSyncExpression", { MemberNumber: Acc.MemberNumber, Name: data.Name, Group: data.Group });
+		}
 	}
 }
 
@@ -928,10 +945,13 @@ function ChatRoomCharacterPoseUpdate(data, socket) {
 		if (typeof data.Pose !== "string" && !Array.isArray(data.Pose)) data.Pose = null;
 		if (Array.isArray(data.Pose)) data.Pose = data.Pose.filter(P => typeof P === "string");
 		var Acc = AccountGet(socket.id);
-		if (Acc != null) Acc.ActivePose = data.Pose;
-		for (var A = 0; (Acc != null) && (Acc.ChatRoom != null) && (Acc.ChatRoom.Account != null) && (A < Acc.ChatRoom.Account.length); A++)
-			if (Acc.ChatRoom.Account[A].MemberNumber != Acc.MemberNumber)
-				Acc.ChatRoom.Account[A].Socket.emit("ChatRoomSyncPose", { MemberNumber: Acc.MemberNumber, Pose: data.Pose });
+		if (Acc != null) {
+			newrelic.addCustomAttribute("MemberNumber", Acc.MemberNumber);
+			Acc.ActivePose = data.Pose;
+			for (var A = 0;(Acc.ChatRoom != null) && (Acc.ChatRoom.Account != null) && (A < Acc.ChatRoom.Account.length); A++)
+				if (Acc.ChatRoom.Account[A].MemberNumber != Acc.MemberNumber)
+					Acc.ChatRoom.Account[A].Socket.emit("ChatRoomSyncPose", { MemberNumber: Acc.MemberNumber, Pose: data.Pose });
+		}
 	}
 }
 
@@ -958,6 +978,7 @@ function ChatRoomCharacterItemUpdate(data, socket) {
 		// Make sure the source account isn't banned from the chat room and has access to use items on the target
 		var Acc = AccountGet(socket.id);
 		if ((Acc == null) || (Acc.ChatRoom == null) || (Acc.ChatRoom.Ban.indexOf(Acc.MemberNumber) >= 0)) return;
+		newrelic.addCustomAttribute("MemberNumber", Acc.MemberNumber);
 		for (var A = 0; (Acc != null) && (Acc.ChatRoom != null) && (Acc.ChatRoom.Account != null) && (A < Acc.ChatRoom.Account.length); A++)
 			if ((Acc.ChatRoom.Account[A].MemberNumber == data.Target) && !ChatRoomGetAllowItem(Acc, Acc.ChatRoom.Account[A]))
 				return;
@@ -978,6 +999,7 @@ function ChatRoomAdmin(data, socket) {
 		// Validates that the current account is a room administrator
 		var Acc = AccountGet(socket.id);
 		if ((Acc != null) && (Acc.ChatRoom != null) && (Acc.ChatRoom.Admin.indexOf(Acc.MemberNumber) >= 0)) {
+			newrelic.addCustomAttribute("MemberNumber", Acc.MemberNumber);
 
 			// Only certain actions can be performed by the administrator on themselves
 			if (Acc.MemberNumber == data.MemberNumber && data.Action != "Swap" && data.Action != "MoveLeft" && data.Action != "MoveRight") return;
@@ -1157,11 +1179,12 @@ function ChatRoomAllowItem(data, socket) {
 		
 		// Gets the source account and target account to check if we allow or not
 		var Acc = AccountGet(socket.id);
-		if ((Acc != null) && (Acc.ChatRoom != null))
+		if ((Acc != null) && (Acc.ChatRoom != null)) {
+			newrelic.addCustomAttribute("MemberNumber", Acc.MemberNumber);
 			for (var A = 0; ((Acc.ChatRoom != null) && (A < Acc.ChatRoom.Account.length)); A++)
 				if (Acc.ChatRoom.Account[A].MemberNumber == data.MemberNumber)
 					socket.emit("ChatRoomAllowItem", { MemberNumber: data.MemberNumber, AllowItem: ChatRoomGetAllowItem(Acc, Acc.ChatRoom.Account[A]) });
-
+		}
 	}
 }
 
@@ -1259,6 +1282,9 @@ function AccountOwnership(data, socket) {
 	
 		// The submissive can flush it's owner at any time in the trial, or after a delay if collared.  Players on Extreme mode cannot break the full ownership.
 		var Acc = AccountGet(socket.id);
+		if (Acc == null) return;
+		newrelic.addCustomAttribute("MemberNumber", Acc.MemberNumber);
+
 		if ((Acc != null) && (Acc.Ownership != null) && (Acc.Ownership.Stage != null) && (Acc.Ownership.Start != null) && ((Acc.Ownership.Stage == 0) || (Acc.Ownership.Start + OwnershipDelay <= CommonTime())) && (data.Action != null) && (typeof data.Action === "string") && (data.Action == "Break"))
 			if ((Acc.Difficulty == null) || (Acc.Difficulty.Level == null) || (typeof Acc.Difficulty.Level !== "number") || (Acc.Difficulty.Level <= 2) || (Acc.Ownership == null) || (Acc.Ownership.Stage == null) || (typeof Acc.Ownership.Stage !== "number") || (Acc.Ownership.Stage == 0)) {
 				Acc.Owner = "";
@@ -1354,6 +1380,9 @@ function AccountLovership(data, socket) {
 
         // A Lover can break her relationship any time if not wed, or after a delay if official
 		var Acc = AccountGet(socket.id);
+		if (Acc == null) return;
+		newrelic.addCustomAttribute("MemberNumber", Acc.MemberNumber);
+
 		if ((Acc != null) && (data.Action != null) && (data.Action === "Break")) {
 
 			var AccLoversNumbers = [];
@@ -1537,6 +1566,7 @@ function AccountDifficulty(data, socket) {
 		// Gets the current account
 		var Acc = AccountGet(socket.id);
 		if (Acc != null) {
+			newrelic.addCustomAttribute("MemberNumber", Acc.MemberNumber);
 
 			// Can only set to 2 or 3 if no change was done for 1 week
 			var LastChange = ((Acc.Difficulty == null) || (Acc.Difficulty.LastChange == null) || (typeof Acc.Difficulty.LastChange !== "number")) ? Acc.Creation : Acc.Difficulty.LastChange;
