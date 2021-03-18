@@ -11,11 +11,12 @@ var IO = new socketio.Server(App, {
 		credentials: true
 	},
 	maxHttpBufferSize: 200000,
-	pingTimeout: 15000,
+	pingTimeout: 20000,
+	upgradeTimeout: 30000,
 	serveClient: false,
 	httpCompression: true,
 	perMessageDeflate: true,
-	allowEIO3: true
+	allowEIO3: false
 });
 var BCrypt = require("bcrypt");
 var Account = [];
