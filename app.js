@@ -173,7 +173,11 @@ function OnLogin(socket) {
 	socket.on("ChatRoomCharacterPoseUpdate", function(data) { ChatRoomCharacterPoseUpdate(data, socket) });
 	socket.on("ChatRoomCharacterArousalUpdate", function(data) { ChatRoomCharacterArousalUpdate(data, socket) });
 	socket.on("ChatRoomCharacterItemUpdate", function(data) { ChatRoomCharacterItemUpdate(data, socket) });
-	socket.on("ChatRoomAdmin", function(data) { ChatRoomAdmin(data, socket) });
+	socket.on("ChatRoomAdmin", function(data) { ChatRoomAdmin(data, socket) }); // Note: Obsolete (Only kept for compatibility with non-beta accounts)
+	socket.on("ChatRoomAdminUpdateRoomData", function(data) { ChatRoomAdminUpdateRoomData(data, socket) });
+	socket.on("ChatRoomAdminSwapPlayers", function(data) { ChatRoomAdminSwapPlayers(data, socket) });
+	socket.on("ChatRoomAdminShufflePlayers", function(data) { ChatRoomAdminShufflePlayers(data, socket) });
+	socket.on("ChatRoomAdminAction", function(data) { ChatRoomAdminAction(data, socket) });
 	socket.on("ChatRoomAllowItem", function(data) { ChatRoomAllowItem(data, socket) });
 	socket.on("ChatRoomGame", function(data) { ChatRoomGame(data, socket) });
 }
@@ -702,7 +706,7 @@ function ChatRoomJoin(data, socket) {
 									Acc.ChatRoom = ChatRoom[C];
 									ChatRoom[C].Account.push(Acc);
 									socket.emit("ChatRoomSearchResponse", "JoinedRoom");
-									ChatRoomSync(ChatRoom[C], Acc.MemberNumber);
+									ChatRoomMemberJoin(ChatRoom[C], Acc.MemberNumber);
 									ChatRoomMessage(ChatRoom[C], Acc.MemberNumber, "ServerEnter", "Action", null, [{Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber}]);
 									return;
 								} else {
@@ -751,7 +755,7 @@ function ChatRoomRemove(Acc, Reason, Dictionary) {
 		} else {
 			if (!Dictionary || (Dictionary.length == 0)) Dictionary.push({Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber});
 			ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, Reason, "Action", null, Dictionary);
-			ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber);
+			ChatRoomMemberLeave(Acc.ChatRoom, Acc.MemberNumber);
 		}
 		Acc.ChatRoom = null;
 
@@ -836,6 +840,7 @@ function ChatRoomSyncGetCharSharedData(Acc) {
 }
 
 // Syncs the room data with all of it's members
+// Note: Obsolete (Only kept for compatibility with non-beta accounts)
 function ChatRoomSync(CR, SourceMemberNumber) {
 
 	// Exits right away if the chat room was destroyed
@@ -863,6 +868,180 @@ function ChatRoomSync(CR, SourceMemberNumber) {
 	// Sends the full packet to everyone in the room
 	for (var A = 0; A < CR.Account.length; A++)
 		CR.Account[A].Socket.emit("ChatRoomSync", R);
+}
+
+// Syncs the room data with all of it's members
+function ChatRoomSyncToMember(CR, TargetMemberNumber) {
+	// Make sure non-beta clients still use the old function
+	//Todo: Remove this if-clause after "R67"
+	if(Acc.OnlineSharedSettings.GameVersion == "R66") {
+		ChatRoomSync(NewRoom, Acc.MemberNumber);
+		return;
+	}
+	// Exits right away if the chat room was destroyed
+	if (CR == null) { return; }
+
+	// Builds the room data
+	let roomData = {};
+	roomData.Name = CR.Name;
+	roomData.Description = CR.Description;
+	roomData.Admin = CR.Admin;
+	roomData.Ban = CR.Ban;
+	roomData.Background = CR.Background;
+	roomData.Limit = CR.Limit;
+	roomData.Game = CR.Game;
+	roomData.Locked = CR.Locked;
+	roomData.Private = CR.Private;
+	roomData.BlockCategory = CR.BlockCategory;
+
+	// Adds the characters from the room
+	roomData.Character = [];
+	for (let i = 0; i < CR.Account.length; i++) // For each player in the chat room...
+	{
+		//Push character to room data
+		roomData.Character.push(ChatRoomSyncGetCharSharedData(CR.Account[i]));
+	}
+
+	// Sends the full packet to everyone in the room
+	for (let i = 0; i < CR.Account.length; i++) // For each player in the chat room...
+	{
+		if(CR.Account[i].MemberNumber == TargetMemberNumber) // If the player is the one who gets synced...
+		{
+			// Send room data and break loop
+			CR.Account[i].Socket.emit("ChatRoomSync", roomData);
+			break;
+		}
+	}
+}
+
+// Sends the newly joined player to all chat room members
+function ChatRoomSyncCharacters(CR, SourceMemberNumber) {
+	//Todo: Remove this if-clause after "R67"
+	if(Acc.OnlineSharedSettings.GameVersion == "R66") {
+		ChatRoomSync(NewRoom, Acc.MemberNumber);
+		return;
+	}
+	// Exits right away if the chat room was destroyed
+	if (CR == null) return;
+
+	// Builds the room data
+	let characters = [];
+
+	// Adds the characters from the room
+	for (var i = 0; i < CR.Account.length; i++)
+	{
+		characters.push(ChatRoomSyncGetCharSharedData(CR.Account[i]));
+	}
+
+	// Sends the full packet to everyone in the room
+	for (let i = 0; i < CR.Account.length; i++)
+		CR.Account[i].Socket.emit("ChatRoomSyncCharacters", characters);
+	
+}
+
+// Sends the newly joined player to all chat room members
+function ChatRoomMemberJoin(CR, SourceMemberNumber) {
+	//Todo: Remove this if-clause after "R67"
+	if(Acc.OnlineSharedSettings.GameVersion == "R66") {
+		ChatRoomSync(NewRoom, Acc.MemberNumber);
+		return;
+	}
+	// Exits right away if the chat room was destroyed
+	if (CR == null) return;
+
+	// Builds the room data
+	let character = null;
+
+	// Adds the characters from the room
+	for (let i = 0; i < CR.Account.length; i++) // For each player in the chat room...
+	{
+		if(CR.Account[i].MemberNumber === SourceMemberNumber) // If the player is the one who just joined...
+		{
+			//Remember character and break loop
+			character = CR.Account[i]
+			break;
+		}
+	}
+
+	// Sends the full packet to everyone in the room
+	if(character != null) // If we found a character...
+	{
+		for (var i = 0; i < CR.Account.length; i++) // For each player in the chat room...
+		{
+			// Inform about joined player
+			CR.Account[i].Socket.emit("ChatRoomMemberJoin", character);
+		}
+	}
+	
+}
+
+// Sends the left player to all chat room members
+function ChatRoomMemberLeave(CR, SourceMemberNumber) {
+	//Todo: Remove this if-clause after "R67"
+	if(Acc.OnlineSharedSettings.GameVersion == "R66") {
+		ChatRoomSync(NewRoom, Acc.MemberNumber);
+		return;
+	}
+	// Exits right away if the chat room was destroyed
+	if (CR == null) return;
+
+	// Sends the full packet to everyone in the room
+	for (var i = 0; i < CR.Account.length; i++) // For each player in the chat room...
+	{
+		// Inform about left player
+		CR.Account[i].Socket.emit("ChatRoomMemberLeave", SourceMemberNumber);
+	}
+	
+}
+
+// Syncs the room data with all of it's members
+function ChatRoomSyncRoomProperties(CR, SourceMemberNumber) {
+	//Todo: Remove this if-clause after "R67"
+	if(Acc.OnlineSharedSettings.GameVersion == "R66") {
+		ChatRoomSync(NewRoom, Acc.MemberNumber);
+		return;
+	}
+	// Exits right away if the chat room was destroyed
+	if (CR == null) return;
+
+	// Builds the room data
+	let roomData = {};
+	roomData.Name = CR.Name;
+	roomData.Description = CR.Description;
+	roomData.Admin = CR.Admin;
+	roomData.Ban = CR.Ban;
+	roomData.Background = CR.Background;
+	roomData.Limit = CR.Limit;
+	roomData.Game = CR.Game;
+	roomData.SourceMemberNumber = SourceMemberNumber;
+	roomData.Locked = CR.Locked;
+	roomData.Private = CR.Private;
+	roomData.BlockCategory = CR.BlockCategory;
+
+	// Sends the full packet to everyone in the room
+	for (var i = 0; i < CR.Account.length; i++)
+		CR.Account[i].Socket.emit("ChatRoomSyncRoomProperties", roomData);
+}
+
+// Syncs the room data with all of it's members
+function ChatRoomSwapPlayers(CR, SourceMemberNumber, MemberNumber1, MemberNumber2) {
+	//Todo: Remove this if-clause after "R67"
+	if(Acc.OnlineSharedSettings.GameVersion == "R66") {
+		ChatRoomSync(NewRoom, Acc.MemberNumber);
+		return;
+	}
+	// Exits right away if the chat room was destroyed
+	if (CR == null) return;
+
+	// Builds the room data
+	let swapData = {};
+
+	swapData.MemberNumber1 = MemberNumber1
+	swapData.MemberNumber2 = MemberNumber2
+
+	// Sends the full packet to everyone in the room
+	for (var i = 0; i < CR.Account.length; i++)
+		CR.Account[i].Socket.emit("ChatRoomSwapPlayers", swapData);
 }
 
 // Syncs a single character data with all room members
@@ -951,6 +1130,7 @@ function ChatRoomCharacterItemUpdate(data, socket) {
 }
 
 // When an administrator account wants to act on another account in the room
+// Note: Obsolete (Only kept for compatibility with non-beta accounts)
 function ChatRoomAdmin(data, socket) {
 
 	if ((data != null) && (typeof data === "object") && (data.MemberNumber != null) && (typeof data.MemberNumber === "number") && (data.Action != null) && (typeof data.Action === "string")) {
@@ -1088,6 +1268,323 @@ function ChatRoomAdmin(data, socket) {
 		}
 
 	}
+}
+
+/**
+ * Handles room data updated by an administrator and sends the room values back to the players within the room.
+ * @param {object} data - The parameters received from the client alongside the call
+ *		Expected Members of data:
+ * 		{object} Room
+ * 		{string} Room.Name
+ * 		{string} Room.Description
+ * 		{string} Room.Background
+ * 		{array} Room.Admin
+ * 		{array} Room.BlockCategory - [Optional]
+ * 		{array} Room.Game - [Optional]
+ * 		{string} Room.Limit - [Optional]
+ * 		{boolean} Room.Private - [Optional]
+ * 		{boolean} Room.Locked - [Optional]
+ * @param {object} socket - The socket identifying the client that sent the evoking call
+ * @returns {void} - Nothing
+ */
+function ChatRoomAdminUpdateRoomData(data, socket) {
+	// Validate that data is an object
+	if ((data == null) || (typeof data !== "object")) {
+		return;
+	}
+	
+	// Validates that the current account is a room administrator
+	let Acc = AccountGet(socket.id);
+	if ((Acc == null) || (Acc.ChatRoom == null) || (Acc.ChatRoom.Admin.indexOf(Acc.MemberNumber) < 0)) {
+		return;
+	}
+	
+	// Validate existence and data types of room data values
+	if ((data.Room == null) || (typeof data.Room !== "object") || (data.Room.Name == null) || (data.Room.Description == null) || (data.Room.Background == null) || (typeof data.Room.Name !== "string") || (typeof data.Room.Description !== "string") || (typeof data.Room.Background !== "string") || (!Array.isArray(data.Room.Admin)) || (data.Room.Admin.some(i => !Number.isInteger(i))) || (data.Room.Ban == null) || (!Array.isArray(data.Room.Ban)) || (data.Room.Ban.some(i => !Number.isInteger(i)))) {
+		socket.emit("ChatRoomUpdateResponse", "InvalidRoomData");
+		return;
+	}
+	
+	//Validate the room data format and length
+	data.Room.Name = data.Room.Name.trim();
+	let LN = /^[a-zA-Z0-9 ]+$/;
+	if (!data.Room.Name.match(LN) || (data.Room.Name.length < 1) || (data.Room.Name.length > 20) || (data.Room.Description.length > 100) || (data.Room.Background.length > 100)) {
+		socket.emit("ChatRoomUpdateResponse", "InvalidRoomData");
+		return;
+	}
+	
+	for (var i = 0; i < ChatRoom.length; i++) // For each existing chat room
+	{
+		if (Acc.ChatRoom.Name != data.Room.Name && ChatRoom[i].Name.toUpperCase().trim() == data.Room.Name.toUpperCase().trim()) // If the chat room has the same name then the one we want to create...
+		{
+			//Chat room already exists: Send message to updating player and return
+			socket.emit("ChatRoomUpdateResponse", "RoomAlreadyExist");
+			return;
+		}
+	}
+	
+	//Update room data values
+	Acc.ChatRoom.Name = data.Room.Name;
+	Acc.ChatRoom.Background = data.Room.Background;
+	Acc.ChatRoom.Description = data.Room.Description;
+	if ((data.Room.BlockCategory == null) || !Array.isArray(data.Room.BlockCategory)) data.Room.BlockCategory = [];
+	Acc.ChatRoom.BlockCategory = data.Room.BlockCategory;
+	Acc.ChatRoom.Ban = data.Room.Ban;
+	Acc.ChatRoom.Admin = data.Room.Admin;
+	Acc.ChatRoom.Game = ((data.Room.Game == null) || (typeof data.Room.Game !== "string") || (data.Room.Game.length > 100)) ? "" : data.Room.Game;
+	Acc.ChatRoom.Limit = ((data.Room.Limit == null) || (typeof data.Room.Limit !== "string") || isNaN(parseInt(data.Room.Limit)) || (parseInt(data.Room.Limit) < 2) || (parseInt(data.Room.Limit) > 10)) ? 10 : parseInt(data.Room.Limit);
+	if ((data.Room.Private != null) && (typeof data.Room.Private === "boolean")) Acc.ChatRoom.Private = data.Room.Private;
+	if ((data.Room.Locked != null) && (typeof data.Room.Locked === "boolean")) Acc.ChatRoom.Locked = data.Room.Locked;
+
+	//Inform updating player about success
+	socket.emit("ChatRoomUpdateResponse", "Updated");
+
+	//Send Message to inform members inside about update
+	let Dictionary = [];
+	Dictionary.push({Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber})
+	Dictionary.push({Tag: "ChatRoomName", Text: Acc.ChatRoom.Name})
+	Dictionary.push({Tag: "ChatRoomLimit", Text: Acc.ChatRoom.Limit})
+	Dictionary.push({Tag: "ChatRoomPrivacy", TextToLookUp: (Acc.ChatRoom.Private ? "Private" : "Public")})
+	Dictionary.push({Tag: "ChatRoomLocked", TextToLookUp: (Acc.ChatRoom.Locked ? "Locked" : "Unlocked")})
+	ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "ServerUpdateRoom", "Action", null, Dictionary);
+	
+	//Perform the actual room update by sending the updated values to all players within the room
+	ChatRoomSyncRoomProperties(Acc.ChatRoom, Acc.MemberNumber);
+	
+	return;
+		
+}
+
+/**
+ * Handles administrators swapping the position of characters in a room.
+ * @param {object} data - The parameters received from the client alongside the call
+ *		Expected Members of data:
+ * 		{number} TargetMemberNumber - The member number of the first player to move.
+ * 		{number} DestinationMemberNumber - The member number of the second player to move.
+ * 		{boolean} Publish - [Optional] If set to true, then the swap action will be accompanied by a chat room message that explains it
+ * @param {object} socket - The socket identifying the client that sent the evoking call
+ * @returns {void} - Nothing
+ */
+function ChatRoomAdminSwapPlayers(data, socket) {
+	// Validate that data is an object
+	if ((data == null) || (typeof data !== "object")) {
+		return;
+	}
+	
+	// Validates that the current account is a room administrator
+	let Acc = AccountGet(socket.id);
+	if ((Acc == null) || (Acc.ChatRoom == null) || (Acc.ChatRoom.Admin.indexOf(Acc.MemberNumber) < 0)) {
+		return;
+	}
+	
+	//Validate target and destination member numbers
+	if ((data.TargetMemberNumber == null) || (typeof data.TargetMemberNumber !== "number") || (data.DestinationMemberNumber == null) || (typeof data.DestinationMemberNumber !== "number") || (data.TargetMemberNumber == data.DestinationMemberNumber)) {
+		return;
+	}
+	
+	//Find the related accounts
+	let TargetAccountIndex = Acc.ChatRoom.Account.findIndex(x => x.MemberNumber == data.TargetMemberNumber);
+	let DestinationAccountIndex = Acc.ChatRoom.Account.findIndex(x => x.MemberNumber == data.DestinationMemberNumber);
+	
+	//Stop here if we couldn't find the accounts
+	if ((TargetAccountIndex < 0) || (DestinationAccountIndex < 0)) { return; }
+	
+	//Get the actual account objects
+	let TargetAccount = Acc.ChatRoom.Account[TargetAccountIndex];
+	let DestinationAccount = Acc.ChatRoom.Account[DestinationAccountIndex];
+	
+	if ((data.Publish != null) && (typeof data.Publish === "bool") && data.Publish) // If the action is to be published...
+	{
+		//Send Message to inform members inside the room about the position change
+		
+		//If it's a move or a swap option only depends on the distance of the action
+		let indexDiff = (TargetAccountIndex - DestinationAccountIndex)
+		if(Math.abs(indexDiff) > 1) // If the distance is greater then 1...
+		{
+			//It's swap action
+			let Dictionary = [];
+			Dictionary.push({ Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber });
+			Dictionary.push({ Tag: "TargetCharacterName", Text: TargetAccount.Name, MemberNumber: TargetAccount.MemberNumber });
+			Dictionary.push({ Tag: "DestinationCharacterName", Text: DestinationAccount.Name, MemberNumber: DestinationAccount.MemberNumber });
+			ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "ServerSwap", "Action", null, Dictionary);
+		}
+		else if(indexDiff == 1) // If the targetis one to the right of the the destination...
+		{
+			//It's move left action
+			let Dictionary = [];
+			Dictionary.push({Tag: "TargetCharacterName", Text: TargetAccount.Name, MemberNumber: TargetAccount.MemberNumber});
+			Dictionary.push({Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber});
+			ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "ServerMoveLeft", "Action", null, Dictionary);
+		}
+		else if(indexDiff == -1) // If the targetis one to the left of the the destination...
+		{
+			//It's move left action
+			let Dictionary = [];
+			Dictionary.push({Tag: "TargetCharacterName", Text: MovedAccount.Name, MemberNumber: MovedAccount.MemberNumber});
+			Dictionary.push({Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber});
+			ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "ServerMoveRight", "Action", null, Dictionary);
+		}
+
+	}
+	
+	//Perform the actual swap and send the swapped player's member numbers to all players within the room
+	Acc.ChatRoom.Account[TargetAccountIndex] = DestinationAccount;
+	Acc.ChatRoom.Account[DestinationAccountIndex] = TargetAccount;
+	ChatRoomSwapPlayers(Acc.ChatRoom, Acc.MemberNumber, data.TargetMemberNumber, data.DestinationMemberNumber);
+
+	return;
+
+}
+
+/**
+ * Handles administrators shuffling the position of all characters in a room.
+ * @param {object} data - The parameters received from the client alongside the call
+ *		Expected Members of data:
+ * 		{boolean} Publish - [Optional] If set to true, then the shuffle action will be accompanied by a chat room message that explains it
+ * @param {object} socket - The socket identifying the client that sent the evoking call
+ * @returns {void} - Nothing
+ */
+function ChatRoomAdminShufflePlayers(data, socket) {
+	// Validate that data is an object
+	if ((data == null) || (typeof data !== "object")) {
+		return;
+	}
+	
+	// Validates that the current account is a room administrator
+	let Acc = AccountGet(socket.id);
+	if ((Acc == null) || (Acc.ChatRoom == null) || (Acc.ChatRoom.Admin.indexOf(Acc.MemberNumber) < 0)) {
+		return;
+	}
+	
+	for (var i = 0; i < Acc.ChatRoom.Account.length; i++)
+	{
+		Acc.ChatRoom.Account.sort(() => Math.random() - 0.5);
+	}
+	Dictionary.push({Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber});
+	ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "ServerShuffle", "Action", null, Dictionary);
+	ChatRoomSyncCharacters(Acc.ChatRoom, Acc.MemberNumber);
+
+	return;
+
+}
+
+/**
+ * Handles administrators performing actions like ban, kick, promote or demote on character in a room.
+ * @param {object} data - The parameters received from the client alongside the call
+ *		Expected Members of data:
+ * 		{number} MemberNumber - The member number of the player to perform the action on
+ * 		{string} Action - The action that is performed on the specified player ("Kick", "Ban", "Unban", "Promote", "Demote")
+ * @param {object} socket - The socket identifying the client that sent the evoking call
+ * @returns {void} - Nothing
+ */
+function ChatRoomAdminAction(data, socket) {
+	// // Validate that data is an object, as well as the received member number and action
+	if ((data == null) || (typeof data !== "object") ||
+		(data.MemberNumber == null) || (typeof data.MemberNumber !== "number") ||
+		(data.Action == null) || (typeof data.Action != "string"))
+	{
+		return;
+	}
+	
+	// Validates that the current account is a room administrator
+	let Acc = AccountGet(socket.id);
+	if ((Acc == null) || (Acc.ChatRoom == null) || (Acc.ChatRoom.Admin.indexOf(Acc.MemberNumber) < 0)) {
+		return;
+	}
+	
+	let account = null
+	for (let i = 0; i < Acc.ChatRoom.Account.length; i++) {
+		if (Acc.ChatRoom.Account[i].MemberNumber == data.MemberNumber) {
+			account = Acc.ChatRoom.Account[i]
+		}
+	}
+	
+	switch(data.Action)
+	{
+		case "Kick":
+		{
+			//Only allow kicking if the player is inside the room
+			if(account == null)	{ return; }
+			
+			//Inform the kicked player
+			account.Socket.emit("ChatRoomSearchResponse", "RoomKicked");
+			
+			//Inform the players in the chat room
+			Dictionary.push({Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber});
+			Dictionary.push({Tag: "TargetCharacterName", Text: Acc.ChatRoom.Account[A].Name, MemberNumber: Acc.ChatRoom.Account[A].MemberNumber});
+			
+			//Remove the player from the chat room
+			ChatRoomRemove(Acc.ChatRoom.Account[A], "ServerKick", Dictionary);
+			break;
+		}
+		
+		case "Ban":
+		{
+			if (Acc.ChatRoom.Ban.indexOf(data.MemberNumber) < 0) // If the player isn't already banned...
+			{
+				//Add the player to ban list
+				Acc.ChatRoom.Ban.push(data.MemberNumber);
+			}
+			
+			if(account != null) // If the banned player is inside the room...
+			{
+				//Inform the banned player
+				Acc.ChatRoom.Account[A].Socket.emit("ChatRoomSearchResponse", "RoomBanned");
+				
+				//Remove the player from the chat room and inform the players in the chat room
+				Dictionary.push({Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber});
+				Dictionary.push({Tag: "TargetCharacterName", Text: Acc.ChatRoom.Account[A].Name, MemberNumber: Acc.ChatRoom.Account[A].MemberNumber});
+				ChatRoomRemove(Acc.ChatRoom.Account[A], "ServerBan", Dictionary);
+			}
+
+			break;
+		}
+		
+		case "Unban":
+		{
+			if ((Acc.ChatRoom.Ban.indexOf(data.MemberNumber) >= 0)) // If the player is banned...
+			{
+				//Remove the player from ban list
+				Acc.ChatRoom.Ban.splice(Acc.ChatRoom.Ban.indexOf(data.MemberNumber), 1);
+			}
+			break;
+		}
+		
+		case "Promote":
+		{
+			//Only allow promoting if the player is inside the room
+			if(account == null)	{ return; }
+			
+			//Add the player to admin list
+			Acc.ChatRoom.Admin.push(Acc.ChatRoom.Account[A].MemberNumber);
+			
+			//Inform the players in the chat room
+			Dictionary.push({Tag: "TargetCharacterName", Text: Acc.ChatRoom.Account[A].Name, MemberNumber: Acc.ChatRoom.Account[A].MemberNumber});
+			Dictionary.push({Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber});
+			ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "ServerPromoteAdmin", "Action", null, Dictionary);
+			
+			//Send the updated room data to all players in the chat room
+			ChatRoomSyncRoomProperties(Acc.ChatRoom, Acc.MemberNumber);
+			break;
+		}
+		
+		case "Demote":
+		{
+			//Only allow demoting if the player is inside the room
+			if(account == null)	{ return; }
+			Acc.ChatRoom.Admin.splice(Acc.ChatRoom.Admin.indexOf(Acc.ChatRoom.Account[A].MemberNumber), 1);
+			
+			//Inform the players in the chat room
+			Dictionary.push({Tag: "TargetCharacterName", Text: Acc.ChatRoom.Account[A].Name, MemberNumber: Acc.ChatRoom.Account[A].MemberNumber});
+			Dictionary.push({Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber});
+			ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "ServerDemoteAdmin", "Action", null, Dictionary
+			
+			//Send the updated room data to all players in the chat room
+			ChatRoomSyncRoomProperties(Acc.ChatRoom, Acc.MemberNumber);
+			break;
+		}
+	}
+
 }
 
 // Returns a specific reputation value for the player
