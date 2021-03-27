@@ -337,7 +337,7 @@ function AccountLogin(data, socket) {
 						OnLogin(socket);
 						result.Password = null;
 						result.Email = null;
-						socket.emit("LoginResponse", result);
+						socket.compress(false).emit("LoginResponse", result);
 						result.Socket = socket;
 						AccountSendServerInfo(socket);
 						AccountPurgeInfo(result);
