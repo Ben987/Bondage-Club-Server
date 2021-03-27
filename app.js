@@ -1262,6 +1262,7 @@ function ChatRoomAdmin(data, socket) {
 					if (data.Action == "Ban") {
 						Acc.ChatRoom.Ban.push(data.MemberNumber);
 						Acc.ChatRoom.Account[A].Socket.emit("ChatRoomSearchResponse", "RoomBanned");
+						ChatRoomSyncRoomProperties(Acc.ChatRoom, Acc.MemberNumber);
 						if ((Acc != null) && (Acc.ChatRoom != null) && (Acc.ChatRoom.Account[A] != null)) {
 							Dictionary.push({Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber});
 							Dictionary.push({Tag: "TargetCharacterName", Text: Acc.ChatRoom.Account[A].Name, MemberNumber: Acc.ChatRoom.Account[A].MemberNumber});
@@ -1322,8 +1323,16 @@ function ChatRoomAdmin(data, socket) {
 				}
 
 			// Can also ban or unban without having the player in the room, there's no visible output
-			if ((data.Action == "Ban") && (Acc.ChatRoom.Ban.indexOf(data.MemberNumber) < 0)) Acc.ChatRoom.Ban.push(data.MemberNumber);
-			if ((data.Action == "Unban") && (Acc.ChatRoom.Ban.indexOf(data.MemberNumber) >= 0)) Acc.ChatRoom.Ban.splice(Acc.ChatRoom.Ban.indexOf(data.MemberNumber), 1);
+			if ((data.Action == "Ban") && (Acc.ChatRoom.Ban.indexOf(data.MemberNumber) < 0))
+			{
+				Acc.ChatRoom.Ban.push(data.MemberNumber);
+				ChatRoomSyncRoomProperties(Acc.ChatRoom, Acc.MemberNumber);
+			}
+			if ((data.Action == "Unban") && (Acc.ChatRoom.Ban.indexOf(data.MemberNumber) >= 0))
+			{
+				Acc.ChatRoom.Ban.splice(Acc.ChatRoom.Ban.indexOf(data.MemberNumber), 1);
+				ChatRoomSyncRoomProperties(Acc.ChatRoom, Acc.MemberNumber);
+			}
 		}
 
 	}
