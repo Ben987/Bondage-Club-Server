@@ -919,7 +919,6 @@ function ChatRoomSyncCharacter(CR, SourceMemberNumber, TargetMemberNumber) {
 function ChatRoomSyncMemberJoin(CR, SourceMemberNumber) {
 	// Exits right away if the chat room was destroyed
 	if (CR == null) return;
-	console.log("ChatRoomSyncMemberJoin")
 	let joinData = { }
 	joinData.SourceMemberNumber = SourceMemberNumber
 	joinData.Character = null
@@ -1262,12 +1261,12 @@ function ChatRoomAdmin(data, socket) {
 					if (data.Action == "Ban") {
 						Acc.ChatRoom.Ban.push(data.MemberNumber);
 						Acc.ChatRoom.Account[A].Socket.emit("ChatRoomSearchResponse", "RoomBanned");
-						ChatRoomSyncRoomProperties(Acc.ChatRoom, Acc.MemberNumber);
 						if ((Acc != null) && (Acc.ChatRoom != null) && (Acc.ChatRoom.Account[A] != null)) {
 							Dictionary.push({Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber});
 							Dictionary.push({Tag: "TargetCharacterName", Text: Acc.ChatRoom.Account[A].Name, MemberNumber: Acc.ChatRoom.Account[A].MemberNumber});
 							ChatRoomRemove(Acc.ChatRoom.Account[A], "ServerBan", Dictionary);
 						}
+						ChatRoomSyncRoomProperties(Acc.ChatRoom, Acc.MemberNumber);
 					}
 					else if (data.Action == "Kick") {
 						Acc.ChatRoom.Account[A].Socket.emit("ChatRoomSearchResponse", "RoomKicked");
