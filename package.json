@@ -9,7 +9,7 @@
   "main": "app.js",
   "private": true,
   "scripts": {
-    "start": "node app.js",
+    "start": "node --unhandled-rejections=throw app.js",
     "e2e": "repo-tools test deploy",
     "test": "repo-tools test app",
     "cover": "nyc --cache npm test; nyc report --reporter=html"
