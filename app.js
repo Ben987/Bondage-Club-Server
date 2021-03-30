@@ -311,7 +311,7 @@ function AccountLogin(data, socket) {
 
 /**
  * The queue of logins
- * @type {[socketio.Socket, string, string][]}
+ * @type {[socketio.Socket, string, string][]} - [socket, username, password]
  */
 const loginQueue = [];
 
@@ -327,13 +327,14 @@ const pendingLogins = new WeakSet();
 function AccountLoginRun() {
 	// Get next waiting login
 	if (loginQueue.length === 0) return;
-	const nx = loginQueue[0];
+	let nx = loginQueue[0];
 
 	// If client disconnected during wait, ignore it
-	if (!nx[0].connected) {
+	while (!nx[0].connected) {
 		pendingLogins.delete(nx[0]);
 		loginQueue.shift();
-		return AccountLoginRun();
+		if (loginQueue.length === 0) return;
+		nx = loginQueue[0];
 	}
 
 	// Process the login and after it queue the next one
