@@ -287,68 +287,131 @@ function AccountPurgeInfo(A) {
 function AccountLogin(data, socket) {
 
 	// Makes sure the login comes with a name and a password
-	if ((data != null) && (typeof data === "object") && (data.AccountName != null) && (typeof data.AccountName === "string") && (data.Password != null) && (typeof data.Password === "string")) {
+	if (!data || typeof data !== "object" || typeof data.AccountName !== "string" || typeof data.Password !== "string") {
+		socket.emit("LoginResponse", "InvalidNamePassword");
+		return;
+	}
 
-		// Checks if there's an account that matches the name
-		data.AccountName = data.AccountName.toUpperCase();
-		Database.collection("Accounts").findOne({ AccountName : data.AccountName}, function(err, result) {
-			if (err) throw err;
-			if (result === null) {
-				socket.emit("LoginResponse", "InvalidNamePassword");
-			}
-			else {
+	// If connection already has login queued, ignore it
+	if (pendingLogins.has(socket)) return;
 
-				// Compare the password to its hashed version
-				BCrypt.compare(data.Password.toUpperCase(), result.Password, function( err, res ) {
-					if (res) {
+	const shouldRun = loginQueue.length === 0;
+	loginQueue.push([socket, data.AccountName.toUpperCase(), data.Password]);
+	pendingLogins.add(socket);
 
-						// Disconnect duplicated logged accounts
-						for (let A = 0; A < Account.length; A++) {
-							const Acc = Account[A];
-							if (Acc.AccountName === result.AccountName) {
-								Acc.Socket.emit("ForceDisconnect", "ErrorDuplicatedLogin");
-								Acc.Socket.disconnect(true);
-								AccountRemove(Acc.ID);
-								break;
-							}
-						}
+	if (loginQueue.length > 16) {
+		socket.emit("LoginQueue", loginQueue.length);
+	}
 
-						// Assigns a member number if there's none
-						if (result.MemberNumber == null) {
-							result.MemberNumber = NextMemberNumber;
-							NextMemberNumber++;
-							console.log("Assigning missing member number: " + result.MemberNumber + " for account: " + result.AccountName);
-							Database.collection("Accounts").updateOne({ AccountName : result.AccountName }, { $set: { MemberNumber: result.MemberNumber } }, function(err, res) { if (err) throw err; });
-						}
+	// If there are no logins being processed, start the processing of the queue
+	if (shouldRun) {
+		AccountLoginRun();
+	}
+}
 
-						// Updates lovership to an array if needed for conversion
-						if (!Array.isArray(result.Lovership)) result.Lovership = (result.Lovership != undefined) ? [result.Lovership] : [];
+/**
+ * The queue of logins
+ * @type {[socketio.Socket, string, string][]} - [socket, username, password]
+ */
+const loginQueue = [];
 
-						// Sets the last login date
-						result.LastLogin = CommonTime();
-						Database.collection("Accounts").updateOne({ AccountName : result.AccountName }, { $set: { LastLogin: result.LastLogin } }, function(err, res) { if (err) throw err; });
+/**
+ * List of sockets, for which there already is a pending login - to prevent duplicate logins during wait time
+ * @type {WeakSet.<socketio.Socket>}
+ */
+const pendingLogins = new WeakSet();
 
-						// Logs the account
-						result.ID = socket.id;
-						result.Environment = AccountGetEnvironment(socket);
-						console.log("Login account: " + result.AccountName + " ID: " + socket.id + " " + result.Environment);
-						AccountValidData(result);
-						Account.push(result);
-						OnLogin(socket);
-						result.Password = null;
-						result.Email = null;
-						socket.emit("LoginResponse", result);
-						result.Socket = socket;
-						AccountSendServerInfo(socket);
-						AccountPurgeInfo(result);
+/**
+ * Runs the next login in queue, waiting for it to finish before running next one
+ */
+function AccountLoginRun() {
+	// Get next waiting login
+	if (loginQueue.length === 0) return;
+	let nx = loginQueue[0];
 
-					} else socket.emit("LoginResponse", "InvalidNamePassword");
-				});
+	// If client disconnected during wait, ignore it
+	while (!nx[0].connected) {
+		pendingLogins.delete(nx[0]);
+		loginQueue.shift();
+		if (loginQueue.length === 0) return;
+		nx = loginQueue[0];
+	}
 
-			}			
-		});
-		
-	} else socket.emit("LoginResponse", "InvalidNamePassword");
+	// Process the login and after it queue the next one
+	AccountLoginProcess(...nx).then(() => {
+		pendingLogins.delete(nx[0]);
+		loginQueue.shift();
+		if (loginQueue.length > 0) {
+			setTimeout(AccountLoginRun, 50);
+		}
+	}, err => { throw err; });
+}
+
+/**
+ * Processes a single login request
+ * @param {socketio.Socket} socket
+ * @param {string} AccountName The username the user is trying to log in with
+ * @param {string} Password
+ */
+async function AccountLoginProcess(socket, AccountName, Password) {
+	// Checks if there's an account that matches the name
+	/** @type {Account|null} */
+	const result = await Database.collection("Accounts").findOne({ AccountName });
+
+	if (!socket.connected) return;
+	if (result === null) {
+		socket.emit("LoginResponse", "InvalidNamePassword");
+		return;
+	}
+
+	// Compare the password to its hashed version
+	const res = await BCrypt.compare(Password.toUpperCase(), result.Password);
+
+	if (!socket.connected) return;
+	if (!res) {
+		socket.emit("LoginResponse", "InvalidNamePassword");
+		return;
+	}
+
+	// Disconnect duplicated logged accounts
+	for (let A = 0; A < Account.length; A++) {
+		const Acc = Account[A];
+		if (Acc.AccountName === result.AccountName) {
+			Acc.Socket.emit("ForceDisconnect", "ErrorDuplicatedLogin");
+			Acc.Socket.disconnect(true);
+			AccountRemove(Acc.ID);
+			break;
+		}
+	}
+
+	// Assigns a member number if there's none
+	if (result.MemberNumber == null) {
+		result.MemberNumber = NextMemberNumber;
+		NextMemberNumber++;
+		console.log("Assigning missing member number: " + result.MemberNumber + " for account: " + result.AccountName);
+		Database.collection("Accounts").updateOne({ AccountName : result.AccountName }, { $set: { MemberNumber: result.MemberNumber } }, function(err, res) { if (err) throw err; });
+	}
+
+	// Updates lovership to an array if needed for conversion
+	if (!Array.isArray(result.Lovership)) result.Lovership = (result.Lovership != undefined) ? [result.Lovership] : [];
+
+	// Sets the last login date
+	result.LastLogin = CommonTime();
+	Database.collection("Accounts").updateOne({ AccountName : result.AccountName }, { $set: { LastLogin: result.LastLogin } }, function(err, res) { if (err) throw err; });
+
+	// Logs the account
+	result.ID = socket.id;
+	result.Environment = AccountGetEnvironment(socket);
+	console.log("Login account: " + result.AccountName + " ID: " + socket.id + " " + result.Environment);
+	AccountValidData(result);
+	Account.push(result);
+	OnLogin(socket);
+	delete result.Password;
+	delete result.Email;
+	socket.compress(false).emit("LoginResponse", result);
+	result.Socket = socket;
+	AccountSendServerInfo(socket);
+	AccountPurgeInfo(result);
 }
 
 // Returns TRUE if the object is empty
