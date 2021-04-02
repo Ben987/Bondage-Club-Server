@@ -765,7 +765,8 @@ function ChatRoomJoin(data, socket) {
 									Acc.ChatRoom = ChatRoom[C];
 									ChatRoom[C].Account.push(Acc);
 									socket.emit("ChatRoomSearchResponse", "JoinedRoom");
-									ChatRoomSync(ChatRoom[C], Acc.MemberNumber);
+									ChatRoomSyncToMember(ChatRoom[C], Acc.MemberNumber, Acc.MemberNumber);
+									ChatRoomSyncMemberJoin(ChatRoom[C], Acc.MemberNumber);
 									ChatRoomMessage(ChatRoom[C], Acc.MemberNumber, "ServerEnter", "Action", null, [{Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber}]);
 									return;
 								} else {
