@@ -1276,7 +1276,7 @@ function ChatRoomAdmin(data, socket) {
 						Dictionary.push({Tag: "TargetCharacterName", Text: MovedAccount.Name, MemberNumber: MovedAccount.MemberNumber});
 						Dictionary.push({Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber});
 						if ((data.Publish != null) && (typeof data.Publish === "boolean") && data.Publish) ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "ServerMoveLeft", "Action", null, Dictionary);
-						ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber);
+						ChatRoomSyncMovePlayer(Acc.ChatRoom, Acc.MemberNumber, MovedAccount.MemberNumber, "Left");
 					}
 					else if ((data.Action == "MoveRight") && (A < Acc.ChatRoom.Account.length - 1)) {
 						var MovedAccount = Acc.ChatRoom.Account[A];
@@ -1285,7 +1285,7 @@ function ChatRoomAdmin(data, socket) {
 						Dictionary.push({Tag: "TargetCharacterName", Text: MovedAccount.Name, MemberNumber: MovedAccount.MemberNumber});
 						Dictionary.push({Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber});
 						if ((data.Publish != null) && (typeof data.Publish === "boolean") && data.Publish) ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "ServerMoveRight", "Action", null, Dictionary);
-						ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber);
+						ChatRoomSyncMovePlayer(Acc.ChatRoom, Acc.MemberNumber, MovedAccount.MemberNumber, "Right");
 					}
 					else if (data.Action == "Shuffle") {
 						for (var X = 0; X < Acc.ChatRoom.Account.length; X++)
