@@ -1531,7 +1531,7 @@ function AccountOwnership(data, socket) {
 								Database.collection("Accounts").updateOne({ AccountName : Acc.AccountName }, { $set: O }, function(err, res) { if (err) throw err; });
 								socket.emit("AccountOwnership", O);
 								ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "StartTrial", "ServerMessage", null, [{ Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber }]);
-								ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber);
+								ChatRoomSyncCharacter(Acc.ChatRoom, Acc.MemberNumber, Acc.Ownership.MemberNumber);
 							} else socket.emit("AccountOwnership", { MemberNumber: data.MemberNumber, Result: "CanStartTrial" });
 						}
 
@@ -1544,7 +1544,7 @@ function AccountOwnership(data, socket) {
 								Database.collection("Accounts").updateOne({ AccountName : Acc.AccountName }, { $set: O }, function(err, res) { if (err) throw err; });
 								socket.emit("AccountOwnership", O);
 								ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "EndTrial", "ServerMessage", null, [{ Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber }]);
-								ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber);
+								ChatRoomSyncCharacter(Acc.ChatRoom, Acc.MemberNumber, Acc.Ownership.MemberNumber);
 							} else socket.emit("AccountOwnership", { MemberNumber: data.MemberNumber, Result: "CanEndTrial" });
 						}
 
@@ -1607,7 +1607,10 @@ function AccountLovership(data, socket) {
 							if (Account[A].MemberNumber == data.MemberNumber) {
 								Account[A].Lovership = P;
 								Account[A].Socket.emit("AccountLovership", { Lovership: Account[A].Lovership });
-								if (Account[A].ChatRoom != null) ChatRoomSync(Account[A].ChatRoom, Account[A].MemberNumber);
+								if (Account[A].ChatRoom != null)
+								{
+									ChatRoomSyncCharacter(Account[A].ChatRoom, Account[A].MemberNumber, Account[A].MemberNumber);
+								}
 							}
 
 						AccountUpdateLovership(P, data.MemberNumber, null,false);
@@ -1708,7 +1711,8 @@ function AccountLovership(data, socket) {
 								Dictionary.push({ Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber });
 								Dictionary.push({ Tag: "TargetCharacter", Text: Acc.Lovership[AL].Name, MemberNumber: Acc.Lovership[AL].MemberNumber });
 								ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "BeginDating", "ServerMessage", null, Dictionary);
-								ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber);
+								ChatRoomSyncCharacter(Acc.ChatRoom, Acc.MemberNumber, Acc.MemberNumber);
+								ChatRoomSyncCharacter(Acc.ChatRoom, Acc.MemberNumber, Acc.Lovership[AL].MemberNumber);
 							} else socket.emit("AccountLovership", { MemberNumber: data.MemberNumber, Result: "CanBeginDating" });
 						}
 
@@ -1724,7 +1728,8 @@ function AccountLovership(data, socket) {
 								Dictionary.push({ Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber });
 								Dictionary.push({ Tag: "TargetCharacter", Text: Acc.Lovership[AL].Name, MemberNumber: Acc.Lovership[AL].MemberNumber });
 								ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "BeginEngagement", "ServerMessage", null, Dictionary);
-								ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber);
+								ChatRoomSyncCharacter(Acc.ChatRoom, Acc.MemberNumber, Acc.MemberNumber);
+								ChatRoomSyncCharacter(Acc.ChatRoom, Acc.MemberNumber, Acc.Lovership[AL].MemberNumber);
 							} else socket.emit("AccountLovership", { MemberNumber: data.MemberNumber, Result: "CanBeginEngagement" });
 						}
 
@@ -1740,7 +1745,8 @@ function AccountLovership(data, socket) {
 								Dictionary.push({ Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber });
 								Dictionary.push({ Tag: "TargetCharacter", Text: Acc.Lovership[AL].Name, MemberNumber: Acc.Lovership[AL].MemberNumber });
 								ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "BeginWedding", "ServerMessage", null, Dictionary);
-								ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber);
+								ChatRoomSyncCharacter(Acc.ChatRoom, Acc.MemberNumber, Acc.MemberNumber);
+								ChatRoomSyncCharacter(Acc.ChatRoom, Acc.MemberNumber, Acc.Lovership[AL].MemberNumber);
 							} else socket.emit("AccountLovership", { MemberNumber: data.MemberNumber, Result: "CanBeginWedding" });
 						}
 					}
