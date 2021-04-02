@@ -1227,7 +1227,7 @@ function ChatRoomAdmin(data, socket) {
 				if ((Acc != null) && (Acc.ChatRoom != null)) {
 					Acc.ChatRoom.Account[TargetAccountIndex] = DestinationAccount;
 					Acc.ChatRoom.Account[DestinationAccountIndex] = TargetAccount;
-					ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber);
+					ChatRoomSyncSwapPlayers(Acc.ChatRoom, Acc.MemberNumber, TargetAccount.MemberNumber, DestinationAccount.MemberNumber);
 				}
 				return;
 			}
