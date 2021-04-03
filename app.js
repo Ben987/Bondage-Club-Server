@@ -1,5 +1,6 @@
 "use strict";
 require('newrelic');
+const base64id = require("base64id");
 
 // Main game objects
 var App = require("http").createServer();
@@ -10,11 +11,12 @@ var IO = new socketio.Server(App, {
 		credentials: true
 	},
 	maxHttpBufferSize: 200000,
-	pingTimeout: 15000,
+	pingTimeout: 20000,
+	upgradeTimeout: 30000,
 	serveClient: false,
 	httpCompression: true,
 	perMessageDeflate: true,
-	allowEIO3: true
+	allowEIO3: false
 });
 var BCrypt = require("bcrypt");
 var Account = [];
@@ -710,6 +712,7 @@ function ChatRoomCreate(data, socket) {
 			if (Acc != null) {
 				ChatRoomRemove(Acc, "ServerLeave", []);
 				var NewRoom = {
+					ID: base64id.generateId(),
 					Name: data.Name,
 					Description: data.Description,
 					Background: data.Background,
@@ -730,6 +733,7 @@ function ChatRoomCreate(data, socket) {
 				Acc.ChatRoom = NewRoom;
 				NewRoom.Account.push(Acc);
 				console.log("Chat room (" + ChatRoom.length.toString() + ") " + data.Name + " created by account " + Acc.AccountName + ", ID: " + socket.id);
+				socket.join("chatroom-" + NewRoom.ID);
 				socket.emit("ChatRoomCreateResponse", "ChatRoomCreated");
 				ChatRoomSync(NewRoom, Acc.MemberNumber);
 			} else socket.emit("ChatRoomCreateResponse", "AccountError");
@@ -764,6 +768,7 @@ function ChatRoomJoin(data, socket) {
 								if (!ChatRoom[C].Locked || (ChatRoom[C].Admin.indexOf(Acc.MemberNumber) >= 0)) {
 									Acc.ChatRoom = ChatRoom[C];
 									ChatRoom[C].Account.push(Acc);
+									socket.join("chatroom-" + ChatRoom[C].ID);
 									socket.emit("ChatRoomSearchResponse", "JoinedRoom");
 									ChatRoomSync(ChatRoom[C], Acc.MemberNumber);
 									ChatRoomMessage(ChatRoom[C], Acc.MemberNumber, "ServerEnter", "Action", null, [{Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber}]);
@@ -795,6 +800,7 @@ function ChatRoomJoin(data, socket) {
 // Removes a player from a room
 function ChatRoomRemove(Acc, Reason, Dictionary) {
 	if (Acc.ChatRoom != null) {
+		Acc.Socket.leave("chatroom-" + Acc.ChatRoom.ID);
 
 		// Removes it from the chat room array
 		for (var A = 0; A < Acc.ChatRoom.Account.length; A++)
@@ -829,16 +835,17 @@ function ChatRoomLeave(socket) {
 
 // Sends a text message to everyone in the room or a specific target
 function ChatRoomMessage(CR, Sender, Content, Type, Target, Dictionary) {
-	if (CR != null)
-		for (var A = 0; A < CR.Account.length; A++)
-			if (Target == null) {
+	if (CR == null) return;
+	if (Target == null) {
+		IO.to("chatroom-" + CR.ID).emit("ChatRoomMessage", { Sender: Sender, Content: Content, Type: Type, Dictionary: Dictionary } );
+	} else {
+		for (let A = 0; A < CR.Account.length; A++) {
+			if (Target === CR.Account[A].MemberNumber) {
 				CR.Account[A].Socket.emit("ChatRoomMessage", { Sender: Sender, Content: Content, Type: Type, Dictionary: Dictionary } );
-			} else {
-				if (Target == CR.Account[A].MemberNumber) {
-					CR.Account[A].Socket.emit("ChatRoomMessage", { Sender: Sender, Content: Content, Type: Type, Dictionary: Dictionary } );
-					return;
-				}
+				return;
 			}
+		}
+	}
 }
 
 // When a user sends a chat message, we propagate it to everyone in the room
@@ -854,8 +861,9 @@ function ChatRoomGame(data, socket) {
 	if ((data != null) && (typeof data === "object")) {
 		var R = Math.random();
 		var Acc = AccountGet(socket.id);
-		for (var A = 0; (Acc != null) && (Acc.ChatRoom != null) && (Acc.ChatRoom.Account != null) && (A < Acc.ChatRoom.Account.length); A++)
-			Acc.ChatRoom.Account[A].Socket.emit("ChatRoomGameResponse", { Sender: Acc.MemberNumber, Data: data, RNG: R } );
+		if (Acc && Acc.ChatRoom) {
+			IO.to("chatroom-" + Acc.ChatRoom.ID).emit("ChatRoomGameResponse", { Sender: Acc.MemberNumber, Data: data, RNG: R } );
+		}
 	}
 }
 
@@ -905,36 +913,38 @@ function ChatRoomSync(CR, SourceMemberNumber) {
 	if (CR == null) return;
 
 	// Builds the room data
-	var R = {};
-	R.Name = CR.Name;
-	R.Description = CR.Description;
-	R.Admin = CR.Admin;
-	R.Ban = CR.Ban;
-	R.Background = CR.Background;
-	R.Limit = CR.Limit;
-	R.Game = CR.Game;
-	R.SourceMemberNumber = SourceMemberNumber;
-	R.Locked = CR.Locked;
-	R.Private = CR.Private;
-	R.BlockCategory = CR.BlockCategory;
+	const R = {
+		Name: CR.Name,
+		Description: CR.Description,
+		Admin: CR.Admin,
+		Ban: CR.Ban,
+		Background: CR.Background,
+		Limit: CR.Limit,
+		Game: CR.Game,
+		SourceMemberNumber,
+		Locked: CR.Locked,
+		Private: CR.Private,
+		BlockCategory: CR.BlockCategory,
+		Character: []
+	};
 
 	// Adds the characters from the room
-	R.Character = [];
-	for (var C = 0; C < CR.Account.length; C++)
+	for (let C = 0; C < CR.Account.length; C++)
 		R.Character.push(ChatRoomSyncGetCharSharedData(CR.Account[C]));
 
 	// Sends the full packet to everyone in the room
-	for (var A = 0; A < CR.Account.length; A++)
-		CR.Account[A].Socket.emit("ChatRoomSync", R);
+	IO.to("chatroom-" + CR.ID).emit("ChatRoomSync", R);
 }
 
 // Syncs a single character data with all room members
 function ChatRoomSyncSingle(Acc, SourceMemberNumber) {
-	var R = {};
-	R.SourceMemberNumber = SourceMemberNumber;
-	R.Character = ChatRoomSyncGetCharSharedData(Acc);
-	for (var A = 0; (Acc.ChatRoom != null) && (Acc.ChatRoom.Account != null) && (A < Acc.ChatRoom.Account.length); A++)
-		Acc.ChatRoom.Account[A].Socket.emit("ChatRoomSyncSingle", R);
+	const R = {
+		SourceMemberNumber,
+		Character: ChatRoomSyncGetCharSharedData(Acc)
+	};
+	if (Acc.ChatRoom) {
+		IO.to("chatroom-" + Acc.ChatRoom.ID).emit("ChatRoomSyncSingle", R);
+	}
 }
 
 // Updates a character from the chat room
@@ -956,12 +966,13 @@ function ChatRoomCharacterUpdate(data, socket) {
 
 // Updates a character expression for a chat room, this does not update the database
 function ChatRoomCharacterExpressionUpdate(data, socket) {
-	if ((data != null) && (typeof data === "object") && (data.Group != null) && (typeof data.Group === "string") && (data.Group != "")) {
-		var Acc = AccountGet(socket.id);
-		if ((Acc != null) && (data.Appearance != null) && Array.isArray(data.Appearance) && (data.Appearance.length >= 5)) Acc.Appearance = data.Appearance;
-		for (var A = 0; (Acc != null) && (Acc.ChatRoom != null) && (Acc.ChatRoom.Account != null) && (A < Acc.ChatRoom.Account.length); A++)
-			if (Acc.ChatRoom.Account[A].MemberNumber != Acc.MemberNumber)
-				Acc.ChatRoom.Account[A].Socket.emit("ChatRoomSyncExpression", { MemberNumber: Acc.MemberNumber, Name: data.Name, Group: data.Group });
+	if ((data != null) && (typeof data === "object") && (typeof data.Group === "string") && (data.Group != "")) {
+		const Acc = AccountGet(socket.id);
+		if (Acc && Array.isArray(data.Appearance) && data.Appearance.length >= 5)
+			Acc.Appearance = data.Appearance;
+		if (Acc && Acc.ChatRoom) {
+			socket.to("chatroom-" + Acc.ChatRoom.ID).emit("ChatRoomSyncExpression", { MemberNumber: Acc.MemberNumber, Name: data.Name, Group: data.Group });
+		}
 	}
 }
 
@@ -972,9 +983,9 @@ function ChatRoomCharacterPoseUpdate(data, socket) {
 		if (Array.isArray(data.Pose)) data.Pose = data.Pose.filter(P => typeof P === "string");
 		var Acc = AccountGet(socket.id);
 		if (Acc != null) Acc.ActivePose = data.Pose;
-		for (var A = 0; (Acc != null) && (Acc.ChatRoom != null) && (Acc.ChatRoom.Account != null) && (A < Acc.ChatRoom.Account.length); A++)
-			if (Acc.ChatRoom.Account[A].MemberNumber != Acc.MemberNumber)
-				Acc.ChatRoom.Account[A].Socket.emit("ChatRoomSyncPose", { MemberNumber: Acc.MemberNumber, Pose: data.Pose });
+		if (Acc && Acc.ChatRoom) {
+			socket.to("chatroom-" + Acc.ChatRoom.ID).emit("ChatRoomSyncPose", { MemberNumber: Acc.MemberNumber, Pose: data.Pose });
+		}
 	}
 }
 
@@ -987,9 +998,9 @@ function ChatRoomCharacterArousalUpdate(data, socket) {
 			Acc.ArousalSettings.OrgasmCount = data.OrgasmCount;
 			Acc.ArousalSettings.Progress = data.Progress;
 			Acc.ArousalSettings.ProgressTimer = data.ProgressTimer;
-			for (var A = 0; (Acc != null) && (Acc.ChatRoom != null) && (Acc.ChatRoom.Account != null) && (A < Acc.ChatRoom.Account.length); A++)
-				if (Acc.ChatRoom.Account[A].MemberNumber != Acc.MemberNumber)
-					Acc.ChatRoom.Account[A].Socket.emit("ChatRoomSyncArousal", { MemberNumber: Acc.MemberNumber, OrgasmTimer: data.OrgasmTimer, OrgasmCount: data.OrgasmCount, Progress: data.Progress, ProgressTimer: data.ProgressTimer });
+			if (Acc && Acc.ChatRoom) {
+				socket.to("chatroom-" + Acc.ChatRoom.ID).emit("ChatRoomSyncArousal", { MemberNumber: Acc.MemberNumber, OrgasmTimer: data.OrgasmTimer, OrgasmCount: data.OrgasmCount, Progress: data.Progress, ProgressTimer: data.ProgressTimer });
+			}
 		}
 	}
 }
@@ -1006,10 +1017,9 @@ function ChatRoomCharacterItemUpdate(data, socket) {
 				return;
 
 		// Sends the item to use to everyone but the source
-		for (var A = 0; (Acc != null) && (Acc.ChatRoom != null) && (Acc.ChatRoom.Account != null) && (A < Acc.ChatRoom.Account.length); A++)
-			if (Acc.ChatRoom.Account[A].MemberNumber != Acc.MemberNumber)
-				Acc.ChatRoom.Account[A].Socket.emit("ChatRoomSyncItem", { Source: Acc.MemberNumber, Item: data });
-
+		if (Acc && Acc.ChatRoom) {
+			socket.to("chatroom-" + Acc.ChatRoom.ID).emit("ChatRoomSyncItem", { Source: Acc.MemberNumber, Item: data });
+		}
 	}
 }
 
