@@ -821,7 +821,7 @@ function ChatRoomRemove(Acc, Reason, Dictionary) {
 		} else {
 			if (!Dictionary || (Dictionary.length == 0)) Dictionary.push({Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber});
 			ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, Reason, "Action", null, Dictionary);
-			ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber);
+			ChatRoomSyncMemberLeave(Acc.ChatRoom, Acc.MemberNumber);
 		}
 		Acc.ChatRoom = null;
 
