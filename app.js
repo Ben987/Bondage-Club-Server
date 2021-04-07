@@ -770,8 +770,7 @@ function ChatRoomJoin(data, socket) {
 									ChatRoom[C].Account.push(Acc);
 									socket.join("chatroom-" + ChatRoom[C].ID);
 									socket.emit("ChatRoomSearchResponse", "JoinedRoom");
-									ChatRoomSyncToMember(ChatRoom[C], Acc.MemberNumber, Acc.MemberNumber);
-									ChatRoomSyncMemberJoin(ChatRoom[C], Acc.MemberNumber);
+									ChatRoomSyncMemberJoin(ChatRoom[C], Acc);
 									ChatRoomMessage(ChatRoom[C], Acc.MemberNumber, "ServerEnter", "Action", null, [{Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber}]);
 									return;
 								} else {
@@ -907,9 +906,9 @@ function ChatRoomSyncGetCharSharedData(Acc) {
 	return A;
 }
 
-// Syncs the room data with all of it's members
-function ChatRoomSync(CR, SourceMemberNumber) {
-
+// Returns a ChatRoom data that can be synced to clients
+function ChatRoomGetData(CR, SourceMemberNumber, IncludeCharacters)
+{
 	// Exits right away if the chat room was destroyed
 	if (CR == null) return;
 
@@ -926,44 +925,29 @@ function ChatRoomSync(CR, SourceMemberNumber) {
 		Locked: CR.Locked,
 		Private: CR.Private,
 		BlockCategory: CR.BlockCategory,
-		Character: []
 	};
 
-	// Adds the characters from the room
-	for (let C = 0; C < CR.Account.length; C++)
-		R.Character.push(ChatRoomSyncGetCharSharedData(CR.Account[C]));
+	if (IncludeCharacters) {
+		R.Character = CR.Account.map(ChatRoomSyncGetCharSharedData);
+	}
 
-	// Sends the full packet to everyone in the room
-	IO.to("chatroom-" + CR.ID).emit("ChatRoomSync", R);
+	return R;
 }
 
+// Syncs the room data with all of it's members
+function ChatRoomSync(CR, SourceMemberNumber) {
+
+	// Exits right away if the chat room was destroyed
+	if (CR == null) return;
+
+	// Sends the full packet to everyone in the room
+	IO.to("chatroom-" + CR.ID).emit("ChatRoomSync", ChatRoomGetData(CR, SourceMemberNumber, true));
+}
 
 // Syncs the room data with all of it's members
 function ChatRoomSyncToMember(CR, SourceMemberNumber, TargetMemberNumber) {
 	// Exits right away if the chat room was destroyed
 	if (CR == null) { return; }
-	
-	// Builds the room data
-	let roomData = {};
-	roomData.Name = CR.Name;
-	roomData.Description = CR.Description;
-	roomData.Admin = CR.Admin;
-	roomData.Ban = CR.Ban;
-	roomData.Background = CR.Background;
-	roomData.Limit = CR.Limit;
-	roomData.Game = CR.Game;
-	roomData.SourceMemberNumber = SourceMemberNumber;
-	roomData.Locked = CR.Locked;
-	roomData.Private = CR.Private;
-	roomData.BlockCategory = CR.BlockCategory;
-
-	// Adds the characters from the room
-	roomData.Character = [];
-	for (let i = 0; i < CR.Account.length; i++) // For each player in the chat room...
-	{
-		//Push character to room data
-		roomData.Character.push(ChatRoomSyncGetCharSharedData(CR.Account[i]));
-	}
 
 	// Sends the full packet to everyone in the room
 	for (let i = 0; i < CR.Account.length; i++) // For each player in the chat room...
@@ -971,10 +955,24 @@ function ChatRoomSyncToMember(CR, SourceMemberNumber, TargetMemberNumber) {
 		if(CR.Account[i].MemberNumber == TargetMemberNumber) // If the player is the one who gets synced...
 		{
 			// Send room data and break loop
-			CR.Account[i].Socket.emit("ChatRoomSync", roomData);
+			CR.Account[i].Socket.emit("ChatRoomSync", ChatRoomGetData(CR, SourceMemberNumber, true));
 			break;
 		}
 	}
+}
+
+// TODO: remove this and every use of it after R67 release
+function ChatRoomSyncToOldClients(CR, SourceMemberNumber, Source) {
+	if (CR == null) { return; }
+
+	if (CR.Account.some(C => C.OnlineSharedSettings?.GameVersion == "R66")) {
+		const roomData = ChatRoomGetData(CR, SourceMemberNumber, true);
+		if (Source) Source.Socket.to("chatroom-" + CR.ID).emit("ChatRoomSync", roomData);
+		else IO.to("chatroom-" + CR.ID).emit("ChatRoomSync", roomData);
+		return true;
+	}
+
+	return false;
 }
 
 // Syncs the room data with all of it's members
@@ -982,79 +980,32 @@ function ChatRoomSyncCharacter(CR, SourceMemberNumber, TargetMemberNumber) {
 	// Exits right away if the chat room was destroyed
 	if (CR == null) return;
 
+	const Target = CR.Account.find(Acc => Acc.MemberNumber === TargetMemberNumber);
+	if (!Target) return;
+	const Source = CR.Account.find(Acc => Acc.MemberNumber === SourceMemberNumber)
+	if (!Source) return;
+
 	let characterData = { }
 	characterData.SourceMemberNumber = SourceMemberNumber
-	characterData.Character = null
+	characterData.Character = ChatRoomSyncGetCharSharedData(Target);
 
-	// Adds the characters from the room
-	for (let i = 0; i < CR.Account.length; i++) // For each player in the chat room...
-	{
-		if(CR.Account[i].MemberNumber === TargetMemberNumber) // If the player is the one we want to update...
-		{
-			//Remember character and break loop
-			characterData.Character = ChatRoomSyncGetCharSharedData(CR.Account[i])
-			break;
-		}
-	}
-
-	// Sends the full packet to everyone in the room
-	if(characterData.Character != null) // If we found a character...
-	{
-		for (let i = 0; i < CR.Account.length; i++) // For each player in the chat room...
-		{
-			//Todo: Remove this if-clause after "R67"
-			if(CR.Account[i].OnlineSharedSettings.GameVersion == "R66") // If this client does not support the ChatRoomSync split...
-			{
-				//Send full sync to this member for compatibility
-				ChatRoomSyncToMember(CR, SourceMemberNumber, CR.Account[i].MemberNumber)
-			}
-			else if(CR.Account[i].MemberNumber != SourceMemberNumber) // If this client supports the ChatRoomSync split and is not the character that just joined...
-			{
-				// Inform about joined player
-				CR.Account[i].Socket.emit("ChatRoomSyncCharacter", characterData);
-			}
-		}
-	}
+	if (!ChatRoomSyncToOldClients(CR, SourceMemberNumber, Source))
+		Source.Socket.to("chatroom-" + CR.ID).emit("ChatRoomSyncCharacter", characterData);
 }
 
 // Sends the newly joined player to all chat room members
-function ChatRoomSyncMemberJoin(CR, SourceMemberNumber) {
+function ChatRoomSyncMemberJoin(CR, Character) {
 	// Exits right away if the chat room was destroyed
 	if (CR == null) return;
-	let joinData = { }
-	joinData.SourceMemberNumber = SourceMemberNumber
-	joinData.Character = null
+	let joinData = {
+		SourceMemberNumber: Character.MemberNumber,
+		Character: ChatRoomSyncGetCharSharedData(Character)
+	};
 
-	// Adds the characters from the room
-	for (let i = 0; i < CR.Account.length; i++) // For each player in the chat room...
-	{
-		if(CR.Account[i].MemberNumber == SourceMemberNumber) // If the player is the one who just joined...
-		{
-			//Remember character and break loop
-			joinData.Character = ChatRoomSyncGetCharSharedData(CR.Account[i])
-			break;
-		}
-	}
+	Character.Socket.to("chatroom-" + CR.ID).emit("ChatRoomSyncMemberJoin", joinData);
 
-	// Sends the full packet to everyone in the room
-	if(joinData.Character != null) // If we found a character...
-	{
-		for (let i = 0; i < CR.Account.length; i++) // For each player in the chat room...
-		{
-			//Todo: Remove this if-clause after "R67"
-			if(CR.Account[i].OnlineSharedSettings.GameVersion == "R66") // If this client does not support the ChatRoomSync split...
-			{
-				//Send full sync to this member for compatibility
-				ChatRoomSyncToMember(CR, SourceMemberNumber, CR.Account[i].MemberNumber)
-			}
-			else if(CR.Account[i].MemberNumber != SourceMemberNumber) // If this client supports the ChatRoomSync split and is not the character that just joined...
-			{
-				// Inform about joined player
-				CR.Account[i].Socket.emit("ChatRoomSyncMemberJoin", joinData);
-			}
-		}
-	}
-	
+	if (!ChatRoomSyncToOldClients(CR, Character.MemberNumber))
+		ChatRoomSyncToMember(CR, Character.MemberNumber, Character.MemberNumber);
 }
 
 // Sends the left player to all chat room members
@@ -1066,21 +1017,8 @@ function ChatRoomSyncMemberLeave(CR, SourceMemberNumber) {
 	leaveData.SourceMemberNumber = SourceMemberNumber;
 
 	// Sends the full packet to everyone in the room
-	for (let i = 0; i < CR.Account.length; i++) // For each player in the chat room...
-	{
-		//Todo: Remove this if-clause after "R67"
-		if(CR.Account[i].OnlineSharedSettings.GameVersion == "R66") // If this client does not support the ChatRoomSync split...
-		{
-			//Send full sync to this member for compatibility
-			ChatRoomSyncToMember(CR, SourceMemberNumber, CR.Account[i].MemberNumber)
-		}
-		else // If this client supports the ChatRoomSync split...
-		{
-			// Inform about left player
-			CR.Account[i].Socket.emit("ChatRoomSyncMemberLeave", leaveData);
-		}
-	}
-	
+	if (!ChatRoomSyncToOldClients(CR, SourceMemberNumber))
+		IO.to("chatroom-" + CR.ID).emit("ChatRoomSyncMemberLeave", leaveData);
 }
 
 // Syncs the room data with all of it's members
@@ -1088,35 +1026,9 @@ function ChatRoomSyncRoomProperties(CR, SourceMemberNumber) {
 	// Exits right away if the chat room was destroyed
 	if (CR == null) return;
 
-	// Builds the room data
-	let roomData = {};
-	roomData.Name = CR.Name;
-	roomData.Description = CR.Description;
-	roomData.Admin = CR.Admin;
-	roomData.Ban = CR.Ban;
-	roomData.Background = CR.Background;
-	roomData.Limit = CR.Limit;
-	roomData.Game = CR.Game;
-	roomData.SourceMemberNumber = SourceMemberNumber;
-	roomData.Locked = CR.Locked;
-	roomData.Private = CR.Private;
-	roomData.BlockCategory = CR.BlockCategory;
-
 	// Sends the full packet to everyone in the room
-	for (var i = 0; i < CR.Account.length; i++) // For each player in the chat room...
-	{
-		//Todo: Remove this if-clause after "R67"
-		if(CR.Account[i].OnlineSharedSettings.GameVersion == "R66") // If this client does not support the ChatRoomSync split...
-		{
-			//Send full sync to this member for compatibility
-			ChatRoomSyncToMember(CR, SourceMemberNumber, CR.Account[i].MemberNumber)
-		}
-		else // If this client supports the ChatRoomSync split...
-		{
-			// Send new room properties to player
-			CR.Account[i].Socket.emit("ChatRoomSyncRoomProperties", roomData);
-		}
-	}
+	if (!ChatRoomSyncToOldClients(CR, SourceMemberNumber))
+		IO.to("chatroom-" + CR.ID).emit("ChatRoomSyncRoomProperties", ChatRoomGetData(CR, SourceMemberNumber, false));
 }
 
 // Syncs the room data with all of it's members
@@ -1131,20 +1043,8 @@ function ChatRoomSyncSwapPlayers(CR, SourceMemberNumber, MemberNumber1, MemberNu
 	swapData.MemberNumber2 = MemberNumber2
 
 	// Sends the full packet to everyone in the room
-	for (let i = 0; i < CR.Account.length; i++) // For each player in the chat room...
-	{
-		//Todo: Remove this if-clause after "R67"
-		if(CR.Account[i].OnlineSharedSettings.GameVersion == "R66") // If this client does not support the ChatRoomSync split...
-		{
-			//Send full sync to this member for compatibility
-			ChatRoomSyncToMember(CR, SourceMemberNumber, CR.Account[i].MemberNumber)
-		}
-		else // If this client supports the ChatRoomSync split...
-		{
-			// Inform players about swap
-			CR.Account[i].Socket.emit("ChatRoomSyncSwapPlayers", swapData);
-		}
-	}
+	if (!ChatRoomSyncToOldClients(CR, SourceMemberNumber))
+		IO.to("chatroom-" + CR.ID).emit("ChatRoomSyncSwapPlayers", swapData);
 }
 
 // Syncs the room data with all of it's members
@@ -1159,20 +1059,8 @@ function ChatRoomSyncMovePlayer(CR, SourceMemberNumber, TargetMemberNumber, Dire
 	moveData.Direction = Direction
 
 	// Sends the full packet to everyone in the room
-	for (let i = 0; i < CR.Account.length; i++) // For each player in the chat room...
-	{
-		//Todo: Remove this if-clause after "R67"
-		if(CR.Account[i].OnlineSharedSettings.GameVersion == "R66") // If this client does not support the ChatRoomSync split...
-		{
-			//Send full sync to this member for compatibility
-			ChatRoomSyncToMember(CR, SourceMemberNumber, CR.Account[i].MemberNumber)
-		}
-		else // If this client supports the ChatRoomSync split...
-		{
-			// Inform players about move
-			CR.Account[i].Socket.emit("ChatRoomSyncMovePlayer", moveData);
-		}
-	}
+	if (!ChatRoomSyncToOldClients(CR, SourceMemberNumber))
+		IO.to("chatroom-" + CR.ID).emit("ChatRoomSyncMovePlayer", moveData);
 }
 
 // Syncs the room data with all of it's members
@@ -1186,20 +1074,8 @@ function ChatRoomSyncReorderPlayers(CR, SourceMemberNumber, NewPlayerOrder) {
 	reorderData.PlayerOrder = NewPlayerOrder
 
 	// Sends the full packet to everyone in the room
-	for (let i = 0; i < CR.Account.length; i++) // For each player in the chat room...
-	{
-		//Todo: Remove this if-clause after "R67"
-		if(CR.Account[i].OnlineSharedSettings.GameVersion == "R66") // If this client does not support the ChatRoomSync split...
-		{
-			//Send full sync to this member for compatibility
-			ChatRoomSyncToMember(CR, SourceMemberNumber, CR.Account[i].MemberNumber)
-		}
-		else // If this client supports the ChatRoomSync split...
-		{
-			// Inform players about move
-			CR.Account[i].Socket.emit("ChatRoomSyncReorderPlayers", reorderData);
-		}
-	}
+	if (!ChatRoomSyncToOldClients(CR, SourceMemberNumber))
+		IO.to("chatroom-" + CR.ID).emit("ChatRoomSyncReorderPlayers", reorderData);
 }
 
 // Syncs a single character data with all room members
