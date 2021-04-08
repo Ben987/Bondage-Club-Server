@@ -869,41 +869,32 @@ function ChatRoomGame(data, socket) {
 
 // Builds the character packet to send over to the clients, white list is only sent if there are limited items and a low item permission
 function ChatRoomSyncGetCharSharedData(Acc) {
-	const Whitelist = [];
-	// We filter whitelist based on people in room
-	if (Array.isArray(Acc.WhiteList) && Acc.ChatRoom && Acc.ChatRoom.Account) {
-		for (const B of Acc.ChatRoom.Account) {
-			if (Acc.WhiteList.includes(B.MemberNumber)) {
-				Whitelist.push(B.MemberNumber);
-			}
-		}
-	}
-
-	const A = {};
-	A.ID = Acc.ID;
-	A.Name = Acc.Name;
-	A.AssetFamily = Acc.AssetFamily;
-	A.Title = Acc.Title;
-	A.Appearance = Acc.Appearance;
-	A.ActivePose = Acc.ActivePose;
-	A.Reputation = Acc.Reputation;
-	A.Creation = Acc.Creation;
-	A.Lovership = Acc.Lovership;
-	A.Description = Acc.Description;
-	A.Owner = Acc.Owner;
-	A.MemberNumber = Acc.MemberNumber;
-	A.LabelColor = Acc.LabelColor;
-	A.ItemPermission = Acc.ItemPermission;
-	A.Inventory = Acc.Inventory;
-	A.Ownership = Acc.Ownership;
-	A.BlockItems = Acc.BlockItems;
-	A.LimitedItems = Acc.LimitedItems;
-	A.ArousalSettings = Acc.ArousalSettings;
-	A.OnlineSharedSettings = Acc.OnlineSharedSettings;
-	A.WhiteList = Whitelist;
-	A.Game = Acc.Game;
-	A.Difficulty = Acc.Difficulty;
-	return A;
+	return {
+		ID: Acc.ID,
+		Name: Acc.Name,
+		AssetFamily: Acc.AssetFamily,
+		Title: Acc.Title,
+		Appearance: Acc.Appearance,
+		ActivePose: Acc.ActivePose,
+		Reputation: Acc.Reputation,
+		Creation: Acc.Creation,
+		Lovership: Acc.Lovership,
+		Description: Acc.Description,
+		Owner: Acc.Owner,
+		MemberNumber: Acc.MemberNumber,
+		LabelColor: Acc.LabelColor,
+		ItemPermission: Acc.ItemPermission,
+		Inventory: Acc.Inventory,
+		Ownership: Acc.Ownership,
+		BlockItems: Acc.BlockItems,
+		LimitedItems: Acc.LimitedItems,
+		ArousalSettings: Acc.ArousalSettings,
+		OnlineSharedSettings: Acc.OnlineSharedSettings,
+		WhiteList: Array.isArray(Acc.WhiteList) ? Acc.WhiteList : [],
+		BlackList: Array.isArray(Acc.BlackList) ? Acc.BlackList : [],
+		Game: Acc.Game,
+		Difficulty: Acc.Difficulty
+	};
 }
 
 // Returns a ChatRoom data that can be synced to clients
