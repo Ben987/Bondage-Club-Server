@@ -869,6 +869,20 @@ function ChatRoomGame(data, socket) {
 
 // Builds the character packet to send over to the clients, white list is only sent if there are limited items and a low item permission
 function ChatRoomSyncGetCharSharedData(Acc) {
+	const WhiteList = [];
+	const BlackList = [];
+	// We filter whitelist&blacklist based on people in room
+	if (Acc.ChatRoom && Acc.ChatRoom.Account) {
+		for (const B of Acc.ChatRoom.Account) {
+			if (Acc.WhiteList.includes(B.MemberNumber)) {
+				WhiteList.push(B.MemberNumber);
+			}
+			if (Acc.BlackList.includes(B.MemberNumber)) {
+				BlackList.push(B.MemberNumber);
+			}
+		}
+	}
+
 	return {
 		ID: Acc.ID,
 		Name: Acc.Name,
@@ -890,8 +904,8 @@ function ChatRoomSyncGetCharSharedData(Acc) {
 		LimitedItems: Acc.LimitedItems,
 		ArousalSettings: Acc.ArousalSettings,
 		OnlineSharedSettings: Acc.OnlineSharedSettings,
-		WhiteList: Array.isArray(Acc.WhiteList) ? Acc.WhiteList : [],
-		BlackList: Array.isArray(Acc.BlackList) ? Acc.BlackList : [],
+		WhiteList,
+		BlackList,
 		Game: Acc.Game,
 		Difficulty: Acc.Difficulty
 	};
@@ -990,8 +1004,19 @@ function ChatRoomSyncMemberJoin(CR, Character) {
 	if (CR == null) return;
 	let joinData = {
 		SourceMemberNumber: Character.MemberNumber,
-		Character: ChatRoomSyncGetCharSharedData(Character)
+		Character: ChatRoomSyncGetCharSharedData(Character),
+		WhiteListedBy: [],
+		BlackListedBy: []
 	};
+
+	for (const B of CR.Account) {
+		if (B.WhiteList.includes(Character.MemberNumber)) {
+			joinData.WhiteListedBy.push(B.MemberNumber);
+		}
+		if (B.BlackList.includes(Character.MemberNumber)) {
+			joinData.BlackListedBy.push(B.MemberNumber);
+		}
+	}
 
 	Character.Socket.to("chatroom-" + CR.ID).emit("ChatRoomSyncMemberJoin", joinData);
 
