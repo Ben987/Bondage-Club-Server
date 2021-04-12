@@ -869,41 +869,47 @@ function ChatRoomGame(data, socket) {
 
 // Builds the character packet to send over to the clients, white list is only sent if there are limited items and a low item permission
 function ChatRoomSyncGetCharSharedData(Acc) {
-	const Whitelist = [];
-	// We filter whitelist based on people in room
-	if (Array.isArray(Acc.WhiteList) && Acc.ChatRoom && Acc.ChatRoom.Account) {
+	const WhiteList = [];
+	const BlackList = [];
+	const sendBlacklist = AccountShouldSendBlackList(Acc);
+	// We filter whitelist&blacklist based on people in room
+	if (Acc.ChatRoom && Acc.ChatRoom.Account) {
 		for (const B of Acc.ChatRoom.Account) {
 			if (Acc.WhiteList.includes(B.MemberNumber)) {
-				Whitelist.push(B.MemberNumber);
+				WhiteList.push(B.MemberNumber);
+			}
+			if (sendBlacklist && Acc.BlackList.includes(B.MemberNumber)) {
+				BlackList.push(B.MemberNumber);
 			}
 		}
 	}
 
-	const A = {};
-	A.ID = Acc.ID;
-	A.Name = Acc.Name;
-	A.AssetFamily = Acc.AssetFamily;
-	A.Title = Acc.Title;
-	A.Appearance = Acc.Appearance;
-	A.ActivePose = Acc.ActivePose;
-	A.Reputation = Acc.Reputation;
-	A.Creation = Acc.Creation;
-	A.Lovership = Acc.Lovership;
-	A.Description = Acc.Description;
-	A.Owner = Acc.Owner;
-	A.MemberNumber = Acc.MemberNumber;
-	A.LabelColor = Acc.LabelColor;
-	A.ItemPermission = Acc.ItemPermission;
-	A.Inventory = Acc.Inventory;
-	A.Ownership = Acc.Ownership;
-	A.BlockItems = Acc.BlockItems;
-	A.LimitedItems = Acc.LimitedItems;
-	A.ArousalSettings = Acc.ArousalSettings;
-	A.OnlineSharedSettings = Acc.OnlineSharedSettings;
-	A.WhiteList = Whitelist;
-	A.Game = Acc.Game;
-	A.Difficulty = Acc.Difficulty;
-	return A;
+	return {
+		ID: Acc.ID,
+		Name: Acc.Name,
+		AssetFamily: Acc.AssetFamily,
+		Title: Acc.Title,
+		Appearance: Acc.Appearance,
+		ActivePose: Acc.ActivePose,
+		Reputation: Acc.Reputation,
+		Creation: Acc.Creation,
+		Lovership: Acc.Lovership,
+		Description: Acc.Description,
+		Owner: Acc.Owner,
+		MemberNumber: Acc.MemberNumber,
+		LabelColor: Acc.LabelColor,
+		ItemPermission: Acc.ItemPermission,
+		Inventory: Acc.Inventory,
+		Ownership: Acc.Ownership,
+		BlockItems: Acc.BlockItems,
+		LimitedItems: Acc.LimitedItems,
+		ArousalSettings: Acc.ArousalSettings,
+		OnlineSharedSettings: Acc.OnlineSharedSettings,
+		WhiteList,
+		BlackList,
+		Game: Acc.Game,
+		Difficulty: Acc.Difficulty
+	};
 }
 
 // Returns a ChatRoom data that can be synced to clients
@@ -999,8 +1005,19 @@ function ChatRoomSyncMemberJoin(CR, Character) {
 	if (CR == null) return;
 	let joinData = {
 		SourceMemberNumber: Character.MemberNumber,
-		Character: ChatRoomSyncGetCharSharedData(Character)
+		Character: ChatRoomSyncGetCharSharedData(Character),
+		WhiteListedBy: [],
+		BlackListedBy: []
 	};
+
+	for (const B of CR.Account) {
+		if (B.WhiteList.includes(Character.MemberNumber)) {
+			joinData.WhiteListedBy.push(B.MemberNumber);
+		}
+		if (AccountShouldSendBlackList(B) && B.BlackList.includes(Character.MemberNumber)) {
+			joinData.BlackListedBy.push(B.MemberNumber);
+		}
+	}
 
 	Character.Socket.to("chatroom-" + CR.ID).emit("ChatRoomSyncMemberJoin", joinData);
 
@@ -1312,6 +1329,18 @@ function ChatRoomDominantValue(Account) {
 			if ((Account.Reputation[R].Type != null) && (Account.Reputation[R].Value != null) && (typeof Account.Reputation[R].Type === "string") && (typeof Account.Reputation[R].Value === "number") && (Account.Reputation[R].Type == "Dominant"))
 				return parseInt(Account.Reputation[R].Value);
 	return 0;
+}
+
+/**
+ * Checks if account's blacklist should be sent.
+ * It should only be sent if it is easily visible a person in blacklisted without this info.
+ * This means if the player is on permission that blocks depending on blacklist
+ * @see ChatRoomGetAllowItem
+ * @param {Account} Acc The account to check
+ * @returns {boolean}
+ */
+function AccountShouldSendBlackList(Acc) {
+	return Acc.ItemPermission === 1 || Acc.ItemPermission === 2;
 }
 
 // Compares the source account and target account to check if we allow using an item
