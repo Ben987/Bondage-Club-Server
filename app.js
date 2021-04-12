@@ -871,13 +871,14 @@ function ChatRoomGame(data, socket) {
 function ChatRoomSyncGetCharSharedData(Acc) {
 	const WhiteList = [];
 	const BlackList = [];
+	const sendBlacklist = AccountShouldSendBlackList(Acc);
 	// We filter whitelist&blacklist based on people in room
 	if (Acc.ChatRoom && Acc.ChatRoom.Account) {
 		for (const B of Acc.ChatRoom.Account) {
 			if (Acc.WhiteList.includes(B.MemberNumber)) {
 				WhiteList.push(B.MemberNumber);
 			}
-			if (Acc.BlackList.includes(B.MemberNumber)) {
+			if (sendBlacklist && Acc.BlackList.includes(B.MemberNumber)) {
 				BlackList.push(B.MemberNumber);
 			}
 		}
@@ -1013,7 +1014,7 @@ function ChatRoomSyncMemberJoin(CR, Character) {
 		if (B.WhiteList.includes(Character.MemberNumber)) {
 			joinData.WhiteListedBy.push(B.MemberNumber);
 		}
-		if (B.BlackList.includes(Character.MemberNumber)) {
+		if (AccountShouldSendBlackList(B) && B.BlackList.includes(Character.MemberNumber)) {
 			joinData.BlackListedBy.push(B.MemberNumber);
 		}
 	}
@@ -1328,6 +1329,18 @@ function ChatRoomDominantValue(Account) {
 			if ((Account.Reputation[R].Type != null) && (Account.Reputation[R].Value != null) && (typeof Account.Reputation[R].Type === "string") && (typeof Account.Reputation[R].Value === "number") && (Account.Reputation[R].Type == "Dominant"))
 				return parseInt(Account.Reputation[R].Value);
 	return 0;
+}
+
+/**
+ * Checks if account's blacklist should be sent.
+ * It should only be sent if it is easily visible a person in blacklisted without this info.
+ * This means if the player is on permission that blocks depending on blacklist
+ * @see ChatRoomGetAllowItem
+ * @param {Account} Acc The account to check
+ * @returns {boolean}
+ */
+function AccountShouldSendBlackList(Acc) {
+	return Acc.ItemPermission === 1 || Acc.ItemPermission === 2;
 }
 
 // Compares the source account and target account to check if we allow using an item
