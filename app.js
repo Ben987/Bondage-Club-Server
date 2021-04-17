@@ -971,7 +971,7 @@ function ChatRoomSyncToMember(CR, SourceMemberNumber, TargetMemberNumber) {
 function ChatRoomSyncToOldClients(CR, SourceMemberNumber, Source) {
 	if (CR == null) { return; }
 
-	if (CR.Account.some(C => C.OnlineSharedSettings?.GameVersion == "R66")) {
+	if (CR.Account.some(C => C.OnlineSharedSettings?.GameVersion == "R67")) {
 		const roomData = ChatRoomGetData(CR, SourceMemberNumber, true);
 		if (Source) Source.Socket.to("chatroom-" + CR.ID).emit("ChatRoomSync", roomData);
 		else IO.to("chatroom-" + CR.ID).emit("ChatRoomSync", roomData);
@@ -1020,9 +1020,7 @@ function ChatRoomSyncMemberJoin(CR, Character) {
 	}
 
 	Character.Socket.to("chatroom-" + CR.ID).emit("ChatRoomSyncMemberJoin", joinData);
-
-	if (!ChatRoomSyncToOldClients(CR, Character.MemberNumber))
-		ChatRoomSyncToMember(CR, Character.MemberNumber, Character.MemberNumber);
+	ChatRoomSyncToMember(CR, Character.MemberNumber, Character.MemberNumber);
 }
 
 // Sends the left player to all chat room members
@@ -1034,8 +1032,7 @@ function ChatRoomSyncMemberLeave(CR, SourceMemberNumber) {
 	leaveData.SourceMemberNumber = SourceMemberNumber;
 
 	// Sends the full packet to everyone in the room
-	if (!ChatRoomSyncToOldClients(CR, SourceMemberNumber))
-		IO.to("chatroom-" + CR.ID).emit("ChatRoomSyncMemberLeave", leaveData);
+	IO.to("chatroom-" + CR.ID).emit("ChatRoomSyncMemberLeave", leaveData);
 }
 
 // Syncs the room data with all of it's members
