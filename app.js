@@ -1288,11 +1288,14 @@ function ChatRoomAdmin(data, socket) {
 						ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber);
 					}
 					else if (data.Action == "Shuffle") {
-						for (var X = 0; X < Acc.ChatRoom.Account.length; X++)
-							Acc.ChatRoom.Account.sort(() => Math.random() - 0.5);
+						let newPlayerOrder = []
+						Acc.ChatRoom.Account.sort(() => Math.random() - 0.5);
+						for (let i = 0; i < Acc.ChatRoom.Account.length; i++) {
+							newPlayerOrder.push(Acc.ChatRoom.Account[i].MemberNumber);
+						}
 						Dictionary.push({Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber});
 						ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "ServerShuffle", "Action", null, Dictionary);
-						ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber);
+						ChatRoomSyncReorderPlayers(Acc.ChatRoom, Acc.MemberNumber, newPlayerOrder);
 					}
 					else if ((data.Action == "Promote") && (Acc.ChatRoom.Admin.indexOf(Acc.ChatRoom.Account[A].MemberNumber) < 0)) {
 						Acc.ChatRoom.Admin.push(Acc.ChatRoom.Account[A].MemberNumber);
