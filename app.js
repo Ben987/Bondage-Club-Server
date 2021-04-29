@@ -1046,19 +1046,19 @@ function ChatRoomSyncRoomProperties(CR, SourceMemberNumber) {
 }
 
 // Syncs the room data with all of it's members
-function ChatRoomSyncSwapPlayers(CR, SourceMemberNumber, MemberNumber1, MemberNumber2) {
+function ChatRoomSyncMovePlayer(CR, SourceMemberNumber, TargetMemberNumber, Direction) {
 	// Exits right away if the chat room was destroyed
 	if (CR == null) return;
 
 	// Builds the room data
-	let swapData = {};
+	let moveData = {};
 
-	swapData.MemberNumber1 = MemberNumber1
-	swapData.MemberNumber2 = MemberNumber2
+	moveData.TargetMemberNumber = TargetMemberNumber
+	moveData.Direction = Direction
 
 	// Sends the full packet to everyone in the room
 	if (!ChatRoomSyncToOldClients(CR, SourceMemberNumber))
-		IO.to("chatroom-" + CR.ID).emit("ChatRoomSyncSwapPlayers", swapData);
+		IO.to("chatroom-" + CR.ID).emit("ChatRoomSyncMovePlayer", moveData);
 }
 
 // Syncs the room data with all of it's members
@@ -1227,7 +1227,11 @@ function ChatRoomAdmin(data, socket) {
 				if ((Acc != null) && (Acc.ChatRoom != null)) {
 					Acc.ChatRoom.Account[TargetAccountIndex] = DestinationAccount;
 					Acc.ChatRoom.Account[DestinationAccountIndex] = TargetAccount;
-					ChatRoomSync(Acc.ChatRoom, Acc.MemberNumber);
+					let newPlayerOrder = [];
+					for (let i = 0; i < Acc.ChatRoom.Account.length; i++) {
+						newPlayerOrder.push(Acc.ChatRoom.Account[i].MemberNumber);
+					}
+					ChatRoomSyncReorderPlayers(Acc.ChatRoom, Acc.MemberNumber, newPlayerOrder);
 				}
 				return;
 			}
