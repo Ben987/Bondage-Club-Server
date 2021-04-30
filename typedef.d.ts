@@ -22,7 +22,7 @@ interface Account {
 	 * *not updated from client*
 	 */
 	ID: string;
-	Socket: socketio.Socket;
+	Socket: import("socket.io").Socket;
 	/** *not updated from client* */
 	ChatRoom?: Chatroom | null;
 	Money: number;
@@ -51,7 +51,6 @@ interface Account {
 	OnlineSharedSettings?: any;
 	Game?: any;
 	LabelColor?: any;
-	Appearance?: any;
 	Appearance?: any;
 	Description?: any;
 	BlockItems?: any[];
