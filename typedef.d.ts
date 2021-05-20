@@ -104,3 +104,18 @@ interface Chatroom {
 	BlockCategory: any[];
 	Admin: number[];
 }
+
+interface ChatroomData {
+	Name: string;
+	Description: string;
+	Admin: number[];
+	Ban: number[];
+	Background: string;
+	Limit: number;
+	Game: string;
+	Locked: boolean;
+	Private: boolean;
+	BlockCategory: any[];
+	Character?: Partial<Account>[];
+	SourceMemberNumber: number;
+}

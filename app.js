@@ -59,6 +59,7 @@ var DatabaseName = process.env.DATABASE_NAME || "BondageClubDatabase";
 var PasswordResetProgress = [];
 var NodeMailer = require("nodemailer");
 var MailTransporter = NodeMailer.createTransport({
+	// @ts-ignore
 	host: "mail.bondageprojects.com",
 	Port: 465,
 	secure: true,
@@ -707,6 +708,7 @@ function ChatRoomSearch(data, socket) {
 			if ((data.FullRooms != null) && (typeof data.FullRooms === "boolean")) FullRooms = data.FullRooms;
 
 			// Checks if the user opted to ignore certain rooms
+			/** @type {string[]} */
 			var IgnoredRooms = [];
 			if ((data.Ignore != null) && (Array.isArray(data.Ignore))) IgnoredRooms = data.Ignore;
 
@@ -1047,6 +1049,7 @@ function ChatRoomGetData(CR, SourceMemberNumber, IncludeCharacters)
 	if (CR == null) return;
 
 	// Builds the room data
+	/** @type {ChatroomData} */
 	const R = {
 		Name: CR.Name,
 		Description: CR.Description,
@@ -1134,6 +1137,7 @@ function ChatRoomSyncCharacter(CR, SourceMemberNumber, TargetMemberNumber) {
 function ChatRoomSyncMemberJoin(CR, Character) {
 	// Exits right away if the chat room was destroyed
 	if (CR == null) return;
+	/** @type {{ SourceMemberNumber: number; Character: Partial<Account>, WhiteListedBy: number[]; BlackListedBy: number[] }} */
 	let joinData = {
 		SourceMemberNumber: Character.MemberNumber,
 		Character: ChatRoomSyncGetCharSharedData(Character),
@@ -1257,7 +1261,7 @@ function ChatRoomCharacterExpressionUpdate(data, socket) {
  * Updates a character pose for a chat room
  *
  * *This does not update the database*
- * @param {any} data
+ * @param {{ Pose?: string | string[] }} data
  * @param {socketio.Socket} socket
  */
 function ChatRoomCharacterPoseUpdate(data, socket) {
@@ -1336,7 +1340,7 @@ function ChatRoomAdmin(data, socket) {
 
 			// An administrator can update lots of room data.  The room values are sent back to the clients.
 			if (data.Action == "Update")
-				if ((data.Room != null) && (typeof data.Room === "object") && (data.Room.Name != null) && (data.Room.Description != null) && (data.Room.Background != null) && (typeof data.Room.Name === "string") && (typeof data.Room.Description === "string") && (typeof data.Room.Background === "string") && (data.Room.Admin != null) && (Array.isArray(data.Room.Admin)) && (!data.Room.Admin.some(i => !Number.isInteger(i))) && (data.Room.Ban != null) && (Array.isArray(data.Room.Ban)) && (!data.Room.Ban.some(i => !Number.isInteger(i)))) {
+				if ((data.Room != null) && (typeof data.Room === "object") && (data.Room.Name != null) && (data.Room.Description != null) && (data.Room.Background != null) && (typeof data.Room.Name === "string") && (typeof data.Room.Description === "string") && (typeof data.Room.Background === "string") && (data.Room.Admin != null) && (Array.isArray(data.Room.Admin)) && (!data.Room.Admin.some((/** @type {unknown} */ i) => !Number.isInteger(i))) && (data.Room.Ban != null) && (Array.isArray(data.Room.Ban)) && (!data.Room.Ban.some((/** @type {unknown} */ i) => !Number.isInteger(i)))) {
 					data.Room.Name = data.Room.Name.trim();
 					var LN = /^[a-zA-Z0-9 ]+$/;
 					if (data.Room.Name.match(LN) && (data.Room.Name.length >= 1) && (data.Room.Name.length <= 20) && (data.Room.Description.length <= 100) && (data.Room.Background.length <= 100)) {
@@ -1807,7 +1811,13 @@ function AccountOwnership(data, socket) {
 function AccountLovership(data, socket) {
 	if ((data != null) && (typeof data === "object") && (data.MemberNumber != null) && (typeof data.MemberNumber === "number")) {
 
-		// Update the lovership and delete all unnecessary information
+		/**
+		 * Update the lovership and delete all unnecessary information
+		 * @param {Lovership[]} Lovership
+		 * @param {number} MemberNumber
+		 * @param {socketio.Socket} [CurrentSocket]
+		 * @param {boolean} [Emit]
+		 */
 		function AccountUpdateLovership(Lovership, MemberNumber, CurrentSocket = socket, Emit = true) {
 			var newLovership = Lovership.slice();
 			for (var L = newLovership.length - 1; L >= 0; L--) {
