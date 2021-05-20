@@ -120,7 +120,7 @@ DatabaseClient.connect(DatabaseURL, { useUnifiedTopology: true, useNewUrlParser:
 				// If there is trusted forward header set by proxy, use that instead
 				// But only trust the last hop!
 				if (IP_CONNECTION_PROXY_HEADER && typeof socket.handshake.headers[IP_CONNECTION_PROXY_HEADER] === "string") {
-					const hops = socket.handshake.headers[IP_CONNECTION_PROXY_HEADER].split(",");
+					const hops = /** @type {string} */ (socket.handshake.headers[IP_CONNECTION_PROXY_HEADER]).split(",");
 					address = hops[hops.length-1].trim();
 				}
 
