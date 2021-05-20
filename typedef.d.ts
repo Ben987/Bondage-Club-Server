@@ -87,6 +87,7 @@ interface Ownership {
 }
 
 interface Chatroom {
+	ID: string;
 	Name: string;
 	Description: string;
 	Background: string;

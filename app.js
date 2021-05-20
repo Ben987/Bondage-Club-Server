@@ -1128,7 +1128,7 @@ function ChatRoomSyncCharacter(CR, SourceMemberNumber, TargetMemberNumber) {
 
 /**
  * Sends the newly joined player to all chat room members
- * @param {ChatRoom} CR
+ * @param {Chatroom} CR
  * @param {Account} Character
  */
 function ChatRoomSyncMemberJoin(CR, Character) {
