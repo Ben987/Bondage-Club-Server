@@ -1480,7 +1480,7 @@ function AccountOwnership(data, socket) {
 	if (data != null && typeof data === "object" && typeof data.MemberNumber === "number") {
 
 		// The submissive can flush it's owner at any time in the trial, or after a delay if collared.  Players on Extreme mode cannot break the full ownership.
-		var Acc = AccountGet(socket.id);
+		const Acc = AccountGet(socket.id);
 		if (Acc == null) return;
 
 		if (Acc.Ownership != null &&
@@ -1514,6 +1514,25 @@ function AccountOwnership(data, socket) {
 		if (!TargetAcc) return;
 
 		// In a chatroom, the dominant and submissive can enter in a BDSM relationship (4 steps to complete)
+
+		// The dominant can release the submissive player at any time
+		if (data.Action === "Release" &&
+			TargetAcc.Ownership != null &&
+			TargetAcc.Ownership.MemberNumber === Acc.MemberNumber
+		) {
+			const isTrial = typeof TargetAcc.Ownership.Stage !== "number" || TargetAcc.Ownership.Stage == 0;
+			TargetAcc.Owner = "";
+			TargetAcc.Ownership = null;
+			let O = { Ownership: TargetAcc.Ownership, Owner: TargetAcc.Owner };
+			Database.collection("Accounts").updateOne({ AccountName : TargetAcc.AccountName }, { $set: O }, function(err, res) { if (err) throw err; });
+			TargetAcc.Socket.emit("AccountOwnership", { ClearOwnership: true });
+			ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, isTrial ? "EndOwnershipTrial" : "EndOwnership", "ServerMessage", null, [
+				{ Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber },
+				{ Tag: "TargetCharacter", Text: TargetAcc.Name, MemberNumber: TargetAcc.MemberNumber },
+			]);
+			ChatRoomSyncCharacter(Acc.ChatRoom, TargetAcc.MemberNumber, TargetAcc.MemberNumber);
+			return;
+		}
 
 		// The dominant player proposes to the submissive player
 		// Cannot propose if target player is already owner
@@ -1570,7 +1589,7 @@ function AccountOwnership(data, socket) {
 						Database.collection("Accounts").updateOne({ AccountName : Acc.AccountName }, { $set: O }, function(err, res) { if (err) throw err; });
 						socket.emit("AccountOwnership", O);
 						ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "StartTrial", "ServerMessage", null, [{ Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber }]);
-						ChatRoomSyncCharacter(Acc.ChatRoom, Acc.MemberNumber, Acc.Ownership.MemberNumber);
+						ChatRoomSyncCharacter(Acc.ChatRoom, Acc.MemberNumber, Acc.MemberNumber);
 					} else socket.emit("AccountOwnership", { MemberNumber: data.MemberNumber, Result: "CanStartTrial" });
 				}
 
@@ -1587,7 +1606,7 @@ function AccountOwnership(data, socket) {
 						Database.collection("Accounts").updateOne({ AccountName : Acc.AccountName }, { $set: O }, function(err, res) { if (err) throw err; });
 						socket.emit("AccountOwnership", O);
 						ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "EndTrial", "ServerMessage", null, [{ Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber }]);
-						ChatRoomSyncCharacter(Acc.ChatRoom, Acc.MemberNumber, Acc.Ownership.MemberNumber);
+						ChatRoomSyncCharacter(Acc.ChatRoom, Acc.MemberNumber, Acc.MemberNumber);
 					} else socket.emit("AccountOwnership", { MemberNumber: data.MemberNumber, Result: "CanEndTrial" });
 				}
 
