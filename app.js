@@ -1558,9 +1558,8 @@ function AccountOwnership(data, socket) {
 					if (TargetAcc.Ownership != null &&
 						TargetAcc.Ownership.MemberNumber == Acc.MemberNumber &&
 						TargetAcc.Ownership.EndTrialOfferedByMemberNumber == null &&
-						TargetAcc.Ownership.Stage != null &&
+						TargetAcc.Ownership.Stage === 0 &&
 						TargetAcc.Ownership.Start != null &&
-						TargetAcc.Ownership.Stage == 0 &&
 						TargetAcc.Ownership.Start + OwnershipDelay <= CommonTime()
 					) {
 						if (data.Action === "Propose") {
@@ -1599,7 +1598,7 @@ function AccountOwnership(data, socket) {
 					Acc.Ownership.EndTrialOfferedByMemberNumber != null &&
 					Acc.Ownership.EndTrialOfferedByMemberNumber == data.MemberNumber
 				) {
-					if ((data.Action != null) && (typeof data.Action === "string") && (data.Action == "Accept")) {
+					if (data.Action === "Accept") {
 						Acc.Owner = TargetAcc.Name;
 						Acc.Ownership = { MemberNumber: data.MemberNumber, Name: TargetAcc.Name, Start: CommonTime(), Stage: 1 };
 						let O = { Ownership: Acc.Ownership, Owner: Acc.Owner };
