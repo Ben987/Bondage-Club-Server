@@ -967,20 +967,6 @@ function ChatRoomSyncToMember(CR, SourceMemberNumber, TargetMemberNumber) {
 	}
 }
 
-// TODO: remove this and every use of it after R67 release
-function ChatRoomSyncToOldClients(CR, SourceMemberNumber, Source) {
-	if (CR == null) { return; }
-
-	if (CR.Account.some(C => C.OnlineSharedSettings?.GameVersion == "R67")) {
-		const roomData = ChatRoomGetData(CR, SourceMemberNumber, true);
-		if (Source) Source.Socket.to("chatroom-" + CR.ID).emit("ChatRoomSync", roomData);
-		else IO.to("chatroom-" + CR.ID).emit("ChatRoomSync", roomData);
-		return true;
-	}
-
-	return false;
-}
-
 // Syncs the room data with all of it's members
 function ChatRoomSyncCharacter(CR, SourceMemberNumber, TargetMemberNumber) {
 	// Exits right away if the chat room was destroyed
@@ -995,8 +981,7 @@ function ChatRoomSyncCharacter(CR, SourceMemberNumber, TargetMemberNumber) {
 	characterData.SourceMemberNumber = SourceMemberNumber
 	characterData.Character = ChatRoomSyncGetCharSharedData(Target);
 
-	if (!ChatRoomSyncToOldClients(CR, SourceMemberNumber, Source))
-		Source.Socket.to("chatroom-" + CR.ID).emit("ChatRoomSyncCharacter", characterData);
+	Source.Socket.to("chatroom-" + CR.ID).emit("ChatRoomSyncCharacter", characterData);
 }
 
 // Sends the newly joined player to all chat room members
@@ -1031,7 +1016,6 @@ function ChatRoomSyncMemberLeave(CR, SourceMemberNumber) {
 	let leaveData = { }
 	leaveData.SourceMemberNumber = SourceMemberNumber;
 
-	// Sends the full packet to everyone in the room
 	IO.to("chatroom-" + CR.ID).emit("ChatRoomSyncMemberLeave", leaveData);
 }
 
@@ -1040,9 +1024,7 @@ function ChatRoomSyncRoomProperties(CR, SourceMemberNumber) {
 	// Exits right away if the chat room was destroyed
 	if (CR == null) return;
 
-	// Sends the full packet to everyone in the room
-	if (!ChatRoomSyncToOldClients(CR, SourceMemberNumber))
-		IO.to("chatroom-" + CR.ID).emit("ChatRoomSyncRoomProperties", ChatRoomGetData(CR, SourceMemberNumber, false));
+	IO.to("chatroom-" + CR.ID).emit("ChatRoomSyncRoomProperties", ChatRoomGetData(CR, SourceMemberNumber, false));
 }
 
 // Syncs the room data with all of it's members
@@ -1056,9 +1038,7 @@ function ChatRoomSyncMovePlayer(CR, SourceMemberNumber, TargetMemberNumber, Dire
 	moveData.TargetMemberNumber = TargetMemberNumber
 	moveData.Direction = Direction
 
-	// Sends the full packet to everyone in the room
-	if (!ChatRoomSyncToOldClients(CR, SourceMemberNumber))
-		IO.to("chatroom-" + CR.ID).emit("ChatRoomSyncMovePlayer", moveData);
+	IO.to("chatroom-" + CR.ID).emit("ChatRoomSyncMovePlayer", moveData);
 }
 
 // Syncs the room data with all of it's members
@@ -1072,9 +1052,7 @@ function ChatRoomSyncReorderPlayers(CR, SourceMemberNumber) {
 		newPlayerOrder.push(CR.Account[i].MemberNumber);
 	}
 
-	// Sends the full packet to everyone in the room
-	if (!ChatRoomSyncToOldClients(CR, SourceMemberNumber))
-		IO.to("chatroom-" + CR.ID).emit("ChatRoomSyncReorderPlayers", { PlayerOrder: newPlayerOrder });
+	IO.to("chatroom-" + CR.ID).emit("ChatRoomSyncReorderPlayers", { PlayerOrder: newPlayerOrder });
 }
 
 // Syncs a single character data with all room members
