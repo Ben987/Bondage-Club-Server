@@ -1028,20 +1028,6 @@ function ChatRoomSyncRoomProperties(CR, SourceMemberNumber) {
 }
 
 // Syncs the room data with all of it's members
-function ChatRoomSyncMovePlayer(CR, SourceMemberNumber, TargetMemberNumber, Direction) {
-	// Exits right away if the chat room was destroyed
-	if (CR == null) return;
-
-	// Builds the room data
-	let moveData = {};
-
-	moveData.TargetMemberNumber = TargetMemberNumber
-	moveData.Direction = Direction
-
-	IO.to("chatroom-" + CR.ID).emit("ChatRoomSyncMovePlayer", moveData);
-}
-
-// Syncs the room data with all of it's members
 function ChatRoomSyncReorderPlayers(CR, SourceMemberNumber) {
 	// Exits right away if the chat room was destroyed
 	if (CR == null) return;
