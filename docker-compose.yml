@@ -1,5 +1,11 @@
 version: '3.7'
 services:
+    web:
+        image: nginx
+        volumes:
+            - ../Bondage-College/:/usr/share/nginx/html
+        ports:
+            - 80:80
     app:
         env_file: .env
         depends_on:
@@ -11,7 +17,7 @@ services:
             - 4288:4288
     db:
         env_file: .env
-        image: mongo:4.4
+        image: mongo:4.2
         ports:
             - 27017:27017
         volumes:
