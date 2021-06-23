@@ -11,7 +11,9 @@ services:
             - 4288:4288
     db:
         env_file: .env
-        image: mongo
+        image: mongo:4.4
+        ports:
+            - 27017:27017
         volumes:
             - db-data:/data/db
     mongo-express:
