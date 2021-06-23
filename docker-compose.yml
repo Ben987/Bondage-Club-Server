@@ -1,0 +1,33 @@
+version: '3.7'
+services:
+    web:
+        image: nginx
+        volumes:
+            - ../Bondage-College/:/usr/share/nginx/html
+        ports:
+            - 80:80
+    app:
+        env_file: .env
+        depends_on:
+            - db
+        build:
+            context: .
+            dockerfile: Dockerfile
+        ports:
+            - 4288:4288
+    db:
+        env_file: .env
+        image: mongo:4.2
+        ports:
+            - 27017:27017
+        volumes:
+            - db-data:/data/db
+    mongo-express:
+        env_file: .env
+        depends_on:
+            - db
+        image: mongo-express
+        ports:
+            - 8081:8081
+volumes:
+    db-data:
