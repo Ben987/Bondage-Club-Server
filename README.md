@@ -16,3 +16,11 @@ Make the required changes to index.html in your Bondage-Club repository, and it 
 
  * Mongo runs at localhost:27017, by default with the username and password `admin` and `password`, this can be changed in the .env file `MONGO_INITDB_ROOT_USERNAME` and `MONGO_INITDB_ROOT_PASSWORD`
  * Mongo-Express runs in a separate container at http://localhost:8081 and lets you access the database
+
+### Convenience commands
+ * `docker-compose down` Tear down and remove all containers but not the mongo database
+ * `docker-compose down --volumes` Remove all the containers and the mongo database
+ * `docker-compose up -d --build` build the server with any changes and start it up
+ * `docker-compose up -d --build --no-cache` rebuild the server and start it up
+ * `docker-compose logs app` View the logs from the bondage club server
+ * `docker-compose logs db` View the logs of Mongo
