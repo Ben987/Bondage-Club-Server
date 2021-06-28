@@ -199,7 +199,7 @@ function CommonTime() {
 function AccountCreate(data, socket) {
 
 	// Makes sure the account comes with a name and a password
-	if ((data != null) && (typeof data === "object") && (data.Name != null) && (data.AccountName != null) && (data.Password != null) && (data.Email != null)) {		
+	if ((data != null) && (typeof data === "object") && (data.Name != null) && (data.AccountName != null) && (data.Password != null) && (data.Email != null) && (typeof data.Name === "string") && (typeof data.AccountName === "string") && (typeof data.Password === "string") && (typeof data.Email === "string")) {
 	
 		// Makes sure the data is valid
 		var LN = /^[a-zA-Z0-9]+$/;
