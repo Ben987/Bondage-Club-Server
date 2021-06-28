@@ -459,6 +459,7 @@ function AccountUpdate(data, socket) {
 				if (data.Description != null) Account[P].Description = data.Description;
 				if (data.BlockItems != null) Account[P].BlockItems = data.BlockItems;
 				if (data.LimitedItems != null) Account[P].LimitedItems = data.LimitedItems;
+				if (data.FavoriteItems != null) Account[P].FavoriteItems = data.FavoriteItems;
 				if ((data.WhiteList != null) && Array.isArray(data.WhiteList)) Account[P].WhiteList = data.WhiteList;
 				if ((data.BlackList != null) && Array.isArray(data.BlackList)) Account[P].BlackList = data.BlackList;
 				if ((data.FriendList != null) && Array.isArray(data.FriendList)) Account[P].FriendList = data.FriendList;
@@ -903,6 +904,7 @@ function ChatRoomSyncGetCharSharedData(Acc) {
 		Ownership: Acc.Ownership,
 		BlockItems: Acc.BlockItems,
 		LimitedItems: Acc.LimitedItems,
+		FavoriteItems: Acc.FavoriteItems,
 		ArousalSettings: Acc.ArousalSettings,
 		OnlineSharedSettings: Acc.OnlineSharedSettings,
 		WhiteList,
