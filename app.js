@@ -19,7 +19,9 @@ var IO = new socketio.Server(App, {
 	allowEIO3: false
 });
 var BCrypt = require("bcrypt");
+/** @type {Account[]} */
 var Account = [];
+/** @type {Chatroom[]} */
 var ChatRoom = [];
 var ChatRoomMessageType = ["Chat", "Action", "Activity", "Emote", "Whisper", "Hidden"];
 var ChatRoomProduction = [
@@ -32,7 +34,7 @@ var ChatRoomProduction = [
 	process.env.PRODUCTION6 || "",
 	process.env.PRODUCTION7 || "",
 	process.env.PRODUCTION8 || "",
-	process.env.PRODUCTION9 || "" 
+	process.env.PRODUCTION9 || ""
 ];
 var NextMemberNumber = 1;
 var OwnershipDelay = 604800000; // 7 days delay for ownership events
@@ -42,23 +44,28 @@ const IP_CONNECTION_LIMIT = 64; // Limit of connections per IP address
 const IP_CONNECTION_PROXY_HEADER = "x-forwarded-for"; // Header with real IP, if set by trusted proxy (lowercase)
 
 // DB Access
+/** @type { import("mongodb").Db } */
 var Database;
 var DatabaseClient = require('mongodb').MongoClient;
 var DatabaseURL = process.env.DATABASE_URL || "mongodb://localhost:27017/BondageClubDatabase";
 var DatabasePort = process.env.PORT || 4288;
 var DatabaseName = process.env.DATABASE_NAME || "BondageClubDatabase";
 
-// Email password reset
+/**
+ * Email password reset
+ * @type { { AccountName: string; ResetNumber: string; }[] }
+ */
 var PasswordResetProgress = [];
 var NodeMailer = require("nodemailer");
 var MailTransporter = NodeMailer.createTransport({
+	// @ts-ignore
 	host: "mail.bondageprojects.com",
 	Port: 465,
 	secure: true,
 	auth: {
 		user: "donotreply@bondageprojects.com",
 		pass: process.env.EMAIL_PASSWORD || ""
-    }
+	}
 });
 
 // If the server received an unhandled error, we log it through console for future review, send an email and exit so the application can restart
@@ -80,11 +87,12 @@ process.on('uncaughtException', function(error) {
 	});
 });
 
+/** @type {Map<string, number>} */
 const IPConnectionCounts = new Map();
 
 // Connects to the Mongo Database
 DatabaseClient.connect(DatabaseURL, { useUnifiedTopology: true, useNewUrlParser: true }, function(err, db) {
-	
+
 	// Keeps the database object
 	if (err) throw err;
 	Database = db.db(DatabaseName);
@@ -93,24 +101,25 @@ DatabaseClient.connect(DatabaseURL, { useUnifiedTopology: true, useNewUrlParser:
 
 	// Gets the next unique member number
 	Database.collection("Accounts").find({ MemberNumber : { $exists: true, $ne: null }}).sort({MemberNumber: -1}).limit(1).toArray(function(err, result) {
-	
+
 		// Shows the next member number
 		if ((result.length > 0) && (result[0].MemberNumber != null)) NextMemberNumber = result[0].MemberNumber + 1;
 		console.log("Next Member Number: " + NextMemberNumber);
-		
+
 		// Listens for clients on port 4288 if local or a random port if online
 		App.listen(DatabasePort, function () {
-			
+
 			// Sets up the Client/Server events
 			console.log("Bondage Club server is listening on " + (DatabasePort).toString());
 			console.log("****************************************");
-			IO.on("connection", function (socket) {
+			IO.on("connection", function ( /** @type {socketio.Socket} */ socket) {
+				/** @type {string} */
 				let address = socket.conn.remoteAddress;
 
 				// If there is trusted forward header set by proxy, use that instead
 				// But only trust the last hop!
 				if (IP_CONNECTION_PROXY_HEADER && typeof socket.handshake.headers[IP_CONNECTION_PROXY_HEADER] === "string") {
-					const hops = socket.handshake.headers[IP_CONNECTION_PROXY_HEADER].split(",");
+					const hops = /** @type {string} */ (socket.handshake.headers[IP_CONNECTION_PROXY_HEADER]).split(",");
 					address = hops[hops.length-1].trim();
 				}
 
@@ -137,10 +146,10 @@ DatabaseClient.connect(DatabaseURL, { useUnifiedTopology: true, useNewUrlParser:
 
 				socket.emit("ServerMessage", "Connected to the Bondage Club Server.");
 				socket.emit("ServerMessage", "Warning!  Console scripts can break your account or steal your data.");
-				socket.on("AccountCreate", function (data) { AccountCreate(data, socket) });
-				socket.on("AccountLogin", function (data) { AccountLogin(data, socket) });
-				socket.on("PasswordReset", function(data) { PasswordReset(data, socket) });
-				socket.on("PasswordResetProcess", function(data) { PasswordResetProcess(data, socket) });
+				socket.on("AccountCreate", function (data) { AccountCreate(data, socket); });
+				socket.on("AccountLogin", function (data) { AccountLogin(data, socket); });
+				socket.on("PasswordReset", function(data) { PasswordReset(data, socket); });
+				socket.on("PasswordResetProcess", function(data) { PasswordResetProcess(data, socket); });
 				AccountSendServerInfo(socket);
 			});
 
@@ -150,63 +159,76 @@ DatabaseClient.connect(DatabaseURL, { useUnifiedTopology: true, useNewUrlParser:
 	});
 });
 
-// Setups socket on successful login or account creation
+/**
+ * Setups socket on successful login or account creation
+ * @param {socketio.Socket} socket
+ */
 function OnLogin(socket) {
 	socket.removeAllListeners("AccountCreate");
 	socket.removeAllListeners("AccountLogin");
 	socket.removeAllListeners("PasswordReset");
 	socket.removeAllListeners("PasswordResetProcess");
-	socket.on("AccountUpdate", function(data) { AccountUpdate(data, socket) });
-	socket.on("AccountUpdateEmail", function(data) { AccountUpdateEmail(data, socket) });
-	socket.on("AccountQuery", function(data) { AccountQuery(data, socket) });
-	socket.on("AccountBeep", function(data) { AccountBeep(data, socket) });
-	socket.on("AccountOwnership", function(data) { AccountOwnership(data, socket) });
-	socket.on("AccountLovership", function(data) { AccountLovership(data, socket) });
-	socket.on("AccountDifficulty", function(data) { AccountDifficulty(data, socket) });
-	socket.on("AccountDisconnect", function() { AccountRemove(socket.id) });
-	socket.on("disconnect", function() { AccountRemove(socket.id) });
-	socket.on("ChatRoomSearch", function(data) { ChatRoomSearch(data, socket) });
-	socket.on("ChatRoomCreate", function(data) { ChatRoomCreate(data, socket) });
-	socket.on("ChatRoomJoin", function(data) { ChatRoomJoin(data, socket) });
-	socket.on("ChatRoomLeave", function() { ChatRoomLeave(socket) });
-	socket.on("ChatRoomChat", function(data) { ChatRoomChat(data, socket) });
-	socket.on("ChatRoomCharacterUpdate", function(data) { ChatRoomCharacterUpdate(data, socket) });
-	socket.on("ChatRoomCharacterExpressionUpdate", function(data) { ChatRoomCharacterExpressionUpdate(data, socket) });
-	socket.on("ChatRoomCharacterPoseUpdate", function(data) { ChatRoomCharacterPoseUpdate(data, socket) });
-	socket.on("ChatRoomCharacterArousalUpdate", function(data) { ChatRoomCharacterArousalUpdate(data, socket) });
-	socket.on("ChatRoomCharacterItemUpdate", function(data) { ChatRoomCharacterItemUpdate(data, socket) });
-	socket.on("ChatRoomAdmin", function(data) { ChatRoomAdmin(data, socket) });
-	socket.on("ChatRoomAllowItem", function(data) { ChatRoomAllowItem(data, socket) });
-	socket.on("ChatRoomGame", function(data) { ChatRoomGame(data, socket) });
+	socket.on("AccountUpdate", function(data) { AccountUpdate(data, socket); });
+	socket.on("AccountUpdateEmail", function(data) { AccountUpdateEmail(data, socket); });
+	socket.on("AccountQuery", function(data) { AccountQuery(data, socket); });
+	socket.on("AccountBeep", function(data) { AccountBeep(data, socket); });
+	socket.on("AccountOwnership", function(data) { AccountOwnership(data, socket); });
+	socket.on("AccountLovership", function(data) { AccountLovership(data, socket); });
+	socket.on("AccountDifficulty", function(data) { AccountDifficulty(data, socket); });
+	socket.on("AccountDisconnect", function() { AccountRemove(socket.id); });
+	socket.on("disconnect", function() { AccountRemove(socket.id); });
+	socket.on("ChatRoomSearch", function(data) { ChatRoomSearch(data, socket); });
+	socket.on("ChatRoomCreate", function(data) { ChatRoomCreate(data, socket); });
+	socket.on("ChatRoomJoin", function(data) { ChatRoomJoin(data, socket); });
+	socket.on("ChatRoomLeave", function() { ChatRoomLeave(socket); });
+	socket.on("ChatRoomChat", function(data) { ChatRoomChat(data, socket); });
+	socket.on("ChatRoomCharacterUpdate", function(data) { ChatRoomCharacterUpdate(data, socket); });
+	socket.on("ChatRoomCharacterExpressionUpdate", function(data) { ChatRoomCharacterExpressionUpdate(data, socket); });
+	socket.on("ChatRoomCharacterPoseUpdate", function(data) { ChatRoomCharacterPoseUpdate(data, socket); });
+	socket.on("ChatRoomCharacterArousalUpdate", function(data) { ChatRoomCharacterArousalUpdate(data, socket); });
+	socket.on("ChatRoomCharacterItemUpdate", function(data) { ChatRoomCharacterItemUpdate(data, socket); });
+	socket.on("ChatRoomAdmin", function(data) { ChatRoomAdmin(data, socket); });
+	socket.on("ChatRoomAllowItem", function(data) { ChatRoomAllowItem(data, socket); });
+	socket.on("ChatRoomGame", function(data) { ChatRoomGame(data, socket); });
 }
 
-// Sends the server info to all players or one specific player (socket)
+/**
+ * Sends the server info to all players or one specific player (socket)
+ * @param {socketio.Socket} [socket]
+ */
 function AccountSendServerInfo(socket) {
 	var SI = {
 		Time: CommonTime(),
 		OnlinePlayers: Account.length
-	}
+	};
 	if (socket != null) socket.emit("ServerInfo", SI);
 	else IO.sockets.volatile.emit("ServerInfo", SI);
 }
 
-// Return the current time
+/**
+ * Return the current time
+ * @returns {number}
+ */
 function CommonTime() {
 	return new Date().getTime();
 }
 
-// Creates a new account by creating its file
+/**
+ * Creates a new account by creating its file
+ * @param {any} data
+ * @param {socketio.Socket} socket
+ */
 function AccountCreate(data, socket) {
 
 	// Makes sure the account comes with a name and a password
 	if ((data != null) && (typeof data === "object") && (data.Name != null) && (data.AccountName != null) && (data.Password != null) && (data.Email != null) && (typeof data.Name === "string") && (typeof data.AccountName === "string") && (typeof data.Password === "string") && (typeof data.Email === "string")) {
-	
+
 		// Makes sure the data is valid
 		var LN = /^[a-zA-Z0-9]+$/;
 		var LS = /^[a-zA-Z ]+$/;
 		var E = /^[a-zA-Z0-9@.!#$%&'*+/=?^_`{|}~-]+$/;
 		if (data.Name.match(LS) && data.AccountName.match(LN) && data.Password.match(LN) && (data.Email.match(E) || data.Email == "") && (data.Name.length > 0) && (data.Name.length <= 20) && (data.AccountName.length > 0) && (data.AccountName.length <= 20) && (data.Password.length > 0) && (data.Password.length <= 20) && (data.Email.length <= 100)) {
-	
+
 			// Checks if the account already exists
 			data.AccountName = data.AccountName.toUpperCase();
 			Database.collection("Accounts").findOne({ AccountName : data.AccountName }, function(err, result) {
@@ -214,9 +236,9 @@ function AccountCreate(data, socket) {
 				// Makes sure the result is null so the account doesn't already exists
 				if (err) throw err;
 				if (result != null) {
-					socket.emit("CreationResponse", "Account already exists");			
+					socket.emit("CreationResponse", "Account already exists");
 				} else {
-				
+
 					// Creates a hashed password and saves it with the account info
 					BCrypt.hash(data.Password.toUpperCase(), 10, function( err, hash ) {
 						if (err) throw err;
@@ -250,7 +272,11 @@ function AccountCreate(data, socket) {
 
 }
 
-// Gets the current environment for online play (www.bondageprojects.com is considered production)
+/**
+ * Gets the current environment for online play (www.bondageprojects.com is considered production)
+ * @param {socketio.Socket} socket
+ * @returns {"PROD"|"DEV"|string}
+ */
 function AccountGetEnvironment(socket) {
 	if ((socket != null) && (socket.request != null) && (socket.request.headers != null) && (socket.request.headers.origin != null) && (socket.request.headers.origin != "")) {
 		if (ChatRoomProduction.indexOf(socket.request.headers.origin.toLowerCase()) >= 0) return "PROD";
@@ -258,7 +284,10 @@ function AccountGetEnvironment(socket) {
 	} else return (Math.round(Math.random() * 1000000000000)).toString();
 }
 
-// Makes sure the account data is valid, creates the missing fields if we need to
+/**
+ * Makes sure the account data is valid, creates the missing fields if we need to
+ * @param {Account} Account
+ */
 function AccountValidData(Account) {
 	if (Account != null) {
 		if ((Account.ItemPermission == null) || (typeof Account.ItemPermission !== "number")) Account.ItemPermission = 2;
@@ -268,7 +297,10 @@ function AccountValidData(Account) {
 	}
 }
 
-// Purge some account info that's not required to be kept in memory on the server side
+/**
+ * Purge some account info that's not required to be kept in memory on the server side
+ * @param {Account} A
+ */
 function AccountPurgeInfo(A) {
 	delete A.Log;
 	delete A.Skill;
@@ -285,7 +317,11 @@ function AccountPurgeInfo(A) {
 	delete A.HiddenItems;
 }
 
-// Load a single account file
+/**
+ * Load a single account file
+ * @param {any} data
+ * @param {socketio.Socket} socket
+ */
 function AccountLogin(data, socket) {
 
 	// Makes sure the login comes with a name and a password
@@ -416,15 +452,23 @@ async function AccountLoginProcess(socket, AccountName, Password) {
 	AccountPurgeInfo(result);
 }
 
-// Returns TRUE if the object is empty
+/**
+ * Returns TRUE if the object is empty
+ * @param {Record<any, any>} obj Object to check
+ * @returns {boolean}
+ */
 function ObjectEmpty(obj) {
-    for(var key in obj)
-        if (obj.hasOwnProperty(key))
-            return false;
-    return true;
+	for(var key in obj)
+		if (obj.hasOwnProperty(key))
+			return false;
+	return true;
 }
 
-// Updates any account data except the basic ones that cannot change
+/**
+ * Updates any account data except the basic ones that cannot change
+ * @param {Partial<Account>} data
+ * @param {socketio.Socket} socket
+ */
 function AccountUpdate(data, socket) {
 	if ((data != null) && (typeof data === "object") && !Array.isArray(data))
 		for (var P = 0; P < Account.length; P++)
@@ -492,7 +536,11 @@ function AccountUpdate(data, socket) {
 			}
 }
 
-// Updates email address
+/**
+ * Updates email address
+ * @param {any} data
+ * @param {socketio.Socket} socket
+ */
 function AccountUpdateEmail(data, socket) {
 	if ((data != null) && (typeof data === "object") && (data.EmailOld != null) && (data.EmailNew != null) && (typeof data.EmailOld === "string") && (typeof data.EmailNew === "string")) {
 		var Acc = AccountGet(socket.id);
@@ -512,7 +560,11 @@ function AccountUpdateEmail(data, socket) {
 	}
 }
 
-// When the client account sends a query to the server
+/**
+ * When the client account sends a query to the server
+ * @param {any} data
+ * @param {socketio.Socket} socket
+ */
 function AccountQuery(data, socket) {
 	if ((data != null) && (typeof data === "object") && !Array.isArray(data) && (data.Query != null) && (typeof data.Query === "string")) {
 
@@ -569,7 +621,11 @@ function AccountQuery(data, socket) {
 	}
 }
 
-// When a player wants to beep another player
+/**
+ * When a player wants to beep another player
+ * @param {any} data
+ * @param {socketio.Socket} socket
+ */
 function AccountBeep(data, socket) {
 	if ((data != null) && (typeof data === "object") && !Array.isArray(data) && (data.MemberNumber != null) && (typeof data.MemberNumber === "number")) {
 
@@ -591,7 +647,10 @@ function AccountBeep(data, socket) {
 	}
 }
 
-// Removes the account from the buffer
+/**
+ * Removes the account from the buffer
+ * @param {string} ID
+ */
 function AccountRemove(ID) {
 	if (ID != null)
 		for (var P = 0; P < Account.length; P++)
@@ -603,7 +662,11 @@ function AccountRemove(ID) {
 			}
 }
 
-// Returns the account object related to it's ID
+/**
+ * Returns the account object related to it's ID
+ * @param {string} ID
+ * @returns {Account|null}
+ */
 function AccountGet(ID) {
 	for (var P = 0; P < Account.length; P++)
 		if (Account[P].ID == ID)
@@ -611,7 +674,11 @@ function AccountGet(ID) {
 	return null;
 }
 
-// When a user searches for a chat room
+/**
+ * When a user searches for a chat room
+ * @param {any} data
+ * @param {socketio.Socket} socket
+ */
 function ChatRoomSearch(data, socket) {
 	if ((data != null) && (typeof data === "object") && (data.Query != null) && (typeof data.Query === "string") && (data.Query.length <= 20)) {
 
@@ -630,15 +697,16 @@ function ChatRoomSearch(data, socket) {
 			// Checks if the user requested full rooms
 			var FullRooms = false;
 			if ((data.FullRooms != null) && (typeof data.FullRooms === "boolean")) FullRooms = data.FullRooms;
-			
+
 			// Checks if the user opted to ignore certain rooms
+			/** @type {string[]} */
 			var IgnoredRooms = [];
 			if ((data.Ignore != null) && (Array.isArray(data.Ignore))) IgnoredRooms = data.Ignore;
-			
+
 			// Validate array, only strings are valid.
-			var LN = /^[a-zA-Z0-9 ]+$/; 
+			var LN = /^[a-zA-Z0-9 ]+$/;
 			IgnoredRooms = IgnoredRooms.filter(R => typeof R === "string" && R.match(LN));
-			
+
 			// Builds a list of all public rooms, the last rooms created are shown first
 			var CR = [];
 			var C = 0;
@@ -683,7 +751,11 @@ function ChatRoomSearch(data, socket) {
 	}
 }
 
-// Creates a new chat room 
+/**
+ * Creates a new chat room
+ * @param {any} data
+ * @param {socketio.Socket} socket
+ */
 function ChatRoomCreate(data, socket) {
 
 	// Make sure we have everything to create it
@@ -693,7 +765,7 @@ function ChatRoomCreate(data, socket) {
 		data.Name = data.Name.trim();
 		var LN = /^[a-zA-Z0-9 ]+$/;
 		if (data.Name.match(LN) && (data.Name.length >= 1) && (data.Name.length <= 20) && (data.Description.length <= 100) && (data.Background.length <= 100)) {
-		
+
 			// Check if the same name already exists and quits if that's the case
 			for (var C = 0; C < ChatRoom.length; C++)
 				if (ChatRoom[C].Name.toUpperCase().trim() == data.Name.toUpperCase().trim()) {
@@ -712,6 +784,7 @@ function ChatRoomCreate(data, socket) {
 			var Acc = AccountGet(socket.id);
 			if (Acc != null) {
 				ChatRoomRemove(Acc, "ServerLeave", []);
+				/** @type {Chatroom} */
 				var NewRoom = {
 					ID: base64id.generateId(),
 					Name: data.Name,
@@ -729,7 +802,7 @@ function ChatRoomCreate(data, socket) {
 					Ban: [],
 					BlockCategory: data.BlockCategory,
 					Admin: [Acc.MemberNumber]
-				}
+				};
 				ChatRoom.push(NewRoom);
 				Acc.ChatRoom = NewRoom;
 				NewRoom.Account.push(Acc);
@@ -745,12 +818,16 @@ function ChatRoomCreate(data, socket) {
 
 }
 
-// Join an existing chat room 
+/**
+ * Join an existing chat room
+ * @param {any} data
+ * @param {socketio.Socket} socket
+ */
 function ChatRoomJoin(data, socket) {
 
 	// Make sure we have everything to join it
 	if ((data != null) && (typeof data === "object") && (data.Name != null) && (typeof data.Name === "string") && (data.Name != "")) {
-		
+
 		// Finds the current account
 		var Acc = AccountGet(socket.id);
 		if (Acc != null) {
@@ -764,7 +841,7 @@ function ChatRoomJoin(data, socket) {
 					if (Acc.Environment == ChatRoom[C].Environment)
 						if (ChatRoom[C].Account.length < ChatRoom[C].Limit) {
 							if (ChatRoom[C].Ban.indexOf(Acc.MemberNumber) < 0) {
-								
+
 								// If the room is unlocked or the player is an admin, we allow her inside
 								if (!ChatRoom[C].Locked || (ChatRoom[C].Admin.indexOf(Acc.MemberNumber) >= 0)) {
 									Acc.ChatRoom = ChatRoom[C];
@@ -798,7 +875,12 @@ function ChatRoomJoin(data, socket) {
 
 }
 
-// Removes a player from a room
+/**
+ * Removes a player from a room
+ * @param {Account} Acc
+ * @param {string} Reason
+ * @param {any[]} Dictionary
+ */
 function ChatRoomRemove(Acc, Reason, Dictionary) {
 	if (Acc.ChatRoom != null) {
 		Acc.Socket.leave("chatroom-" + Acc.ChatRoom.ID);
@@ -828,13 +910,24 @@ function ChatRoomRemove(Acc, Reason, Dictionary) {
 	}
 }
 
-// Finds the current account and removes it from it's chat room, nothing is returned to the client
+/**
+ * Finds the current account and removes it from it's chat room, nothing is returned to the client
+ * @param {socketio.Socket} socket
+ */
 function ChatRoomLeave(socket) {
 	var Acc = AccountGet(socket.id);
 	if (Acc != null) ChatRoomRemove(Acc, "ServerLeave", []);
 }
 
-// Sends a text message to everyone in the room or a specific target
+/**
+ * Sends a text message to everyone in the room or a specific target
+ * @param {Chatroom|null|undefined} CR
+ * @param {number} Sender Sender's MemberNumber
+ * @param {string} Content
+ * @param {string} Type
+ * @param {number|null} Target Target's MemberNumber or null if broadcast
+ * @param {any[]} Dictionary
+ */
 function ChatRoomMessage(CR, Sender, Content, Type, Target, Dictionary) {
 	if (CR == null) return;
 	if (Target == null) {
@@ -849,7 +942,11 @@ function ChatRoomMessage(CR, Sender, Content, Type, Target, Dictionary) {
 	}
 }
 
-// When a user sends a chat message, we propagate it to everyone in the room
+/**
+ * When a user sends a chat message, we propagate it to everyone in the room
+ * @param {any} data
+ * @param {socketio.Socket} socket
+ */
 function ChatRoomChat(data, socket) {
 	if ((data != null) && (typeof data === "object") && (data.Content != null) && (data.Type != null) && (typeof data.Content === "string") && (typeof data.Type === "string") && (ChatRoomMessageType.indexOf(data.Type) >= 0) && (data.Content.length <= 1000)) {
 		var Acc = AccountGet(socket.id);
@@ -857,7 +954,11 @@ function ChatRoomChat(data, socket) {
 	}
 }
 
-// When a user sends a game packet (for LARP or other games), we propagate it to everyone in the room
+/**
+ * When a user sends a game packet (for LARP or other games), we propagate it to everyone in the room
+ * @param {any} data
+ * @param {socketio.Socket} socket
+ */
 function ChatRoomGame(data, socket) {
 	if ((data != null) && (typeof data === "object")) {
 		var R = Math.random();
@@ -868,7 +969,11 @@ function ChatRoomGame(data, socket) {
 	}
 }
 
-// Builds the character packet to send over to the clients, white list is only sent if there are limited items and a low item permission
+/**
+ * Builds the character packet to send over to the clients
+ * @param {Account} Acc
+ * @returns {Partial<Account>}
+ */
 function ChatRoomSyncGetCharSharedData(Acc) {
 	const WhiteList = [];
 	const BlackList = [];
@@ -914,13 +1019,19 @@ function ChatRoomSyncGetCharSharedData(Acc) {
 	};
 }
 
-// Returns a ChatRoom data that can be synced to clients
+/**
+ * Returns a ChatRoom data that can be synced to clients
+ * @param {Chatroom} CR
+ * @param {number} SourceMemberNumber
+ * @param {boolean} IncludeCharacters If the data should include full character info
+ */
 function ChatRoomGetData(CR, SourceMemberNumber, IncludeCharacters)
 {
 	// Exits right away if the chat room was destroyed
 	if (CR == null) return;
 
 	// Builds the room data
+	/** @type {ChatroomData} */
 	const R = {
 		Name: CR.Name,
 		Description: CR.Description,
@@ -942,7 +1053,11 @@ function ChatRoomGetData(CR, SourceMemberNumber, IncludeCharacters)
 	return R;
 }
 
-// Syncs the room data with all of it's members
+/**
+ * Syncs the room data with all of it's members
+ * @param {Chatroom} CR
+ * @param {number} SourceMemberNumber
+ */
 function ChatRoomSync(CR, SourceMemberNumber) {
 
 	// Exits right away if the chat room was destroyed
@@ -952,7 +1067,12 @@ function ChatRoomSync(CR, SourceMemberNumber) {
 	IO.to("chatroom-" + CR.ID).emit("ChatRoomSync", ChatRoomGetData(CR, SourceMemberNumber, true));
 }
 
-// Syncs the room data with all of it's members
+/**
+ * Syncs the room data only to target
+ * @param {Chatroom} CR
+ * @param {number} SourceMemberNumber MemberNumber of account causing change
+ * @param {*} TargetMemberNumber The account to which the sync should be sent
+ */
 function ChatRoomSyncToMember(CR, SourceMemberNumber, TargetMemberNumber) {
 	// Exits right away if the chat room was destroyed
 	if (CR == null) { return; }
@@ -970,6 +1090,13 @@ function ChatRoomSyncToMember(CR, SourceMemberNumber, TargetMemberNumber) {
 }
 
 // TODO: remove this and every use of it after R67 release
+/**
+ * Syncs data to old clients in room
+ * @param {Chatroom} CR
+ * @param {number} SourceMemberNumber
+ * @param {Account} [Source] If specified, the data won't be sent to source
+ * @returns {boolean} if any data was sent
+ */
 function ChatRoomSyncToOldClients(CR, SourceMemberNumber, Source) {
 	if (CR == null) { return; }
 
@@ -983,28 +1110,38 @@ function ChatRoomSyncToOldClients(CR, SourceMemberNumber, Source) {
 	return false;
 }
 
-// Syncs the room data with all of it's members
+/**
+ * Syncs the room data with all of it's members
+ * @param {Chatroom} CR
+ * @param {number} SourceMemberNumber
+ * @param {number} TargetMemberNumber The character to sync
+ */
 function ChatRoomSyncCharacter(CR, SourceMemberNumber, TargetMemberNumber) {
 	// Exits right away if the chat room was destroyed
 	if (CR == null) return;
 
 	const Target = CR.Account.find(Acc => Acc.MemberNumber === TargetMemberNumber);
 	if (!Target) return;
-	const Source = CR.Account.find(Acc => Acc.MemberNumber === SourceMemberNumber)
+	const Source = CR.Account.find(Acc => Acc.MemberNumber === SourceMemberNumber);
 	if (!Source) return;
 
-	let characterData = { }
-	characterData.SourceMemberNumber = SourceMemberNumber
+	let characterData = { };
+	characterData.SourceMemberNumber = SourceMemberNumber;
 	characterData.Character = ChatRoomSyncGetCharSharedData(Target);
 
 	if (!ChatRoomSyncToOldClients(CR, SourceMemberNumber, Source))
 		Source.Socket.to("chatroom-" + CR.ID).emit("ChatRoomSyncCharacter", characterData);
 }
 
-// Sends the newly joined player to all chat room members
+/**
+ * Sends the newly joined player to all chat room members
+ * @param {Chatroom} CR
+ * @param {Account} Character
+ */
 function ChatRoomSyncMemberJoin(CR, Character) {
 	// Exits right away if the chat room was destroyed
 	if (CR == null) return;
+	/** @type {{ SourceMemberNumber: number; Character: Partial<Account>, WhiteListedBy: number[]; BlackListedBy: number[] }} */
 	let joinData = {
 		SourceMemberNumber: Character.MemberNumber,
 		Character: ChatRoomSyncGetCharSharedData(Character),
@@ -1025,19 +1162,27 @@ function ChatRoomSyncMemberJoin(CR, Character) {
 	ChatRoomSyncToMember(CR, Character.MemberNumber, Character.MemberNumber);
 }
 
-// Sends the left player to all chat room members
+/**
+ * Sends the left player to all chat room members
+ * @param {Chatroom} CR
+ * @param {number} SourceMemberNumber The leaving player
+ */
 function ChatRoomSyncMemberLeave(CR, SourceMemberNumber) {
 	// Exits right away if the chat room was destroyed
 	if (CR == null) return;
 
-	let leaveData = { }
+	let leaveData = { };
 	leaveData.SourceMemberNumber = SourceMemberNumber;
 
 	// Sends the full packet to everyone in the room
 	IO.to("chatroom-" + CR.ID).emit("ChatRoomSyncMemberLeave", leaveData);
 }
 
-// Syncs the room data with all of it's members
+/**
+ * Syncs the room data with all of it's members
+ * @param {Chatroom} CR
+ * @param {number} SourceMemberNumber
+ */
 function ChatRoomSyncRoomProperties(CR, SourceMemberNumber) {
 	// Exits right away if the chat room was destroyed
 	if (CR == null) return;
@@ -1047,7 +1192,13 @@ function ChatRoomSyncRoomProperties(CR, SourceMemberNumber) {
 		IO.to("chatroom-" + CR.ID).emit("ChatRoomSyncRoomProperties", ChatRoomGetData(CR, SourceMemberNumber, false));
 }
 
-// Syncs the room data with all of it's members
+/**
+ * Syncs the room data with all of it's members
+ * @param {Chatroom} CR
+ * @param {number} SourceMemberNumber
+ * @param {number} TargetMemberNumber
+ * @param {"Left"|"Right"} Direction
+ */
 function ChatRoomSyncMovePlayer(CR, SourceMemberNumber, TargetMemberNumber, Direction) {
 	// Exits right away if the chat room was destroyed
 	if (CR == null) return;
@@ -1055,15 +1206,19 @@ function ChatRoomSyncMovePlayer(CR, SourceMemberNumber, TargetMemberNumber, Dire
 	// Builds the room data
 	let moveData = {};
 
-	moveData.TargetMemberNumber = TargetMemberNumber
-	moveData.Direction = Direction
+	moveData.TargetMemberNumber = TargetMemberNumber;
+	moveData.Direction = Direction;
 
 	// Sends the full packet to everyone in the room
 	if (!ChatRoomSyncToOldClients(CR, SourceMemberNumber))
 		IO.to("chatroom-" + CR.ID).emit("ChatRoomSyncMovePlayer", moveData);
 }
 
-// Syncs the room data with all of it's members
+/**
+ * Syncs the room data with all of it's members
+ * @param {Chatroom} CR
+ * @param {number} SourceMemberNumber
+ */
 function ChatRoomSyncReorderPlayers(CR, SourceMemberNumber) {
 	// Exits right away if the chat room was destroyed
 	if (CR == null) return;
@@ -1079,7 +1234,11 @@ function ChatRoomSyncReorderPlayers(CR, SourceMemberNumber) {
 		IO.to("chatroom-" + CR.ID).emit("ChatRoomSyncReorderPlayers", { PlayerOrder: newPlayerOrder });
 }
 
-// Syncs a single character data with all room members
+/**
+ * Syncs a single character data with all room members
+ * @param {Account} Acc
+ * @param {number} SourceMemberNumber
+ */
 function ChatRoomSyncSingle(Acc, SourceMemberNumber) {
 	const R = {
 		SourceMemberNumber,
@@ -1090,7 +1249,11 @@ function ChatRoomSyncSingle(Acc, SourceMemberNumber) {
 	}
 }
 
-// Updates a character from the chat room
+/**
+ * Updates a character from the chat room
+ * @param {any} data
+ * @param {socketio.Socket} socket
+ */
 function ChatRoomCharacterUpdate(data, socket) {
 	if ((data != null) && (typeof data === "object") && (data.ID != null) && (typeof data.ID === "string") && (data.ID != "") && (data.Appearance != null)) {
 		var Acc = AccountGet(socket.id);
@@ -1107,7 +1270,13 @@ function ChatRoomCharacterUpdate(data, socket) {
 	}
 }
 
-// Updates a character expression for a chat room, this does not update the database
+/**
+ * Updates a character expression for a chat room
+ *
+ * *This does not update the database*
+ * @param {any} data
+ * @param {socketio.Socket} socket
+ */
 function ChatRoomCharacterExpressionUpdate(data, socket) {
 	if ((data != null) && (typeof data === "object") && (typeof data.Group === "string") && (data.Group != "")) {
 		const Acc = AccountGet(socket.id);
@@ -1119,7 +1288,13 @@ function ChatRoomCharacterExpressionUpdate(data, socket) {
 	}
 }
 
-// Updates a character pose for a chat room, this does not update the database
+/**
+ * Updates a character pose for a chat room
+ *
+ * *This does not update the database*
+ * @param {{ Pose?: string | string[] }} data
+ * @param {socketio.Socket} socket
+ */
 function ChatRoomCharacterPoseUpdate(data, socket) {
 	if ((data != null) && (typeof data === "object")) {
 		if (typeof data.Pose !== "string" && !Array.isArray(data.Pose)) data.Pose = null;
@@ -1132,7 +1307,13 @@ function ChatRoomCharacterPoseUpdate(data, socket) {
 	}
 }
 
-// Updates a character arousal meter for a chat room, this does not update the database
+/**
+ * Updates a character arousal meter for a chat room
+ *
+ * *This does not update the database*
+ * @param {any} data
+ * @param {socketio.Socket} socket
+ */
 function ChatRoomCharacterArousalUpdate(data, socket) {
 	if ((data != null) && (typeof data === "object")) {
 		var Acc = AccountGet(socket.id);
@@ -1148,7 +1329,13 @@ function ChatRoomCharacterArousalUpdate(data, socket) {
 	}
 }
 
-// Updates a character arousal meter for a chat room, this does not update the database
+/**
+ * Updates a character arousal meter for a chat room
+ *
+ * *This does not update the database*
+ * @param {any} data
+ * @param {socketio.Socket} socket
+ */
 function ChatRoomCharacterItemUpdate(data, socket) {
 	if ((data != null) && (typeof data === "object") && (data.Target != null) && (typeof data.Target === "number") && (data.Group != null) && (typeof data.Group === "string")) {
 
@@ -1166,7 +1353,11 @@ function ChatRoomCharacterItemUpdate(data, socket) {
 	}
 }
 
-// When an administrator account wants to act on another account in the room
+/**
+ * When an administrator account wants to act on another account in the room
+ * @param {any} data
+ * @param {socketio.Socket} socket
+ */
 function ChatRoomAdmin(data, socket) {
 
 	if ((data != null) && (typeof data === "object") && (data.MemberNumber != null) && (typeof data.MemberNumber === "number") && (data.Action != null) && (typeof data.Action === "string")) {
@@ -1180,7 +1371,7 @@ function ChatRoomAdmin(data, socket) {
 
 			// An administrator can update lots of room data.  The room values are sent back to the clients.
 			if (data.Action == "Update")
-				if ((data.Room != null) && (typeof data.Room === "object") && (data.Room.Name != null) && (data.Room.Description != null) && (data.Room.Background != null) && (typeof data.Room.Name === "string") && (typeof data.Room.Description === "string") && (typeof data.Room.Background === "string") && (data.Room.Admin != null) && (Array.isArray(data.Room.Admin)) && (!data.Room.Admin.some(i => !Number.isInteger(i))) && (data.Room.Ban != null) && (Array.isArray(data.Room.Ban)) && (!data.Room.Ban.some(i => !Number.isInteger(i)))) {
+				if ((data.Room != null) && (typeof data.Room === "object") && (data.Room.Name != null) && (data.Room.Description != null) && (data.Room.Background != null) && (typeof data.Room.Name === "string") && (typeof data.Room.Description === "string") && (typeof data.Room.Background === "string") && (data.Room.Admin != null) && (Array.isArray(data.Room.Admin)) && (!data.Room.Admin.some((/** @type {unknown} */ i) => !Number.isInteger(i))) && (data.Room.Ban != null) && (Array.isArray(data.Room.Ban)) && (!data.Room.Ban.some((/** @type {unknown} */ i) => !Number.isInteger(i)))) {
 					data.Room.Name = data.Room.Name.trim();
 					var LN = /^[a-zA-Z0-9 ]+$/;
 					if (data.Room.Name.match(LN) && (data.Room.Name.length >= 1) && (data.Room.Name.length <= 20) && (data.Room.Description.length <= 100) && (data.Room.Background.length <= 100)) {
@@ -1203,11 +1394,11 @@ function ChatRoomAdmin(data, socket) {
 						socket.emit("ChatRoomUpdateResponse", "Updated");
 						if ((Acc != null) && (Acc.ChatRoom != null)) {
 							var Dictionary = [];
-							Dictionary.push({Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber})
-							Dictionary.push({Tag: "ChatRoomName", Text: Acc.ChatRoom.Name})
-							Dictionary.push({Tag: "ChatRoomLimit", Text: Acc.ChatRoom.Limit})
-							Dictionary.push({Tag: "ChatRoomPrivacy", TextToLookUp: (Acc.ChatRoom.Private ? "Private" : "Public")})
-							Dictionary.push({Tag: "ChatRoomLocked", TextToLookUp: (Acc.ChatRoom.Locked ? "Locked" : "Unlocked")})
+							Dictionary.push({Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber});
+							Dictionary.push({Tag: "ChatRoomName", Text: Acc.ChatRoom.Name});
+							Dictionary.push({Tag: "ChatRoomLimit", Text: Acc.ChatRoom.Limit});
+							Dictionary.push({Tag: "ChatRoomPrivacy", TextToLookUp: (Acc.ChatRoom.Private ? "Private" : "Public")});
+							Dictionary.push({Tag: "ChatRoomLocked", TextToLookUp: (Acc.ChatRoom.Locked ? "Locked" : "Unlocked")});
 							ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "ServerUpdateRoom", "Action", null, Dictionary);
 						}
 						if ((Acc != null) && (Acc.ChatRoom != null)) ChatRoomSyncRoomProperties(Acc.ChatRoom, Acc.MemberNumber);
@@ -1314,7 +1505,10 @@ function ChatRoomAdmin(data, socket) {
 	}
 }
 
-// Returns a specific reputation value for the player
+/**
+ * Returns a specific reputation value for the player
+ * @param {Account} Account
+ */
 function ChatRoomDominantValue(Account) {
 	if ((Account.Reputation != null) && (Array.isArray(Account.Reputation)))
 		for (var R = 0; R < Account.Reputation.length; R++)
@@ -1335,7 +1529,11 @@ function AccountShouldSendBlackList(Acc) {
 	return Acc.ItemPermission === 1 || Acc.ItemPermission === 2;
 }
 
-// Compares the source account and target account to check if we allow using an item
+/**
+ * Compares the source account and target account to check if we allow using an item
+ * @param {Account} Source
+ * @param {Account} Target
+ */
 function ChatRoomGetAllowItem(Source, Target) {
 
 	// Make sure we have the required data
@@ -1367,10 +1565,14 @@ function ChatRoomGetAllowItem(Source, Target) {
 
 }
 
-// Returns TRUE if we allow applying an item from a character to another
+/**
+ * Returns TRUE if we allow applying an item from a character to another
+ * @param {any} data
+ * @param {socketio.Socket} socket
+ */
 function ChatRoomAllowItem(data, socket) {
 	if ((data != null) && (typeof data === "object") && (data.MemberNumber != null) && (typeof data.MemberNumber === "number")) {
-		
+
 		// Gets the source account and target account to check if we allow or not
 		var Acc = AccountGet(socket.id);
 		if ((Acc != null) && (Acc.ChatRoom != null))
@@ -1381,7 +1583,13 @@ function ChatRoomAllowItem(data, socket) {
 	}
 }
 
-// Updates the reset password entry number or creates a new one, this number will have to be entered by the user later
+/**
+ * Updates the reset password entry number or creates a new one
+ *
+ * This number will have to be entered by the user later
+ * @param {string} AccountName
+ * @param {string} ResetNumber
+ */
 function PasswordResetSetNumber(AccountName, ResetNumber) {
 	for (var R = 0; R < PasswordResetProgress.length; R++)
 		if (PasswordResetProgress[R].AccountName.trim() == AccountName.trim()) {
@@ -1391,7 +1599,11 @@ function PasswordResetSetNumber(AccountName, ResetNumber) {
 	PasswordResetProgress.push({ AccountName: AccountName, ResetNumber: ResetNumber });
 }
 
-// Generates a password reset number and sends it to the user
+/**
+ * Generates a password reset number and sends it to the user
+ * @param {any} data
+ * @param {socketio.Socket} socket
+ */
 function PasswordReset(data, socket) {
 	if ((data != null) && (typeof data === "string") && (data != "") && data.match(/^[a-zA-Z0-9@.]+$/) && (data.length >= 5) && (data.length <= 100) && (data.indexOf("@") > 0) && (data.indexOf(".") > 0)) {
 
@@ -1401,7 +1613,7 @@ function PasswordReset(data, socket) {
 			// If we found accounts with that email
 			if (err) throw err;
 			if ((result != null) && (typeof result === "object") && (result.length > 0)) {
-								
+
 				// Builds a reset number for each account found and creates the email body
 				var EmailBody = "To reset your account password, enter your account name and the reset number included in this email.  You need to put these in the Bondage Club password reset screen, with your new password.<br /><br />";
 				for (var R = 0; R < result.length; R++) {
@@ -1438,17 +1650,21 @@ function PasswordReset(data, socket) {
 	}
 }
 
-// Generates a password reset number and sends it to the user
+/**
+ * Generates a password reset number and sends it to the user
+ * @param {any} data
+ * @param {socketio.Socket} socket
+ */
 function PasswordResetProcess(data, socket) {
 	if ((data != null) && (typeof data === "object") && (data.AccountName != null) && (typeof data.AccountName === "string") && (data.ResetNumber != null) && (typeof data.ResetNumber === "string") && (data.NewPassword != null) && (typeof data.NewPassword === "string")) {
-		
+
 		// Makes sure the data is valid
 		var LN = /^[a-zA-Z0-9 ]+$/;
 		if (data.AccountName.match(LN) && data.NewPassword.match(LN) && (data.AccountName.length > 0) && (data.AccountName.length <= 20) && (data.NewPassword.length > 0) && (data.NewPassword.length <= 20)) {
-			
+
 			// Checks if the reset number matches
 			for (var R = 0; R < PasswordResetProgress.length; R++)
-				if ((PasswordResetProgress[R].AccountName == data.AccountName) && (PasswordResetProgress[R].ResetNumber == data.ResetNumber)) {					
+				if ((PasswordResetProgress[R].AccountName == data.AccountName) && (PasswordResetProgress[R].ResetNumber == data.ResetNumber)) {
 
 					// Creates a hashed password and updates the account with it
 					BCrypt.hash(data.NewPassword.toUpperCase(), 10, function( err, hash ) {
@@ -1468,10 +1684,16 @@ function PasswordResetProcess(data, socket) {
 	} else socket.emit("PasswordResetResponse", "InvalidPasswordResetInfo");
 }
 
-// Gets the current ownership status between two players in the same chatroom, can also trigger the progress in the relationship
+/**
+ * Gets the current ownership status between two players in the same chatroom
+ *
+ * Can also trigger the progress in the relationship
+ * @param {any} data
+ * @param {socketio.Socket} socket
+ */
 function AccountOwnership(data, socket) {
 	if ((data != null) && (typeof data === "object") && (data.MemberNumber != null) && (typeof data.MemberNumber === "number")) {
-	
+
 		// The submissive can flush it's owner at any time in the trial, or after a delay if collared.  Players on Extreme mode cannot break the full ownership.
 		var Acc = AccountGet(socket.id);
 		if ((Acc != null) && (Acc.Ownership != null) && (Acc.Ownership.Stage != null) && (Acc.Ownership.Start != null) && ((Acc.Ownership.Stage == 0) || (Acc.Ownership.Start + OwnershipDelay <= CommonTime())) && (data.Action != null) && (typeof data.Action === "string") && (data.Action == "Break"))
@@ -1516,7 +1738,7 @@ function AccountOwnership(data, socket) {
 			if ((Acc.Ownership != null) && ((Acc.Ownership.MemberNumber == null) || (Acc.Ownership.MemberNumber == data.MemberNumber))) // No possible interaction if the player is owned by someone else
 				for (var A = 0; ((Acc.ChatRoom != null) && (A < Acc.ChatRoom.Account.length)); A++)
 					if ((Acc.ChatRoom.Account[A].MemberNumber == data.MemberNumber) && (Acc.ChatRoom.Account[A].BlackList.indexOf(Acc.MemberNumber) < 0)) { // Cannot accept if on blacklist
-				
+
 						// If the submissive wants to accept to start the trial period (Step 2 / 4)
 						if ((Acc.Ownership.StartTrialOfferedByMemberNumber != null) && (Acc.Ownership.StartTrialOfferedByMemberNumber == data.MemberNumber)) {
 							if ((data.Action != null) && (typeof data.Action === "string") && (data.Action == "Accept")) {
@@ -1550,11 +1772,23 @@ function AccountOwnership(data, socket) {
 	}
 }
 
-// Gets the current lovership status between two players in the same chatroom, can also trigger the progress in the relationship
+/**
+ * Gets the current lovership status between two players in the same chatroom
+ *
+ * Can also trigger the progress in the relationship
+ * @param {any} data
+ * @param {socketio.Socket} socket
+ */
 function AccountLovership(data, socket) {
 	if ((data != null) && (typeof data === "object") && (data.MemberNumber != null) && (typeof data.MemberNumber === "number")) {
 
-		// Update the lovership and delete all unnecessary information
+		/**
+		 * Update the lovership and delete all unnecessary information
+		 * @param {Lovership[]} Lovership
+		 * @param {number} MemberNumber
+		 * @param {socketio.Socket} [CurrentSocket]
+		 * @param {boolean} [Emit]
+		 */
 		function AccountUpdateLovership(Lovership, MemberNumber, CurrentSocket = socket, Emit = true) {
 			var newLovership = Lovership.slice();
 			for (var L = newLovership.length - 1; L >= 0; L--) {
@@ -1567,7 +1801,7 @@ function AccountLovership(data, socket) {
 			if (Emit) CurrentSocket.emit("AccountLovership", L);
 		}
 
-        // A Lover can break her relationship any time if not wed, or after a delay if official
+		// A Lover can break her relationship any time if not wed, or after a delay if official
 		var Acc = AccountGet(socket.id);
 		if ((Acc != null) && (data.Action != null) && (data.Action === "Break")) {
 
@@ -1608,7 +1842,7 @@ function AccountLovership(data, socket) {
 								}
 							}
 
-						AccountUpdateLovership(P, data.MemberNumber, null,false);
+						AccountUpdateLovership(P, data.MemberNumber, null, false);
 
 					}
 					// Updates the account that triggered the break up
@@ -1626,7 +1860,7 @@ function AccountLovership(data, socket) {
 			}
 		}
 
-        // In a chatroom, two players can enter in a lover relationship (6 steps to complete)
+		// In a chatroom, two players can enter in a lover relationship (6 steps to complete)
 		if ((Acc != null) && (Acc.ChatRoom != null)) {
 
 			var AccLoversNumbers = [];
@@ -1751,7 +1985,11 @@ function AccountLovership(data, socket) {
 	}
 }
 
-// Sets a new account difficulty (0 is easy/roleplay, 1 is normal/regular, 2 is hard/hardcore, 3 is very hard/extreme)
+/**
+ * Sets a new account difficulty (0 is easy/roleplay, 1 is normal/regular, 2 is hard/hardcore, 3 is very hard/extreme)
+ * @param {any} data
+ * @param {socketio.Socket} socket
+ */
 function AccountDifficulty(data, socket) {
 	if ((data != null) && (typeof data === "number") && (data >= 0) && (data <= 3)) {
 
