@@ -485,6 +485,31 @@ function AccountUpdate(data, socket) {
 				}
 				if ((data.Title != null)) Account[P].Title = data.Title;
 
+				// Some changes should be synched to other players in chatroom
+				const Acc = Account[P];
+				if (Acc.ChatRoom &&
+					[
+						"AssetFamily",
+						"Title",
+						"Appearance",
+						"Reputation",
+						"Description",
+						"LabelColor",
+						"ItemPermission",
+						"Inventory",
+						"BlockItems",
+						"LimitedItems",
+						"FavoriteItems",
+						"ArousalSettings",
+						"OnlineSharedSettings",
+						"WhiteList",
+						"BlackList",
+						"Game"
+					].some(k => data[k] != null)
+				) {
+					ChatRoomSyncCharacter(Acc.ChatRoom, Acc.MemberNumber, Acc.MemberNumber);
+				}
+
 				// If we have data to push
 				if (!ObjectEmpty(data)) Database.collection("Accounts").updateOne({ AccountName : Account[P].AccountName }, { $set: data }, function(err, res) { if (err) throw err; });
 				break;
