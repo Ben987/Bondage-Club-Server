@@ -491,7 +491,6 @@ function AccountUpdate(data, socket) {
 					[
 						"AssetFamily",
 						"Title",
-						"Appearance",
 						"Reputation",
 						"Description",
 						"LabelColor",
@@ -500,11 +499,9 @@ function AccountUpdate(data, socket) {
 						"BlockItems",
 						"LimitedItems",
 						"FavoriteItems",
-						"ArousalSettings",
 						"OnlineSharedSettings",
 						"WhiteList",
-						"BlackList",
-						"Game"
+						"BlackList"
 					].some(k => data[k] != null)
 				) {
 					ChatRoomSyncCharacter(Acc.ChatRoom, Acc.MemberNumber, Acc.MemberNumber);
