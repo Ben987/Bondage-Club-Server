@@ -534,7 +534,7 @@ function AccountQuery(data, socket) {
 					if ((Account[A].Environment == Acc.Environment)
 						&& ((Account[A].Ownership != null) && (Account[A].Ownership.MemberNumber != null) && (Account[A].Ownership.MemberNumber == Acc.MemberNumber)
 							|| (LoversNumbers.indexOf(Acc.MemberNumber) >= 0))) {
-						Friends.push({ Type: "Submissive", MemberNumber: Account[A].MemberNumber, MemberName: Account[A].Name, ChatRoomSpace: (Account[A].ChatRoom == null) ? null : Account[A].ChatRoom.Space, ChatRoomName: (Account[A].ChatRoom == null) ? null : ((Account[A].ChatRoom.Private ? "Private - " : "") + Account[A].ChatRoom.Name) });
+						Friends.push({ Type: "Submissive", MemberNumber: Account[A].MemberNumber, MemberName: Account[A].Name, ChatRoomSpace: (Account[A].ChatRoom == null) ? null : Account[A].ChatRoom.Space, ChatRoomName: (Account[A].ChatRoom == null) ? null : Account[A].ChatRoom.Name, Private: (Account[A].ChatRoom && Account[A].ChatRoom.Private) ? true : undefined });
 						Index.push(Account[A].MemberNumber);
 					}
 				}
@@ -546,7 +546,7 @@ function AccountQuery(data, socket) {
 							for (var A = 0; A < Account.length; A++)
 								if (Account[A].MemberNumber == Acc.FriendList[F]) {
 									if ((Account[A].Environment == Acc.Environment) && (Account[A].FriendList != null) && (Account[A].FriendList.indexOf(Acc.MemberNumber) >= 0))
-										Friends.push({ Type: "Friend", MemberNumber: Account[A].MemberNumber, MemberName: Account[A].Name, ChatRoomSpace: ((Account[A].ChatRoom != null) && !Account[A].ChatRoom.Private) ? Account[A].ChatRoom.Space : null, ChatRoomName: (Account[A].ChatRoom == null) ? null : (Account[A].ChatRoom.Private) ? "-Private-" : Account[A].ChatRoom.Name });
+										Friends.push({ Type: "Friend", MemberNumber: Account[A].MemberNumber, MemberName: Account[A].Name, ChatRoomSpace: ((Account[A].ChatRoom != null) && !Account[A].ChatRoom.Private) ? Account[A].ChatRoom.Space : null, ChatRoomName: (Account[A].ChatRoom == null) ? null : (Account[A].ChatRoom.Private) ? null : Account[A].ChatRoom.Name, Private: (Account[A].ChatRoom && Account[A].ChatRoom.Private) ? true : undefined });
 									A = Account.length;
 								}
 
@@ -584,6 +584,7 @@ function AccountBeep(data, socket) {
 							MemberName: Acc.Name,
 							ChatRoomSpace: (Acc.ChatRoom == null) ? null : Acc.ChatRoom.Space,
 							ChatRoomName: (Acc.ChatRoom == null) ? null : Acc.ChatRoom.Name,
+							Private: (Acc.ChatRoom == null) ? null : Acc.ChatRoom.Private,
 							BeepType: (data.BeepType) ? data.BeepType : null,
 							Message: data.Message
 						});
