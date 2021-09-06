@@ -606,8 +606,8 @@ function AccountBeep(data, socket) {
 						Account[A].Socket.emit("AccountBeep", {
 							MemberNumber: Acc.MemberNumber,
 							MemberName: Acc.Name,
-							ChatRoomSpace: (Acc.ChatRoom == null) ? null : Acc.ChatRoom.Space,
-							ChatRoomName: (Acc.ChatRoom == null) ? null : Acc.ChatRoom.Name,
+							ChatRoomSpace: (Acc.ChatRoom == null || data.IsSecret) ? null : Acc.ChatRoom.Space,
+							ChatRoomName: (Acc.ChatRoom == null || data.IsSecret) ? null : Acc.ChatRoom.Name,
 							BeepType: (data.BeepType) ? data.BeepType : null,
 							Message: data.Message
 						});
