@@ -553,11 +553,13 @@ function AccountQuery(data, socket) {
 					for (var L = 0; L < Account[A].Lovership.length; L++) {
 						if (Account[A].Lovership[L].MemberNumber != null) { LoversNumbers.push(Account[A].Lovership[L].MemberNumber); }
 					}
-					if ((Account[A].Environment == Acc.Environment)
-						&& ((Account[A].Ownership != null) && (Account[A].Ownership.MemberNumber != null) && (Account[A].Ownership.MemberNumber == Acc.MemberNumber)
-							|| (LoversNumbers.indexOf(Acc.MemberNumber) >= 0))) {
-						Friends.push({ Type: "Submissive", MemberNumber: Account[A].MemberNumber, MemberName: Account[A].Name, ChatRoomSpace: (Account[A].ChatRoom == null) ? null : Account[A].ChatRoom.Space, ChatRoomName: (Account[A].ChatRoom == null) ? null : Account[A].ChatRoom.Name });
-						Index.push(Account[A].MemberNumber);
+					if (Account[A].Environment == Acc.Environment) {
+						var IsOwned = (Account[A].Ownership != null) && (Account[A].Ownership.MemberNumber != null) && (Account[A].Ownership.MemberNumber == Acc.MemberNumber);
+						var IsLover = LoversNumbers.indexOf(Acc.MemberNumber) >= 0;
+						if (IsOwned || IsLover) {
+							Friends.push({ Type: IsOwned ? "Submissive" : "Lover", MemberNumber: Account[A].MemberNumber, MemberName: Account[A].Name, ChatRoomSpace: (Account[A].ChatRoom == null) ? null : Account[A].ChatRoom.Space, ChatRoomName: (Account[A].ChatRoom == null) ? null : Account[A].ChatRoom.Name });
+							Index.push(Account[A].MemberNumber);
+						}
 					}
 				}
 
