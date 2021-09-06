@@ -58,7 +58,7 @@ var MailTransporter = NodeMailer.createTransport({
 	auth: {
 		user: "donotreply@bondageprojects.com",
 		pass: process.env.EMAIL_PASSWORD || ""
-    }
+	}
 });
 
 // If the server received an unhandled error, we log it through console for future review, send an email and exit so the application can restart
@@ -137,10 +137,10 @@ DatabaseClient.connect(DatabaseURL, { useUnifiedTopology: true, useNewUrlParser:
 
 				socket.emit("ServerMessage", "Connected to the Bondage Club Server.");
 				socket.emit("ServerMessage", "Warning!  Console scripts can break your account or steal your data.");
-				socket.on("AccountCreate", function (data) { AccountCreate(data, socket) });
-				socket.on("AccountLogin", function (data) { AccountLogin(data, socket) });
-				socket.on("PasswordReset", function(data) { PasswordReset(data, socket) });
-				socket.on("PasswordResetProcess", function(data) { PasswordResetProcess(data, socket) });
+				socket.on("AccountCreate", function (data) { AccountCreate(data, socket); });
+				socket.on("AccountLogin", function (data) { AccountLogin(data, socket); });
+				socket.on("PasswordReset", function(data) { PasswordReset(data, socket); });
+				socket.on("PasswordResetProcess", function(data) { PasswordResetProcess(data, socket); });
 				AccountSendServerInfo(socket);
 			});
 
@@ -156,28 +156,28 @@ function OnLogin(socket) {
 	socket.removeAllListeners("AccountLogin");
 	socket.removeAllListeners("PasswordReset");
 	socket.removeAllListeners("PasswordResetProcess");
-	socket.on("AccountUpdate", function(data) { AccountUpdate(data, socket) });
-	socket.on("AccountUpdateEmail", function(data) { AccountUpdateEmail(data, socket) });
-	socket.on("AccountQuery", function(data) { AccountQuery(data, socket) });
-	socket.on("AccountBeep", function(data) { AccountBeep(data, socket) });
-	socket.on("AccountOwnership", function(data) { AccountOwnership(data, socket) });
-	socket.on("AccountLovership", function(data) { AccountLovership(data, socket) });
-	socket.on("AccountDifficulty", function(data) { AccountDifficulty(data, socket) });
-	socket.on("AccountDisconnect", function() { AccountRemove(socket.id) });
-	socket.on("disconnect", function() { AccountRemove(socket.id) });
-	socket.on("ChatRoomSearch", function(data) { ChatRoomSearch(data, socket) });
-	socket.on("ChatRoomCreate", function(data) { ChatRoomCreate(data, socket) });
-	socket.on("ChatRoomJoin", function(data) { ChatRoomJoin(data, socket) });
-	socket.on("ChatRoomLeave", function() { ChatRoomLeave(socket) });
-	socket.on("ChatRoomChat", function(data) { ChatRoomChat(data, socket) });
-	socket.on("ChatRoomCharacterUpdate", function(data) { ChatRoomCharacterUpdate(data, socket) });
-	socket.on("ChatRoomCharacterExpressionUpdate", function(data) { ChatRoomCharacterExpressionUpdate(data, socket) });
-	socket.on("ChatRoomCharacterPoseUpdate", function(data) { ChatRoomCharacterPoseUpdate(data, socket) });
-	socket.on("ChatRoomCharacterArousalUpdate", function(data) { ChatRoomCharacterArousalUpdate(data, socket) });
-	socket.on("ChatRoomCharacterItemUpdate", function(data) { ChatRoomCharacterItemUpdate(data, socket) });
-	socket.on("ChatRoomAdmin", function(data) { ChatRoomAdmin(data, socket) });
-	socket.on("ChatRoomAllowItem", function(data) { ChatRoomAllowItem(data, socket) });
-	socket.on("ChatRoomGame", function(data) { ChatRoomGame(data, socket) });
+	socket.on("AccountUpdate", function(data) { AccountUpdate(data, socket); });
+	socket.on("AccountUpdateEmail", function(data) { AccountUpdateEmail(data, socket); });
+	socket.on("AccountQuery", function(data) { AccountQuery(data, socket); });
+	socket.on("AccountBeep", function(data) { AccountBeep(data, socket); });
+	socket.on("AccountOwnership", function(data) { AccountOwnership(data, socket); });
+	socket.on("AccountLovership", function(data) { AccountLovership(data, socket); });
+	socket.on("AccountDifficulty", function(data) { AccountDifficulty(data, socket); });
+	socket.on("AccountDisconnect", function() { AccountRemove(socket.id); });
+	socket.on("disconnect", function() { AccountRemove(socket.id); });
+	socket.on("ChatRoomSearch", function(data) { ChatRoomSearch(data, socket); });
+	socket.on("ChatRoomCreate", function(data) { ChatRoomCreate(data, socket); });
+	socket.on("ChatRoomJoin", function(data) { ChatRoomJoin(data, socket); });
+	socket.on("ChatRoomLeave", function() { ChatRoomLeave(socket); });
+	socket.on("ChatRoomChat", function(data) { ChatRoomChat(data, socket); });
+	socket.on("ChatRoomCharacterUpdate", function(data) { ChatRoomCharacterUpdate(data, socket); });
+	socket.on("ChatRoomCharacterExpressionUpdate", function(data) { ChatRoomCharacterExpressionUpdate(data, socket); });
+	socket.on("ChatRoomCharacterPoseUpdate", function(data) { ChatRoomCharacterPoseUpdate(data, socket); });
+	socket.on("ChatRoomCharacterArousalUpdate", function(data) { ChatRoomCharacterArousalUpdate(data, socket); });
+	socket.on("ChatRoomCharacterItemUpdate", function(data) { ChatRoomCharacterItemUpdate(data, socket); });
+	socket.on("ChatRoomAdmin", function(data) { ChatRoomAdmin(data, socket); });
+	socket.on("ChatRoomAllowItem", function(data) { ChatRoomAllowItem(data, socket); });
+	socket.on("ChatRoomGame", function(data) { ChatRoomGame(data, socket); });
 }
 
 // Sends the server info to all players or one specific player (socket)
@@ -185,7 +185,7 @@ function AccountSendServerInfo(socket) {
 	var SI = {
 		Time: CommonTime(),
 		OnlinePlayers: Account.length
-	}
+	};
 	if (socket != null) socket.emit("ServerInfo", SI);
 	else IO.sockets.volatile.emit("ServerInfo", SI);
 }
@@ -418,10 +418,10 @@ async function AccountLoginProcess(socket, AccountName, Password) {
 
 // Returns TRUE if the object is empty
 function ObjectEmpty(obj) {
-    for(var key in obj)
-        if (obj.hasOwnProperty(key))
-            return false;
-    return true;
+	for(var key in obj)
+		if (obj.hasOwnProperty(key))
+			return false;
+	return true;
 }
 
 // Updates any account data except the basic ones that cannot change
@@ -754,7 +754,7 @@ function ChatRoomCreate(data, socket) {
 					Ban: [],
 					BlockCategory: data.BlockCategory,
 					Admin: [Acc.MemberNumber]
-				}
+				};
 				ChatRoom.push(NewRoom);
 				Acc.ChatRoom = NewRoom;
 				NewRoom.Account.push(Acc);
@@ -1001,11 +1001,11 @@ function ChatRoomSyncCharacter(CR, SourceMemberNumber, TargetMemberNumber) {
 
 	const Target = CR.Account.find(Acc => Acc.MemberNumber === TargetMemberNumber);
 	if (!Target) return;
-	const Source = CR.Account.find(Acc => Acc.MemberNumber === SourceMemberNumber)
+	const Source = CR.Account.find(Acc => Acc.MemberNumber === SourceMemberNumber);
 	if (!Source) return;
 
-	let characterData = { }
-	characterData.SourceMemberNumber = SourceMemberNumber
+	let characterData = { };
+	characterData.SourceMemberNumber = SourceMemberNumber;
 	characterData.Character = ChatRoomSyncGetCharSharedData(Target);
 
 	Source.Socket.to("chatroom-" + CR.ID).emit("ChatRoomSyncCharacter", characterData);
@@ -1040,7 +1040,7 @@ function ChatRoomSyncMemberLeave(CR, SourceMemberNumber) {
 	// Exits right away if the chat room was destroyed
 	if (CR == null) return;
 
-	let leaveData = { }
+	let leaveData = { };
 	leaveData.SourceMemberNumber = SourceMemberNumber;
 
 	IO.to("chatroom-" + CR.ID).emit("ChatRoomSyncMemberLeave", leaveData);
@@ -1192,11 +1192,11 @@ function ChatRoomAdmin(data, socket) {
 						socket.emit("ChatRoomUpdateResponse", "Updated");
 						if ((Acc != null) && (Acc.ChatRoom != null)) {
 							var Dictionary = [];
-							Dictionary.push({Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber})
-							Dictionary.push({Tag: "ChatRoomName", Text: Acc.ChatRoom.Name})
-							Dictionary.push({Tag: "ChatRoomLimit", Text: Acc.ChatRoom.Limit})
-							Dictionary.push({Tag: "ChatRoomPrivacy", TextToLookUp: (Acc.ChatRoom.Private ? "Private" : "Public")})
-							Dictionary.push({Tag: "ChatRoomLocked", TextToLookUp: (Acc.ChatRoom.Locked ? "Locked" : "Unlocked")})
+							Dictionary.push({Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber});
+							Dictionary.push({Tag: "ChatRoomName", Text: Acc.ChatRoom.Name});
+							Dictionary.push({Tag: "ChatRoomLimit", Text: Acc.ChatRoom.Limit});
+							Dictionary.push({Tag: "ChatRoomPrivacy", TextToLookUp: (Acc.ChatRoom.Private ? "Private" : "Public")});
+							Dictionary.push({Tag: "ChatRoomLocked", TextToLookUp: (Acc.ChatRoom.Locked ? "Locked" : "Unlocked")});
 							ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "ServerUpdateRoom", "Action", null, Dictionary);
 						}
 						if ((Acc != null) && (Acc.ChatRoom != null)) ChatRoomSyncRoomProperties(Acc.ChatRoom, Acc.MemberNumber);
@@ -1622,7 +1622,7 @@ function AccountLovership(data, socket) {
 			if (Emit) CurrentSocket.emit("AccountLovership", L);
 		}
 
-        // A Lover can break her relationship any time if not wed, or after a delay if official
+		// A Lover can break her relationship any time if not wed, or after a delay if official
 		var Acc = AccountGet(socket.id);
 		if ((Acc != null) && (data.Action != null) && (data.Action === "Break")) {
 
@@ -1681,7 +1681,7 @@ function AccountLovership(data, socket) {
 			}
 		}
 
-        // In a chatroom, two players can enter in a lover relationship (6 steps to complete)
+		// In a chatroom, two players can enter in a lover relationship (6 steps to complete)
 		if ((Acc != null) && (Acc.ChatRoom != null)) {
 
 			var AccLoversNumbers = [];
