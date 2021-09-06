@@ -32,7 +32,7 @@ var ChatRoomProduction = [
 	process.env.PRODUCTION6 || "",
 	process.env.PRODUCTION7 || "",
 	process.env.PRODUCTION8 || "",
-	process.env.PRODUCTION9 || "" 
+	process.env.PRODUCTION9 || ""
 ];
 var NextMemberNumber = 1;
 var OwnershipDelay = 604800000; // 7 days delay for ownership events
@@ -84,7 +84,7 @@ const IPConnectionCounts = new Map();
 
 // Connects to the Mongo Database
 DatabaseClient.connect(DatabaseURL, { useUnifiedTopology: true, useNewUrlParser: true }, function(err, db) {
-	
+
 	// Keeps the database object
 	if (err) throw err;
 	Database = db.db(DatabaseName);
@@ -93,14 +93,14 @@ DatabaseClient.connect(DatabaseURL, { useUnifiedTopology: true, useNewUrlParser:
 
 	// Gets the next unique member number
 	Database.collection("Accounts").find({ MemberNumber : { $exists: true, $ne: null }}).sort({MemberNumber: -1}).limit(1).toArray(function(err, result) {
-	
+
 		// Shows the next member number
 		if ((result.length > 0) && (result[0].MemberNumber != null)) NextMemberNumber = result[0].MemberNumber + 1;
 		console.log("Next Member Number: " + NextMemberNumber);
-		
+
 		// Listens for clients on port 4288 if local or a random port if online
 		App.listen(DatabasePort, function () {
-			
+
 			// Sets up the Client/Server events
 			console.log("Bondage Club server is listening on " + (DatabasePort).toString());
 			console.log("****************************************");
@@ -200,13 +200,13 @@ function AccountCreate(data, socket) {
 
 	// Makes sure the account comes with a name and a password
 	if ((data != null) && (typeof data === "object") && (data.Name != null) && (data.AccountName != null) && (data.Password != null) && (data.Email != null) && (typeof data.Name === "string") && (typeof data.AccountName === "string") && (typeof data.Password === "string") && (typeof data.Email === "string")) {
-	
+
 		// Makes sure the data is valid
 		var LN = /^[a-zA-Z0-9]+$/;
 		var LS = /^[a-zA-Z ]+$/;
 		var E = /^[a-zA-Z0-9@.!#$%&'*+/=?^_`{|}~-]+$/;
 		if (data.Name.match(LS) && data.AccountName.match(LN) && data.Password.match(LN) && (data.Email.match(E) || data.Email == "") && (data.Name.length > 0) && (data.Name.length <= 20) && (data.AccountName.length > 0) && (data.AccountName.length <= 20) && (data.Password.length > 0) && (data.Password.length <= 20) && (data.Email.length <= 100)) {
-	
+
 			// Checks if the account already exists
 			data.AccountName = data.AccountName.toUpperCase();
 			Database.collection("Accounts").findOne({ AccountName : data.AccountName }, function(err, result) {
@@ -214,9 +214,9 @@ function AccountCreate(data, socket) {
 				// Makes sure the result is null so the account doesn't already exists
 				if (err) throw err;
 				if (result != null) {
-					socket.emit("CreationResponse", "Account already exists");			
+					socket.emit("CreationResponse", "Account already exists");
 				} else {
-				
+
 					// Creates a hashed password and saves it with the account info
 					BCrypt.hash(data.Password.toUpperCase(), 10, function( err, hash ) {
 						if (err) throw err;
@@ -557,7 +557,7 @@ function AccountQuery(data, socket) {
 						var IsOwned = (Account[A].Ownership != null) && (Account[A].Ownership.MemberNumber != null) && (Account[A].Ownership.MemberNumber == Acc.MemberNumber);
 						var IsLover = LoversNumbers.indexOf(Acc.MemberNumber) >= 0;
 						if (IsOwned || IsLover) {
-							Friends.push({ Type: IsOwned ? "Submissive" : "Lover", MemberNumber: Account[A].MemberNumber, MemberName: Account[A].Name, ChatRoomSpace: (Account[A].ChatRoom == null) ? null : Account[A].ChatRoom.Space, ChatRoomName: (Account[A].ChatRoom == null) ? null : Account[A].ChatRoom.Name });
+							Friends.push({ Type: IsOwned ? "Submissive" : "Lover", MemberNumber: Account[A].MemberNumber, MemberName: Account[A].Name, ChatRoomSpace: (Account[A].ChatRoom == null) ? null : Account[A].ChatRoom.Space, ChatRoomName: (Account[A].ChatRoom == null) ? null : Account[A].ChatRoom.Name, Private: (Account[A].ChatRoom && Account[A].ChatRoom.Private) ? true : undefined });
 							Index.push(Account[A].MemberNumber);
 						}
 					}
@@ -570,7 +570,7 @@ function AccountQuery(data, socket) {
 							for (var A = 0; A < Account.length; A++)
 								if (Account[A].MemberNumber == Acc.FriendList[F]) {
 									if ((Account[A].Environment == Acc.Environment) && (Account[A].FriendList != null) && (Account[A].FriendList.indexOf(Acc.MemberNumber) >= 0))
-										Friends.push({ Type: "Friend", MemberNumber: Account[A].MemberNumber, MemberName: Account[A].Name, ChatRoomSpace: ((Account[A].ChatRoom != null) && !Account[A].ChatRoom.Private) ? Account[A].ChatRoom.Space : null, ChatRoomName: (Account[A].ChatRoom == null) ? null : (Account[A].ChatRoom.Private) ? "-Private-" : Account[A].ChatRoom.Name });
+										Friends.push({ Type: "Friend", MemberNumber: Account[A].MemberNumber, MemberName: Account[A].Name, ChatRoomSpace: ((Account[A].ChatRoom != null) && !Account[A].ChatRoom.Private) ? Account[A].ChatRoom.Space : null, ChatRoomName: (Account[A].ChatRoom == null) ? null : (Account[A].ChatRoom.Private) ? null : Account[A].ChatRoom.Name, Private: (Account[A].ChatRoom && Account[A].ChatRoom.Private) ? true : undefined });
 									A = Account.length;
 								}
 
@@ -608,6 +608,7 @@ function AccountBeep(data, socket) {
 							MemberName: Acc.Name,
 							ChatRoomSpace: (Acc.ChatRoom == null || data.IsSecret) ? null : Acc.ChatRoom.Space,
 							ChatRoomName: (Acc.ChatRoom == null || data.IsSecret) ? null : Acc.ChatRoom.Name,
+							Private: (Acc.ChatRoom == null || data.IsSecret) ? null : Acc.ChatRoom.Private,
 							BeepType: (data.BeepType) ? data.BeepType : null,
 							Message: data.Message
 						});
@@ -654,15 +655,15 @@ function ChatRoomSearch(data, socket) {
 			// Checks if the user requested full rooms
 			var FullRooms = false;
 			if ((data.FullRooms != null) && (typeof data.FullRooms === "boolean")) FullRooms = data.FullRooms;
-			
+
 			// Checks if the user opted to ignore certain rooms
 			var IgnoredRooms = [];
 			if ((data.Ignore != null) && (Array.isArray(data.Ignore))) IgnoredRooms = data.Ignore;
-			
+
 			// Validate array, only strings are valid.
-			var LN = /^[a-zA-Z0-9 ]+$/; 
+			var LN = /^[a-zA-Z0-9 ]+$/;
 			IgnoredRooms = IgnoredRooms.filter(R => typeof R === "string" && R.match(LN));
-			
+
 			// Builds a list of all public rooms, the last rooms created are shown first
 			var CR = [];
 			var C = 0;
@@ -707,7 +708,7 @@ function ChatRoomSearch(data, socket) {
 	}
 }
 
-// Creates a new chat room 
+// Creates a new chat room
 function ChatRoomCreate(data, socket) {
 
 	// Make sure we have everything to create it
@@ -717,7 +718,7 @@ function ChatRoomCreate(data, socket) {
 		data.Name = data.Name.trim();
 		var LN = /^[a-zA-Z0-9 ]+$/;
 		if (data.Name.match(LN) && (data.Name.length >= 1) && (data.Name.length <= 20) && (data.Description.length <= 100) && (data.Background.length <= 100)) {
-		
+
 			// Check if the same name already exists and quits if that's the case
 			for (var C = 0; C < ChatRoom.length; C++)
 				if (ChatRoom[C].Name.toUpperCase().trim() == data.Name.toUpperCase().trim()) {
@@ -769,12 +770,12 @@ function ChatRoomCreate(data, socket) {
 
 }
 
-// Join an existing chat room 
+// Join an existing chat room
 function ChatRoomJoin(data, socket) {
 
 	// Make sure we have everything to join it
 	if ((data != null) && (typeof data === "object") && (data.Name != null) && (typeof data.Name === "string") && (data.Name != "")) {
-		
+
 		// Finds the current account
 		var Acc = AccountGet(socket.id);
 		if (Acc != null) {
@@ -788,7 +789,7 @@ function ChatRoomJoin(data, socket) {
 					if (Acc.Environment == ChatRoom[C].Environment)
 						if (ChatRoom[C].Account.length < ChatRoom[C].Limit) {
 							if (ChatRoom[C].Ban.indexOf(Acc.MemberNumber) < 0) {
-								
+
 								// If the room is unlocked or the player is an admin, we allow her inside
 								if (!ChatRoom[C].Locked || (ChatRoom[C].Admin.indexOf(Acc.MemberNumber) >= 0)) {
 									Acc.ChatRoom = ChatRoom[C];
@@ -1358,7 +1359,7 @@ function ChatRoomGetAllowItem(Source, Target) {
 // Returns TRUE if we allow applying an item from a character to another
 function ChatRoomAllowItem(data, socket) {
 	if ((data != null) && (typeof data === "object") && (data.MemberNumber != null) && (typeof data.MemberNumber === "number")) {
-		
+
 		// Gets the source account and target account to check if we allow or not
 		var Acc = AccountGet(socket.id);
 		if ((Acc != null) && (Acc.ChatRoom != null))
@@ -1389,7 +1390,7 @@ function PasswordReset(data, socket) {
 			// If we found accounts with that email
 			if (err) throw err;
 			if ((result != null) && (typeof result === "object") && (result.length > 0)) {
-								
+
 				// Builds a reset number for each account found and creates the email body
 				var EmailBody = "To reset your account password, enter your account name and the reset number included in this email.  You need to put these in the Bondage Club password reset screen, with your new password.<br /><br />";
 				for (var R = 0; R < result.length; R++) {
@@ -1429,14 +1430,14 @@ function PasswordReset(data, socket) {
 // Generates a password reset number and sends it to the user
 function PasswordResetProcess(data, socket) {
 	if ((data != null) && (typeof data === "object") && (data.AccountName != null) && (typeof data.AccountName === "string") && (data.ResetNumber != null) && (typeof data.ResetNumber === "string") && (data.NewPassword != null) && (typeof data.NewPassword === "string")) {
-		
+
 		// Makes sure the data is valid
 		var LN = /^[a-zA-Z0-9 ]+$/;
 		if (data.AccountName.match(LN) && data.NewPassword.match(LN) && (data.AccountName.length > 0) && (data.AccountName.length <= 20) && (data.NewPassword.length > 0) && (data.NewPassword.length <= 20)) {
-			
+
 			// Checks if the reset number matches
 			for (var R = 0; R < PasswordResetProgress.length; R++)
-				if ((PasswordResetProgress[R].AccountName == data.AccountName) && (PasswordResetProgress[R].ResetNumber == data.ResetNumber)) {					
+				if ((PasswordResetProgress[R].AccountName == data.AccountName) && (PasswordResetProgress[R].ResetNumber == data.ResetNumber)) {
 
 					// Creates a hashed password and updates the account with it
 					BCrypt.hash(data.NewPassword.toUpperCase(), 10, function( err, hash ) {
