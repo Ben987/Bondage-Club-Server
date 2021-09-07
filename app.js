@@ -737,8 +737,6 @@ function ChatRoomCreate(data, socket) {
 			if ((data.Ban == null) || !Array.isArray(data.Ban) || data.Ban.some(i => !Number.isInteger(i))) data.Ban = [];
 			if ((data.Admin == null) || !Array.isArray(data.Admin) || data.Admin.some(i => !Number.isInteger(i))) data.Admin = [Acc.MemberNumber];
 
-			// Finds the account and links it to the new room
-			var Acc = AccountGet(socket.id);
 			if (Acc != null) {
 				ChatRoomRemove(Acc, "ServerLeave", []);
 				var NewRoom = {
