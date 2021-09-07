@@ -732,6 +732,7 @@ function ChatRoomCreate(data, socket) {
 			if ((data.Space != null) && (typeof data.Space === "string") && (data.Space.length <= 100)) Space = data.Space;
 			if ((data.Game != null) && (typeof data.Game === "string") && (data.Game.length <= 100)) Game = data.Game;
 			if ((data.BlockCategory == null) || !Array.isArray(data.BlockCategory)) data.BlockCategory = [];
+			if ((data.Ban == null) || !Array.isArray(data.Ban) || data.Ban.some(i => !Number.isInteger(i))) data.Ban = [];
 
 			// Finds the account and links it to the new room
 			var Acc = AccountGet(socket.id);
@@ -751,7 +752,7 @@ function ChatRoomCreate(data, socket) {
 					Creator: Acc.Name,
 					Creation: CommonTime(),
 					Account: [],
-					Ban: [],
+					Ban: data.Ban,
 					BlockCategory: data.BlockCategory,
 					Admin: [Acc.MemberNumber]
 				};
