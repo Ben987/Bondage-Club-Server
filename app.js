@@ -11,7 +11,8 @@ var IO = new socketio.Server(App, {
 		credentials: true
 	},
 	maxHttpBufferSize: 200000,
-	pingTimeout: 20000,
+	pingTimeout: 30000,
+	pingInterval: 50000,
 	upgradeTimeout: 30000,
 	serveClient: false,
 	httpCompression: true,
