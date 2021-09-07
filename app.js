@@ -718,6 +718,8 @@ function ChatRoomCreate(data, socket) {
 		data.Name = data.Name.trim();
 		var LN = /^[a-zA-Z0-9 ]+$/;
 		if (data.Name.match(LN) && (data.Name.length >= 1) && (data.Name.length <= 20) && (data.Description.length <= 100) && (data.Background.length <= 100)) {
+			// Finds the account and links it to the new room
+			var Acc = AccountGet(socket.id);
 
 			// Check if the same name already exists and quits if that's the case
 			for (var C = 0; C < ChatRoom.length; C++)
@@ -733,6 +735,7 @@ function ChatRoomCreate(data, socket) {
 			if ((data.Game != null) && (typeof data.Game === "string") && (data.Game.length <= 100)) Game = data.Game;
 			if ((data.BlockCategory == null) || !Array.isArray(data.BlockCategory)) data.BlockCategory = [];
 			if ((data.Ban == null) || !Array.isArray(data.Ban) || data.Ban.some(i => !Number.isInteger(i))) data.Ban = [];
+			if ((data.Admin == null) || !Array.isArray(data.Admin) || data.Admin.some(i => !Number.isInteger(i))) data.Admin = [Acc.MemberNumber];
 
 			// Finds the account and links it to the new room
 			var Acc = AccountGet(socket.id);
@@ -754,7 +757,7 @@ function ChatRoomCreate(data, socket) {
 					Account: [],
 					Ban: data.Ban,
 					BlockCategory: data.BlockCategory,
-					Admin: [Acc.MemberNumber]
+					Admin: data.Admin
 				};
 				ChatRoom.push(NewRoom);
 				Acc.ChatRoom = NewRoom;
