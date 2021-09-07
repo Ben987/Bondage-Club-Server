@@ -720,6 +720,10 @@ function ChatRoomCreate(data, socket) {
 		if (data.Name.match(LN) && (data.Name.length >= 1) && (data.Name.length <= 20) && (data.Description.length <= 100) && (data.Background.length <= 100)) {
 			// Finds the account and links it to the new room
 			var Acc = AccountGet(socket.id);
+			if (Acc == null) {
+				socket.emit("ChatRoomCreateResponse", "AccountError");
+				return;
+			}
 
 			// Check if the same name already exists and quits if that's the case
 			for (var C = 0; C < ChatRoom.length; C++)
@@ -734,37 +738,35 @@ function ChatRoomCreate(data, socket) {
 			if ((data.Space != null) && (typeof data.Space === "string") && (data.Space.length <= 100)) Space = data.Space;
 			if ((data.Game != null) && (typeof data.Game === "string") && (data.Game.length <= 100)) Game = data.Game;
 			if ((data.BlockCategory == null) || !Array.isArray(data.BlockCategory)) data.BlockCategory = [];
-			if ((data.Ban == null) || !Array.isArray(data.Ban) || data.Ban.some(i => !Number.isInteger(i))) data.Ban = [];
-			if ((data.Admin == null) || !Array.isArray(data.Admin) || data.Admin.some(i => !Number.isInteger(i))) data.Admin = [Acc.MemberNumber];
+			if (!Array.isArray(data.Ban) || data.Ban.some(i => !Number.isInteger(i))) data.Ban = [];
+			if (!Array.isArray(data.Admin) || data.Admin.some(i => !Number.isInteger(i))) data.Admin = [Acc.MemberNumber];
 
-			if (Acc != null) {
-				ChatRoomRemove(Acc, "ServerLeave", []);
-				var NewRoom = {
-					ID: base64id.generateId(),
-					Name: data.Name,
-					Description: data.Description,
-					Background: data.Background,
-					Limit: ((data.Limit == null) || (typeof data.Limit !== "string") || isNaN(parseInt(data.Limit)) || (parseInt(data.Limit) < 2) || (parseInt(data.Limit) > 10)) ? 10 : parseInt(data.Limit),
-					Private: data.Private || false,
-					Locked : data.Locked || false,
-					Environment: Acc.Environment,
-					Space: Space,
-					Game: Game,
-					Creator: Acc.Name,
-					Creation: CommonTime(),
-					Account: [],
-					Ban: data.Ban,
-					BlockCategory: data.BlockCategory,
-					Admin: data.Admin
-				};
-				ChatRoom.push(NewRoom);
-				Acc.ChatRoom = NewRoom;
-				NewRoom.Account.push(Acc);
-				console.log("Chat room (" + ChatRoom.length.toString() + ") " + data.Name + " created by account " + Acc.AccountName + ", ID: " + socket.id);
-				socket.join("chatroom-" + NewRoom.ID);
-				socket.emit("ChatRoomCreateResponse", "ChatRoomCreated");
-				ChatRoomSync(NewRoom, Acc.MemberNumber);
-			} else socket.emit("ChatRoomCreateResponse", "AccountError");
+			ChatRoomRemove(Acc, "ServerLeave", []);
+			var NewRoom = {
+				ID: base64id.generateId(),
+				Name: data.Name,
+				Description: data.Description,
+				Background: data.Background,
+				Limit: ((data.Limit == null) || (typeof data.Limit !== "string") || isNaN(parseInt(data.Limit)) || (parseInt(data.Limit) < 2) || (parseInt(data.Limit) > 10)) ? 10 : parseInt(data.Limit),
+				Private: data.Private || false,
+				Locked : data.Locked || false,
+				Environment: Acc.Environment,
+				Space: Space,
+				Game: Game,
+				Creator: Acc.Name,
+				Creation: CommonTime(),
+				Account: [],
+				Ban: data.Ban,
+				BlockCategory: data.BlockCategory,
+				Admin: data.Admin
+			};
+			ChatRoom.push(NewRoom);
+			Acc.ChatRoom = NewRoom;
+			NewRoom.Account.push(Acc);
+			console.log("Chat room (" + ChatRoom.length.toString() + ") " + data.Name + " created by account " + Acc.AccountName + ", ID: " + socket.id);
+			socket.join("chatroom-" + NewRoom.ID);
+			socket.emit("ChatRoomCreateResponse", "ChatRoomCreated");
+			ChatRoomSync(NewRoom, Acc.MemberNumber);
 
 		} else socket.emit("ChatRoomCreateResponse", "InvalidRoomData");
 
