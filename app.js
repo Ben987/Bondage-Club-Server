@@ -532,7 +532,7 @@ function AccountUpdate(data, socket) {
 
 				// Some changes should be synched to other players in chatroom
 				const Acc = Account[P];
-				if ((Acc != null) && Acc.ChatRoom && ["AssetFamily", "Title", "Reputation", "Description", "LabelColor", "ItemPermission", "Inventory", "BlockItems", "LimitedItems", "FavoriteItems", "OnlineSharedSettings", "WhiteList", "BlackList"].some(k => data[k] != null))
+				if ((Acc != null) && Acc.ChatRoom && /** @type {(keyof Account)[]} */ (["AssetFamily", "Title", "Reputation", "Description", "LabelColor", "ItemPermission", "Inventory", "BlockItems", "LimitedItems", "FavoriteItems", "OnlineSharedSettings", "WhiteList", "BlackList"]).some(k => data[k] != null))
 					ChatRoomSyncCharacter(Acc.ChatRoom, Acc.MemberNumber, Acc.MemberNumber);
 
 				// If we have data to push
@@ -794,8 +794,8 @@ function ChatRoomCreate(data, socket) {
 			if ((data.Space != null) && (typeof data.Space === "string") && (data.Space.length <= 100)) Space = data.Space;
 			if ((data.Game != null) && (typeof data.Game === "string") && (data.Game.length <= 100)) Game = data.Game;
 			if ((data.BlockCategory == null) || !Array.isArray(data.BlockCategory)) data.BlockCategory = [];
-			if (!Array.isArray(data.Ban) || data.Ban.some(i => !Number.isInteger(i))) data.Ban = [];
-			if (!Array.isArray(data.Admin) || data.Admin.some(i => !Number.isInteger(i))) data.Admin = [Acc.MemberNumber];
+			if (!Array.isArray(data.Ban) || data.Ban.some(( /** @type {unknown} */ i) => !Number.isInteger(i))) data.Ban = [];
+			if (!Array.isArray(data.Admin) || data.Admin.some(( /** @type {unknown} */ i) => !Number.isInteger(i))) data.Admin = [Acc.MemberNumber];
 
 			ChatRoomRemove(Acc, "ServerLeave", []);
 			/** @type {Chatroom} */
@@ -1261,7 +1261,7 @@ function ChatRoomCharacterExpressionUpdate(data, socket) {
  * Updates a character pose for a chat room
  *
  * *This does not update the database*
- * @param {{ Pose?: string | string[] }} data
+ * @param {{ Pose?: string | string[] | null }} data
  * @param {socketio.Socket} socket
  */
 function ChatRoomCharacterPoseUpdate(data, socket) {

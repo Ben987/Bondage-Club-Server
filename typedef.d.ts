@@ -55,6 +55,7 @@ interface Account {
 	Description?: any;
 	BlockItems?: any[];
 	LimitedItems?: any[];
+	FavoriteItems?: any[];
 	HiddenItems?: any;
 	Title?: any;
 	Inventory?: string;
