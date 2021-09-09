@@ -428,7 +428,7 @@ function ObjectEmpty(obj) {
 function AccountUpdate(data, socket) {
 	if ((data != null) && (typeof data === "object") && !Array.isArray(data))
 		for (const Acc of Account)
-			if (Acc != null && Acc.ID == socket.id) {
+			if (Acc.ID == socket.id) {
 
 				// Some data is never saved or updated from the client
 				delete data.Name;
@@ -586,7 +586,7 @@ function AccountBeep(data, socket) {
 		var Acc = AccountGet(socket.id);
 		if (Acc != null)
 			for (const OtherAcc of Account)
-				if (OtherAcc != null && OtherAcc.MemberNumber == data.MemberNumber)
+				if (OtherAcc.MemberNumber == data.MemberNumber)
 					if ((OtherAcc.Environment == Acc.Environment) && (((OtherAcc.FriendList != null) && (OtherAcc.FriendList.indexOf(Acc.MemberNumber) >= 0)) || ((OtherAcc.Ownership != null) && (OtherAcc.Ownership.MemberNumber != null) && (OtherAcc.Ownership.MemberNumber == Acc.MemberNumber)) || ((data.BeepType != null) && (typeof data.BeepType === "string") && (data.BeepType == "Leash")))) {
 						OtherAcc.Socket.emit("AccountBeep", {
 							MemberNumber: Acc.MemberNumber,
@@ -607,10 +607,12 @@ function AccountBeep(data, socket) {
 function AccountRemove(ID) {
 	if (ID != null)
 		for (const Acc of Account)
-			if (Acc != null && Acc.ID == ID) {
+			if (Acc.ID == ID) {
 				console.log("Disconnecting account: " + Acc.AccountName + " ID: " + ID);
 				ChatRoomRemove(Acc, "ServerDisconnect", []);
-				Account.splice(Account.indexOf(Acc), 1);
+				const index = Account.indexOf(Acc);
+				if (index >= 0)
+					Account.splice(index, 1);
 				break;
 			}
 }
@@ -618,7 +620,7 @@ function AccountRemove(ID) {
 // Returns the account object related to it's ID
 function AccountGet(ID) {
 	for (const Acc of Account)
-		if (Acc != null && Acc.ID == ID)
+		if (Acc.ID == ID)
 			return Acc;
 	return null;
 }
@@ -714,7 +716,7 @@ function ChatRoomCreate(data, socket) {
 
 			// Check if the same name already exists and quits if that's the case
 			for (const Room of ChatRoom)
-				if (Room != null && Room.Name.toUpperCase().trim() == data.Name.toUpperCase().trim()) {
+				if (Room.Name.toUpperCase().trim() == data.Name.toUpperCase().trim()) {
 					socket.emit("ChatRoomCreateResponse", "RoomAlreadyExist");
 					return;
 				}
@@ -773,7 +775,7 @@ function ChatRoomJoin(data, socket) {
 
 			// Finds the room and join it
 			for (const Room of ChatRoom)
-				if (Room != null && Room.Name.toUpperCase().trim() == data.Name.toUpperCase().trim())
+				if (Room.Name.toUpperCase().trim() == data.Name.toUpperCase().trim())
 					if (Acc.Environment == Room.Environment)
 						if (Room.Account.length < Room.Limit) {
 							if (Room.Ban.indexOf(Acc.MemberNumber) < 0) {
@@ -826,7 +828,7 @@ function ChatRoomRemove(Acc, Reason, Dictionary) {
 
 		// Removes it from the chat room array
 		for (const RoomAcc of Acc.ChatRoom.Account)
-			if (RoomAcc != null && RoomAcc.ID == Acc.ID) {
+			if (RoomAcc.ID == Acc.ID) {
 				Acc.ChatRoom.Account.splice(Acc.ChatRoom.Account.indexOf(RoomAcc), 1);
 				break;
 			}
@@ -834,7 +836,7 @@ function ChatRoomRemove(Acc, Reason, Dictionary) {
 		// Destroys the room if it's empty, warn other players if not
 		if (Acc.ChatRoom.Account.length == 0) {
 			for (const Room of ChatRoom)
-				if (Room != null && Acc.ChatRoom.Name == Room.Name) {
+				if (Acc.ChatRoom.Name == Room.Name) {
 					console.log("Chat room " + Acc.ChatRoom.Name + " was destroyed. Rooms left: " + (ChatRoom.length - 1).toString());
 					ChatRoom.splice(ChatRoom.indexOf(Room), 1);
 					break;
@@ -981,7 +983,7 @@ function ChatRoomSyncToMember(CR, SourceMemberNumber, TargetMemberNumber) {
 	// Sends the full packet to everyone in the room
 	for (const RoomAcc of CR.Account) // For each player in the chat room...
 	{
-		if(RoomAcc != null && RoomAcc.MemberNumber == TargetMemberNumber) // If the player is the one who gets synced...
+		if(RoomAcc.MemberNumber == TargetMemberNumber) // If the player is the one who gets synced...
 		{
 			// Send room data and break loop
 			RoomAcc.Socket.emit("ChatRoomSync", ChatRoomGetData(CR, SourceMemberNumber, true));
@@ -1082,7 +1084,7 @@ function ChatRoomCharacterUpdate(data, socket) {
 		if ((Acc != null) && (Acc.ChatRoom != null))
 			if (Acc.ChatRoom.Ban.indexOf(Acc.MemberNumber) < 0)
 				for (const RoomAcc of Acc.ChatRoom.Account)
-					if ((RoomAcc != null) && (RoomAcc.ID == data.ID) && ChatRoomGetAllowItem(Acc, RoomAcc))
+					if ((RoomAcc.ID == data.ID) && ChatRoomGetAllowItem(Acc, RoomAcc))
 						if ((typeof data.Appearance === "object") && Array.isArray(data.Appearance)) {
 							Database.collection("Accounts").updateOne({ AccountName: RoomAcc.AccountName }, { $set: { Appearance: data.Appearance } }, function(err, res) { if (err) throw err; });
 							RoomAcc.Appearance = data.Appearance;
@@ -1141,7 +1143,7 @@ function ChatRoomCharacterItemUpdate(data, socket) {
 		var Acc = AccountGet(socket.id);
 		if ((Acc == null) || (Acc.ChatRoom == null) || (Acc.ChatRoom.Ban.indexOf(Acc.MemberNumber) >= 0)) return;
 		for (const RoomAcc of Acc.ChatRoom.Account)
-			if (RoomAcc != null && RoomAcc.MemberNumber == data.Target && !ChatRoomGetAllowItem(Acc, RoomAcc))
+			if (RoomAcc.MemberNumber == data.Target && !ChatRoomGetAllowItem(Acc, RoomAcc))
 				return;
 
 		// Sends the item to use to everyone but the source
@@ -1360,7 +1362,7 @@ function ChatRoomAllowItem(data, socket) {
 		var Acc = AccountGet(socket.id);
 		if ((Acc != null) && (Acc.ChatRoom != null))
 			for (const RoomAcc of Acc.ChatRoom.Account)
-				if (RoomAcc != null && RoomAcc.MemberNumber == data.MemberNumber)
+				if (RoomAcc.MemberNumber == data.MemberNumber)
 					socket.emit("ChatRoomAllowItem", { MemberNumber: data.MemberNumber, AllowItem: ChatRoomGetAllowItem(Acc, RoomAcc) });
 
 	}
@@ -1627,8 +1629,8 @@ function AccountLovership(data, socket) {
 
 			var AccLoversNumbers = [];
 			for (const Lover of Acc.Lovership) {
-				if (Lover.MemberNumber != null) { AccLoversNumbers.push(Acc.Lovership[L].MemberNumber); }
-				else if (Lover.Name != null) { AccLoversNumbers.push(Acc.Lovership[L].Name); }
+				if (Lover.MemberNumber != null) { AccLoversNumbers.push(Lover.MemberNumber); }
+				else if (Lover.Name != null) { AccLoversNumbers.push(Lover.Name); }
 				else { AccLoversNumbers.push(-1); }
 			}
 			var AL = AccLoversNumbers.indexOf(data.MemberNumber);
