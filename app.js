@@ -783,11 +783,13 @@ function ChatRoomJoin(data, socket) {
 									if (Acc.ChatRoom == null || Acc.ChatRoom.ID !== Room.ID) {
 										ChatRoomRemove(Acc, "ServerLeave", []);
 										Acc.ChatRoom = Room;
-										Room.Account.push(Acc);
-										socket.join("chatroom-" + Room.ID);
-										socket.emit("ChatRoomSearchResponse", "JoinedRoom");
-										ChatRoomSyncMemberJoin(Room, Acc);
-										ChatRoomMessage(Room, Acc.MemberNumber, "ServerEnter", "Action", null, [{ Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber }]);
+										if (Account.find(A => Acc.MemberNumber === A.MemberNumber)) {
+											Room.Account.push(Acc);
+											socket.join("chatroom-" + Room.ID);
+											socket.emit("ChatRoomSearchResponse", "JoinedRoom");
+											ChatRoomSyncMemberJoin(Room, Acc);
+											ChatRoomMessage(Room, Acc.MemberNumber, "ServerEnter", "Action", null, [{ Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber }]);
+										}
 										return;
 									} else {
 										socket.emit("ChatRoomSearchResponse", "AlreadyInRoom");
