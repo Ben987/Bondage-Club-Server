@@ -835,10 +835,10 @@ function ChatRoomRemove(Acc, Reason, Dictionary) {
 
 		// Destroys the room if it's empty, warn other players if not
 		if (Acc.ChatRoom.Account.length == 0) {
-			for (const Room of ChatRoom)
-				if (Acc.ChatRoom.Name == Room.Name) {
+			for (var C = 0; C < ChatRoom.length; C++)
+				if (Acc.ChatRoom.Name == ChatRoom[C].Name) {
 					console.log("Chat room " + Acc.ChatRoom.Name + " was destroyed. Rooms left: " + (ChatRoom.length - 1).toString());
-					ChatRoom.splice(ChatRoom.indexOf(Room), 1);
+					ChatRoom.splice(C, 1);
 					break;
 				}
 		} else {
@@ -1172,7 +1172,7 @@ function ChatRoomAdmin(data, socket) {
 					var LN = /^[a-zA-Z0-9 ]+$/;
 					if (data.Room.Name.match(LN) && (data.Room.Name.length >= 1) && (data.Room.Name.length <= 20) && (data.Room.Description.length <= 100) && (data.Room.Background.length <= 100)) {
 						for (const Room of ChatRoom)
-							if (Acc.ChatRoom && Room && Acc.ChatRoom.Name != data.Room.Name && Room.Name.toUpperCase().trim() == data.Room.Name.toUpperCase().trim()) {
+							if (Acc.ChatRoom && Acc.ChatRoom.Name != data.Room.Name && Room.Name.toUpperCase().trim() == data.Room.Name.toUpperCase().trim()) {
 								socket.emit("ChatRoomUpdateResponse", "RoomAlreadyExist");
 								return;
 							}
@@ -1743,7 +1743,7 @@ function AccountLovership(data, socket) {
 			// A player can accept a proposal from another one
 			if (((Acc.Lovership.length <= 5)) && (AL >= 0)) // No possible interaction if the player has reached the number of possible lovership or if isn't already a lover
 				for (const AccRoom of Acc.ChatRoom.Account)
-					if (AccRoom != null && (AccRoom.MemberNumber == data.MemberNumber) && (AccRoom.BlackList.indexOf(Acc.MemberNumber) < 0)) { // Cannot accept if on blacklist
+					if ((AccRoom.MemberNumber == data.MemberNumber) && (AccRoom.BlackList.indexOf(Acc.MemberNumber) < 0)) { // Cannot accept if on blacklist
 
 						var TargetLoversNumbers = [];
 						for (const AccRoomLover of AccRoom.Lovership) {
