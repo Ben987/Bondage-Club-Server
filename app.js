@@ -780,11 +780,13 @@ function ChatRoomJoin(data, socket) {
 									if (Acc.ChatRoom == null || Acc.ChatRoom.ID !== ChatRoom[C].ID) {
 										ChatRoomRemove(Acc, "ServerLeave", []);
 										Acc.ChatRoom = ChatRoom[C];
-										ChatRoom[C].Account.push(Acc);
-										socket.join("chatroom-" + ChatRoom[C].ID);
-										socket.emit("ChatRoomSearchResponse", "JoinedRoom");
-										ChatRoomSyncMemberJoin(ChatRoom[C], Acc);
-										ChatRoomMessage(ChatRoom[C], Acc.MemberNumber, "ServerEnter", "Action", null, [{ Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber }]);
+										if (ChatRoom[C] != null) {
+											ChatRoom[C].Account.push(Acc);
+											socket.join("chatroom-" + ChatRoom[C].ID);
+											socket.emit("ChatRoomSearchResponse", "JoinedRoom");
+											ChatRoomSyncMemberJoin(ChatRoom[C], Acc);
+											ChatRoomMessage(ChatRoom[C], Acc.MemberNumber, "ServerEnter", "Action", null, [{ Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber }]);
+										}
 										return;
 									} else {
 										socket.emit("ChatRoomSearchResponse", "AlreadyInRoom");
