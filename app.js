@@ -7,7 +7,7 @@ var App = require("http").createServer();
 const socketio = require("socket.io");
 var IO = new socketio.Server(App, {
 	cors: {
-		origin: [/https?:\/\/(www\.)?bondageprojects(\.elementfx)?.com(:[0-9]+)?/, /http:\/\/127.0.0.1(:[0-9]+)?/, /http:\/\/localhost(:[0-9]+)?/ ],
+		origin: [/https?:\/\/(www\.)?bondageprojects(\.elementfx)?.com(:[0-9]+)?/, /http:\/\/127.0.0.1(:[0-9]+)?/, /http:\/\/localhost(:[0-9]+)?/, /https?:\/\/(www\.)?bondage-europe.com(:[0-9]+)?/ ],
 		credentials: true
 	},
 	maxHttpBufferSize: 200000,
