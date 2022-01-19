@@ -136,8 +136,6 @@ DatabaseClient.connect(DatabaseURL, { useUnifiedTopology: true, useNewUrlParser:
 					}
 				});
 
-				socket.emit("ServerMessage", "Connected to the Bondage Club Server.");
-				socket.emit("ServerMessage", "Warning!  Console scripts can break your account or steal your data.");
 				socket.on("AccountCreate", function (data) { AccountCreate(data, socket); });
 				socket.on("AccountLogin", function (data) { AccountLogin(data, socket); });
 				socket.on("PasswordReset", function(data) { PasswordReset(data, socket); });

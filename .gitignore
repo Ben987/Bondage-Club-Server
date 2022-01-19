@@ -2,3 +2,4 @@ node_modules
 log.txt
 restart.bat
 *.bat
+.idea
