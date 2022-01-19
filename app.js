@@ -3,7 +3,7 @@ require('newrelic');
 const base64id = require("base64id");
 
 // Main game objects
-var App = require("http").createServer();
+var App = require(process.env.PROTOCOL || "http").createServer();
 const socketio = require("socket.io");
 var IO = new socketio.Server(App, {
 	cors: {
