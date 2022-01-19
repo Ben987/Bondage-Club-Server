@@ -3,11 +3,11 @@ require('newrelic');
 const base64id = require("base64id");
 
 // Main game objects
-var App = require("http").createServer();
+var App = require(process.env.PROTOCOL || "http").createServer();
 const socketio = require("socket.io");
 var IO = new socketio.Server(App, {
 	cors: {
-		origin: [/https?:\/\/(www\.)?bondageprojects(\.elementfx)?.com(:[0-9]+)?/, /http:\/\/127.0.0.1(:[0-9]+)?/, /http:\/\/localhost(:[0-9]+)?/, /https?:\/\/(www\.)?bondage-europe.com(:[0-9]+)?/ ],
+		origin: (process.env.CORS_ORIGIN0 == null) ? ["*"] : [process.env.CORS_ORIGIN0, process.env.CORS_ORIGIN1, process.env.CORS_ORIGIN2, process.env.CORS_ORIGIN3, process.env.CORS_ORIGIN4, process.env.CORS_ORIGIN5],
 		credentials: true
 	},
 	maxHttpBufferSize: 200000,
@@ -20,6 +20,7 @@ var IO = new socketio.Server(App, {
 	allowEIO3: false
 });
 var BCrypt = require("bcrypt");
+var AccountCollection = process.env.ACCOUNT_COLLECTION || "Accounts";
 var Account = [];
 var ChatRoom = [];
 var ChatRoomMessageType = ["Chat", "Action", "Activity", "Emote", "Whisper", "Hidden"];
@@ -93,7 +94,7 @@ DatabaseClient.connect(DatabaseURL, { useUnifiedTopology: true, useNewUrlParser:
 	console.log("Database: " + DatabaseName + " connected");
 
 	// Gets the next unique member number
-	Database.collection("Accounts").find({ MemberNumber : { $exists: true, $ne: null }}).sort({MemberNumber: -1}).limit(1).toArray(function(err, result) {
+	Database.collection(AccountCollection).find({ MemberNumber : { $exists: true, $ne: null }}).sort({MemberNumber: -1}).limit(1).toArray(function(err, result) {
 
 		// Shows the next member number
 		if ((result.length > 0) && (result[0].MemberNumber != null)) NextMemberNumber = result[0].MemberNumber + 1;
@@ -210,7 +211,7 @@ function AccountCreate(data, socket) {
 
 			// Checks if the account already exists
 			data.AccountName = data.AccountName.toUpperCase();
-			Database.collection("Accounts").findOne({ AccountName : data.AccountName }, function(err, result) {
+			Database.collection(AccountCollection).findOne({ AccountName : data.AccountName }, function(err, result) {
 
 				// Makes sure the result is null so the account doesn't already exists
 				if (err) throw err;
@@ -228,7 +229,7 @@ function AccountCreate(data, socket) {
 						data.MemberNumber = NextMemberNumber;
 						data.Lovership = [];
 						NextMemberNumber++;
-						Database.collection("Accounts").insertOne(data, function(err, res) { if (err) throw err; });
+						Database.collection(AccountCollection).insertOne(data, function(err, res) { if (err) throw err; });
 						data.Environment = AccountGetEnvironment(socket);
 						console.log("Creating new account: " + data.AccountName + " ID: " + socket.id + " " + data.Environment);
 						data.ID = socket.id;
@@ -359,7 +360,7 @@ function AccountLoginRun() {
 async function AccountLoginProcess(socket, AccountName, Password) {
 	// Checks if there's an account that matches the name
 	/** @type {Account|null} */
-	const result = await Database.collection("Accounts").findOne({ AccountName });
+	const result = await Database.collection(AccountCollection).findOne({ AccountName });
 
 	if (!socket.connected) return;
 	if (result === null) {
@@ -392,7 +393,7 @@ async function AccountLoginProcess(socket, AccountName, Password) {
 		result.MemberNumber = NextMemberNumber;
 		NextMemberNumber++;
 		console.log("Assigning missing member number: " + result.MemberNumber + " for account: " + result.AccountName);
-		Database.collection("Accounts").updateOne({ AccountName : result.AccountName }, { $set: { MemberNumber: result.MemberNumber } }, function(err, res) { if (err) throw err; });
+		Database.collection(AccountCollection).updateOne({ AccountName : result.AccountName }, { $set: { MemberNumber: result.MemberNumber } }, function(err, res) { if (err) throw err; });
 	}
 
 	// Updates lovership to an array if needed for conversion
@@ -400,7 +401,7 @@ async function AccountLoginProcess(socket, AccountName, Password) {
 
 	// Sets the last login date
 	result.LastLogin = CommonTime();
-	Database.collection("Accounts").updateOne({ AccountName : result.AccountName }, { $set: { LastLogin: result.LastLogin } }, function(err, res) { if (err) throw err; });
+	Database.collection(AccountCollection).updateOne({ AccountName : result.AccountName }, { $set: { LastLogin: result.LastLogin } }, function(err, res) { if (err) throw err; });
 
 	// Logs the account
 	result.ID = socket.id;
@@ -492,7 +493,7 @@ function AccountUpdate(data, socket) {
 					ChatRoomSyncCharacter(Acc.ChatRoom, Acc.MemberNumber, Acc.MemberNumber);
 
 				// If we have data to push
-				if ((Acc != null) && !ObjectEmpty(data)) Database.collection("Accounts").updateOne({ AccountName : Acc.AccountName }, { $set: data }, function(err, res) { if (err) throw err; });
+				if ((Acc != null) && !ObjectEmpty(data)) Database.collection(AccountCollection).updateOne({ AccountName : Acc.AccountName }, { $set: data }, function(err, res) { if (err) throw err; });
 				break;
 
 			}
@@ -504,11 +505,11 @@ function AccountUpdateEmail(data, socket) {
 		var Acc = AccountGet(socket.id);
 		var E = /^[a-zA-Z0-9@.!#$%&'*+/=?^_`{|}~-]+$/;
 		if ((Acc != null) && (data.EmailNew.match(E) || (data.EmailNew == "")) && (data.EmailNew.length <= 100) && (data.EmailNew.match(E) || (data.EmailNew == "")) && (data.EmailNew.length <= 100))
-			Database.collection("Accounts").find({ AccountName : Acc.AccountName }).sort({MemberNumber: -1}).limit(1).toArray(function(err, result) {
+			Database.collection(AccountCollection).find({ AccountName : Acc.AccountName }).sort({MemberNumber: -1}).limit(1).toArray(function(err, result) {
 				if (err) throw err;
 				if ((result != null) && (typeof result === "object") && (result.length > 0) && data.EmailOld == result[0].Email) {
 					socket.emit("AccountQueryResult", { Query: "EmailUpdate", Result: true });
-					Database.collection("Accounts").updateOne({ AccountName : Acc.AccountName }, { $set: { Email: data.EmailNew }}, function(err, res) { if (err) throw err; });
+					Database.collection(AccountCollection).updateOne({ AccountName : Acc.AccountName }, { $set: { Email: data.EmailNew }}, function(err, res) { if (err) throw err; });
 					console.log("Account " + Acc.AccountName + " updated email from " + data.EmailOld + " to " + data.EmailNew);
 					return;
 				}
@@ -565,7 +566,7 @@ function AccountQuery(data, socket) {
 
 			// EmailStatus query - returns true if an email is linked to the account
 			if (data.Query == "EmailStatus") {
-				Database.collection("Accounts").find({ AccountName : Acc.AccountName }).toArray(function(err, result) {
+				Database.collection(AccountCollection).find({ AccountName : Acc.AccountName }).toArray(function(err, result) {
 					if (err) throw err;
 					if ((result != null) && (typeof result === "object") && (result.length > 0)) {
 						socket.emit("AccountQueryResult", { Query: data.Query, Result: ((result[0].Email != null) && (result[0].Email != "")) });
@@ -1081,7 +1082,7 @@ function ChatRoomCharacterUpdate(data, socket) {
 				for (var A = 0; ((Acc.ChatRoom != null) && (A < Acc.ChatRoom.Account.length)); A++)
 					if ((Acc.ChatRoom.Account[A].ID == data.ID) && ChatRoomGetAllowItem(Acc, Acc.ChatRoom.Account[A]))
 						if ((typeof data.Appearance === "object") && Array.isArray(data.Appearance) && (data.Appearance.length >= 5) && (JSON.stringify(data.Appearance).length < 180000)) {
-							Database.collection("Accounts").updateOne({ AccountName : Acc.ChatRoom.Account[A].AccountName }, { $set: { Appearance: data.Appearance } }, function(err, res) { if (err) throw err; });
+							Database.collection(AccountCollection).updateOne({ AccountName : Acc.ChatRoom.Account[A].AccountName }, { $set: { Appearance: data.Appearance } }, function(err, res) { if (err) throw err; });
 							Acc.ChatRoom.Account[A].Appearance = data.Appearance;
 							Acc.ChatRoom.Account[A].ActivePose = data.ActivePose;
 							ChatRoomSyncSingle(Acc.ChatRoom.Account[A], Acc.MemberNumber);
@@ -1378,7 +1379,7 @@ function PasswordReset(data, socket) {
 	if ((data != null) && (typeof data === "string") && (data != "") && data.match(/^[a-zA-Z0-9@.]+$/) && (data.length >= 5) && (data.length <= 100) && (data.indexOf("@") > 0) && (data.indexOf(".") > 0)) {
 
 		// Gets all accounts that matches the email
-		Database.collection("Accounts").find({ Email : data }).toArray(function(err, result) {
+		Database.collection(AccountCollection).find({ Email : data }).toArray(function(err, result) {
 
 			// If we found accounts with that email
 			if (err) throw err;
@@ -1436,7 +1437,7 @@ function PasswordResetProcess(data, socket) {
 					BCrypt.hash(data.NewPassword.toUpperCase(), 10, function( err, hash ) {
 						if (err) throw err;
 						console.log("Updating password for account: " + data.AccountName);
-						Database.collection("Accounts").updateOne({ AccountName : data.AccountName }, { $set: { Password: hash } }, function(err, res) { if (err) throw err; });
+						Database.collection(AccountCollection).updateOne({ AccountName : data.AccountName }, { $set: { Password: hash } }, function(err, res) { if (err) throw err; });
 						socket.emit("PasswordResetResponse", "PasswordResetSuccessful");
 					});
 					return;
@@ -1485,7 +1486,7 @@ function AccountOwnership(data, socket) {
 				Acc.Owner = "";
 				Acc.Ownership = null;
 				let O = { Ownership: Acc.Ownership, Owner: Acc.Owner };
-				Database.collection("Accounts").updateOne({ AccountName : Acc.AccountName }, { $set: O }, function(err, res) { if (err) throw err; });
+				Database.collection(AccountCollection).updateOne({ AccountName : Acc.AccountName }, { $set: O }, function(err, res) { if (err) throw err; });
 				socket.emit("AccountOwnership", { ClearOwnership: true });
 				return;
 			}
@@ -1508,7 +1509,7 @@ function AccountOwnership(data, socket) {
 			TargetAcc.Owner = "";
 			TargetAcc.Ownership = null;
 			let O = { Ownership: TargetAcc.Ownership, Owner: TargetAcc.Owner };
-			Database.collection("Accounts").updateOne({ AccountName : TargetAcc.AccountName }, { $set: O }, function(err, res) { if (err) throw err; });
+			Database.collection(AccountCollection).updateOne({ AccountName : TargetAcc.AccountName }, { $set: O }, function(err, res) { if (err) throw err; });
 			TargetAcc.Socket.emit("AccountOwnership", { ClearOwnership: true });
 			ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, isTrial ? "EndOwnershipTrial" : "EndOwnership", "ServerMessage", null, [
 				{ Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber },
@@ -1569,7 +1570,7 @@ function AccountOwnership(data, socket) {
 						Acc.Owner = "";
 						Acc.Ownership = { MemberNumber: data.MemberNumber, Name: TargetAcc.Name, Start: CommonTime(), Stage: 0 };
 						let O = { Ownership: Acc.Ownership, Owner: Acc.Owner };
-						Database.collection("Accounts").updateOne({ AccountName : Acc.AccountName }, { $set: O }, function(err, res) { if (err) throw err; });
+						Database.collection(AccountCollection).updateOne({ AccountName : Acc.AccountName }, { $set: O }, function(err, res) { if (err) throw err; });
 						socket.emit("AccountOwnership", O);
 						ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "StartTrial", "ServerMessage", null, [{ Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber }]);
 						ChatRoomSyncCharacter(Acc.ChatRoom, Acc.MemberNumber, Acc.MemberNumber);
@@ -1586,7 +1587,7 @@ function AccountOwnership(data, socket) {
 						Acc.Owner = TargetAcc.Name;
 						Acc.Ownership = { MemberNumber: data.MemberNumber, Name: TargetAcc.Name, Start: CommonTime(), Stage: 1 };
 						let O = { Ownership: Acc.Ownership, Owner: Acc.Owner };
-						Database.collection("Accounts").updateOne({ AccountName : Acc.AccountName }, { $set: O }, function(err, res) { if (err) throw err; });
+						Database.collection(AccountCollection).updateOne({ AccountName : Acc.AccountName }, { $set: O }, function(err, res) { if (err) throw err; });
 						socket.emit("AccountOwnership", O);
 						ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "EndTrial", "ServerMessage", null, [{ Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber }]);
 						ChatRoomSyncCharacter(Acc.ChatRoom, Acc.MemberNumber, Acc.MemberNumber);
@@ -1611,7 +1612,7 @@ function AccountLovership(data, socket) {
 				if (newLovership[L].BeginDatingOfferedByMemberNumber) newLovership.splice(L, 1);
 			}
 			var L = { Lovership: newLovership };
-			Database.collection("Accounts").updateOne({ MemberNumber : MemberNumber}, { $set: L }, function(err, res) { if (err) throw err; });
+			Database.collection(AccountCollection).updateOne({ MemberNumber : MemberNumber}, { $set: L }, function(err, res) { if (err) throw err; });
 			if (Emit) CurrentSocket.emit("AccountLovership", L);
 		}
 
@@ -1633,7 +1634,7 @@ function AccountLovership(data, socket) {
 
 				// Update the other account if she's online, then update the database
 				var P = [];
-				Database.collection("Accounts").find({ MemberNumber : data.MemberNumber }).sort({MemberNumber: -1}).limit(1).toArray(function(err, result) {
+				Database.collection(AccountCollection).find({ MemberNumber : data.MemberNumber }).sort({MemberNumber: -1}).limit(1).toArray(function(err, result) {
 					if (err) throw err;
 					if ((result != null) && (typeof result === "object") && (result.length > 0)) {
 						P = result[0].Lovership;
@@ -1815,7 +1816,7 @@ function AccountDifficulty(data, socket) {
 				var NewDifficulty = { Difficulty: { Level: data, LastChange: CommonTime() } };
 				Acc.Difficulty = NewDifficulty.Difficulty;
 				console.log("Updating account " + Acc.AccountName + " difficulty to " + NewDifficulty.Difficulty.Level);
-				Database.collection("Accounts").updateOne({ AccountName : Acc.AccountName }, { $set: NewDifficulty }, function(err, res) { if (err) throw err; });
+				Database.collection(AccountCollection).updateOne({ AccountName : Acc.AccountName }, { $set: NewDifficulty }, function(err, res) { if (err) throw err; });
 
 			}
 
