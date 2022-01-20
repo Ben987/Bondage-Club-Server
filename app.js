@@ -15,18 +15,20 @@ if ((ServerCert == null) && (process.env.SERVER_CERT2 != null) && (process.env.S
 console.log("Using Server Key: " + ServerKey);
 console.log("Using Server Certificate: " + ServerCert);
 
-// Main game objects
+// Enforce https with a certificate
 var App;
 var UseSecure;
 if ((ServerKey == null) || (ServerCert == null)) {
-	console.log("No certificate found, starting http server with origin " + process.env.CORS_ORIGIN);
+	console.log("No key or certificate found, starting http server with origin " + process.env.CORS_ORIGIN0);
 	UseSecure = false;
 	App = require("http").createServer();
 } else {
-	console.log("Starting https server for certificate with origin " + process.env.CORS_ORIGIN);
+	console.log("Starting https server for certificate with origin " + process.env.CORS_ORIGIN0);
 	UseSecure = true;
 	App = require("https").createServer({ key: ServerKey, cert: ServerCert, requestCert: false, rejectUnauthorized: false });
 }
+
+// Starts socket.io to accept incoming connections on specified origins
 const socketio = require("socket.io");
 var IO = new socketio.Server(App, {
 	cors: {
@@ -42,11 +44,13 @@ var IO = new socketio.Server(App, {
 	allowEIO3: false,
 	secure: UseSecure
 });
+
+// Main game objects
 var BCrypt = require("bcrypt");
 var AccountCollection = process.env.ACCOUNT_COLLECTION || "Accounts";
 var Account = [];
 var ChatRoom = [];
-var ChatRoomMessageType = ["Chat", "Action", "Activity", "Emote", "Whisper", "Hidden"];
+var ChatRoomMessageType = ["Chat", "Action", "Activity", "Emote", "Whisper", "Hidden", "Status"];
 var ChatRoomProduction = [
 	process.env.PRODUCTION0 || "",
 	process.env.PRODUCTION1 || "",
