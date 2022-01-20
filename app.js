@@ -17,18 +17,20 @@ console.log("Using Server Certificate: " + ServerCert);
 
 // Main game objects
 var App;
+var UseSecure;
 if ((ServerKey == null) || (ServerCert == null)) {
 	console.log("No certificate found, starting http server");
+	UseSecure = false;
 	App = require("http").createServer();
 } else {
 	console.log("Starting https server for certificate");
-	App = require("https").createServer({ key: ServerKey, cert: ServerCert });
+	UseSecure = true;
+	App = require("https").createServer({ key: ServerKey, cert: ServerCert, requestCert: false, rejectUnauthorized: false });
 }
 const socketio = require("socket.io");
 var IO = new socketio.Server(App, {
 	cors: {
-		origin: ((process.env.CORS_ORIGIN0 == null) || (process.env.CORS_ORIGIN0 == "")) ? ["*"] : [process.env.CORS_ORIGIN0, process.env.CORS_ORIGIN1, process.env.CORS_ORIGIN2, process.env.CORS_ORIGIN3, process.env.CORS_ORIGIN4, process.env.CORS_ORIGIN5],
-		credentials: true
+		origin: ((process.env.CORS_ORIGIN0 == null) || (process.env.CORS_ORIGIN0 == "")) ? ["*"] : [process.env.CORS_ORIGIN0, process.env.CORS_ORIGIN1, process.env.CORS_ORIGIN2, process.env.CORS_ORIGIN3, process.env.CORS_ORIGIN4, process.env.CORS_ORIGIN5]
 	},
 	handlePreflightRequest: (req, res) => {
 		res.writeHead(200, {
@@ -46,7 +48,8 @@ var IO = new socketio.Server(App, {
 	serveClient: false,
 	httpCompression: true,
 	perMessageDeflate: true,
-	allowEIO3: false
+	allowEIO3: false,
+	secure: UseSecure
 });
 var BCrypt = require("bcrypt");
 var AccountCollection = process.env.ACCOUNT_COLLECTION || "Accounts";
