@@ -19,18 +19,18 @@ console.log("Using Server Certificate: " + ServerCert);
 var App;
 var UseSecure;
 if ((ServerKey == null) || (ServerCert == null)) {
-	console.log("No certificate found, starting http server");
+	console.log("No certificate found, starting http server with origin " + process.env.CORS_ORIGIN);
 	UseSecure = false;
 	App = require("http").createServer();
 } else {
-	console.log("Starting https server for certificate");
+	console.log("Starting https server for certificate with origin " + process.env.CORS_ORIGIN);
 	UseSecure = true;
 	App = require("https").createServer({ key: ServerKey, cert: ServerCert, requestCert: false, rejectUnauthorized: false });
 }
 const socketio = require("socket.io");
 var IO = new socketio.Server(App, {
 	cors: {
-		origin: ((process.env.CORS_ORIGIN0 == null) || (process.env.CORS_ORIGIN0 == "")) ? ["*"] : [process.env.CORS_ORIGIN0, process.env.CORS_ORIGIN1, process.env.CORS_ORIGIN2, process.env.CORS_ORIGIN3, process.env.CORS_ORIGIN4, process.env.CORS_ORIGIN5]
+		origin: ((process.env.CORS_ORIGIN == null) || (process.env.CORS_ORIGIN == "")) ? "*" : process.env.CORS_ORIGIN
 	},
 	handlePreflightRequest: (req, res) => {
 		res.writeHead(200, {
