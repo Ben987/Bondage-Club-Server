@@ -5,13 +5,13 @@ const base64id = require("base64id");
 // Reads the SSL key and certificate, if there's no file available, we switch to regular http
 const fs = require("fs");
 var ServerKey = null;
-if ((process.env.SERVER_KEY0 != null) && (process.env.SERVER_KEY0 != "")) { try { ServerKey = fs.readFileSync(process.env.SERVER_KEY0); }}
-if ((ServerKey == null) && (process.env.SERVER_KEY1 != null) && (process.env.SERVER_KEY1 != "")) { try { ServerKey = fs.readFileSync(process.env.SERVER_KEY1); }}
-if ((ServerKey == null) && (process.env.SERVER_KEY2 != null) && (process.env.SERVER_KEY2 != "")) { try { ServerKey = fs.readFileSync(process.env.SERVER_KEY1); }}
+if ((process.env.SERVER_KEY0 != null) && (process.env.SERVER_KEY0 != "")) { try { ServerKey = fs.readFileSync(process.env.SERVER_KEY0); } catch(err) {} }
+if ((ServerKey == null) && (process.env.SERVER_KEY1 != null) && (process.env.SERVER_KEY1 != "")) { try { ServerKey = fs.readFileSync(process.env.SERVER_KEY1); } catch(err) {} }
+if ((ServerKey == null) && (process.env.SERVER_KEY2 != null) && (process.env.SERVER_KEY2 != "")) { try { ServerKey = fs.readFileSync(process.env.SERVER_KEY1); } catch(err) {} }
 var ServerCert = null;
-if ((process.env.SERVER_CERT0 != null) && (process.env.SERVER_CERT0 != "")) { try { ServerCert = fs.readFileSync(process.env.SERVER_CERT0); }}
-if ((ServerCert == null) && (process.env.SERVER_CERT1 != null) && (process.env.SERVER_CERT1 != "")) { try { ServerCert = fs.readFileSync(process.env.SERVER_CERT1); }}
-if ((ServerCert == null) && (process.env.SERVER_CERT2 != null) && (process.env.SERVER_CERT2 != "")) { try { ServerCert = fs.readFileSync(process.env.SERVER_CERT2); }}
+if ((process.env.SERVER_CERT0 != null) && (process.env.SERVER_CERT0 != "")) { try { ServerCert = fs.readFileSync(process.env.SERVER_CERT0); } catch(err) {} }
+if ((ServerCert == null) && (process.env.SERVER_CERT1 != null) && (process.env.SERVER_CERT1 != "")) { try { ServerCert = fs.readFileSync(process.env.SERVER_CERT1); } catch(err) {} }
+if ((ServerCert == null) && (process.env.SERVER_CERT2 != null) && (process.env.SERVER_CERT2 != "")) { try { ServerCert = fs.readFileSync(process.env.SERVER_CERT2); } catch(err) {} }
 console.log("Using Server Key: " + ServerKey);
 console.log("Using Server Certificate: " + ServerCert);
 
