@@ -7,7 +7,7 @@ var App = require(process.env.PROTOCOL || "http").createServer();
 const socketio = require("socket.io");
 var IO = new socketio.Server(App, {
 	cors: {
-		origin: (process.env.CORS_ORIGIN0 == null) ? ["*"] : [process.env.CORS_ORIGIN0, process.env.CORS_ORIGIN1, process.env.CORS_ORIGIN2, process.env.CORS_ORIGIN3, process.env.CORS_ORIGIN4, process.env.CORS_ORIGIN5],
+		origin: [process.env.CORS_ORIGIN0, process.env.CORS_ORIGIN1, process.env.CORS_ORIGIN2, process.env.CORS_ORIGIN3, process.env.CORS_ORIGIN4, process.env.CORS_ORIGIN5],
 		credentials: true
 	},
 	maxHttpBufferSize: 200000,
