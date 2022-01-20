@@ -32,15 +32,6 @@ var IO = new socketio.Server(App, {
 	cors: {
 		origin: ((process.env.CORS_ORIGIN == null) || (process.env.CORS_ORIGIN == "")) ? "*" : process.env.CORS_ORIGIN
 	},
-	handlePreflightRequest: (req, res) => {
-		res.writeHead(200, {
-			"Access-Control-Allow-Origin": "*",
-			"Access-Control-Allow-Methods": "GET, POST, PATCH, PUT, DELETE, OPTIONS",
-			"Access-Control-Allow-Headers": "Origin, Content-Type, X-Auth-Token",
-			"Access-Control-Allow-Credentials": false
-		});
-		res.end();
-	},
 	maxHttpBufferSize: 200000,
 	pingTimeout: 30000,
 	pingInterval: 50000,
