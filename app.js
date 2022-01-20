@@ -16,7 +16,7 @@ console.log("Using Server Key: " + ServerKey);
 console.log("Using Server Certificate: " + ServerCert);
 
 // Main game objects
-var App = ((ServerKey == null) || (ServerCert == null)) ? require("http").createServer() : require("https").createServer({ key: ServerKey, ServerCert });
+var App = ((ServerKey == null) || (ServerCert == null)) ? require("http").createServer() : require("https").createServer({ key: ServerKey, cert: ServerCert });
 const socketio = require("socket.io");
 var IO = new socketio.Server(App, {
 	cors: {
