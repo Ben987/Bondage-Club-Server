@@ -16,11 +16,18 @@ console.log("Using Server Key: " + ServerKey);
 console.log("Using Server Certificate: " + ServerCert);
 
 // Main game objects
-var App = ((ServerKey == null) || (ServerCert == null)) ? require("http").createServer() : require("https").createServer({ key: ServerKey, cert: ServerCert });
+var App;
+if ((ServerKey == null) || (ServerCert == null)) {
+	console.log("No certificate found, starting http server");
+	App = require("http").createServer();
+} else {
+	console.log("Starting https server for certificate");
+	App = require("https").createServer({ key: ServerKey, cert: ServerCert });
+}
 const socketio = require("socket.io");
 var IO = new socketio.Server(App, {
 	cors: {
-		origin: (process.env.CORS_ORIGIN0 == null) ? ["*"] : [process.env.CORS_ORIGIN0, process.env.CORS_ORIGIN1, process.env.CORS_ORIGIN2, process.env.CORS_ORIGIN3, process.env.CORS_ORIGIN4, process.env.CORS_ORIGIN5],
+		origin: ((process.env.CORS_ORIGIN0 == null) || (process.env.CORS_ORIGIN0 == "")) ? ["*"] : [process.env.CORS_ORIGIN0, process.env.CORS_ORIGIN1, process.env.CORS_ORIGIN2, process.env.CORS_ORIGIN3, process.env.CORS_ORIGIN4, process.env.CORS_ORIGIN5],
 		credentials: true
 	},
 	handlePreflightRequest: (req, res) => {
