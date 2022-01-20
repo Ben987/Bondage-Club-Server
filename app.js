@@ -26,8 +26,8 @@ var IO = new socketio.Server(App, {
 	handlePreflightRequest: (req, res) => {
 		res.writeHead(200, {
 			"Access-Control-Allow-Origin": "*",
-			"Access-Control-Allow-Methods": "GET,POST",
-			"Access-Control-Allow-Headers": "custom-header",
+			"Access-Control-Allow-Methods": "GET, POST, PATCH, PUT, DELETE, OPTIONS",
+			"Access-Control-Allow-Headers": "Origin, Content-Type, X-Auth-Token",
 			"Access-Control-Allow-Credentials": false
 		});
 		res.end();
