@@ -28,7 +28,7 @@ var IO = new socketio.Server(App, {
 			"Access-Control-Allow-Origin": "*",
 			"Access-Control-Allow-Methods": "GET,POST",
 			"Access-Control-Allow-Headers": "custom-header",
-			"Access-Control-Allow-Credentials": true
+			"Access-Control-Allow-Credentials": false
 		});
 		res.end();
 	},
