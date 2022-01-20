@@ -12,6 +12,8 @@ var ServerCert = null;
 if ((process.env.SERVER_CERT0 != null) && (process.env.SERVER_CERT0 != "")) { try { ServerCert = fs.readFileSync(process.env.SERVER_CERT0); }}
 if ((ServerCert == null) && (process.env.SERVER_CERT1 != null) && (process.env.SERVER_CERT1 != "")) { try { ServerCert = fs.readFileSync(process.env.SERVER_CERT1); }}
 if ((ServerCert == null) && (process.env.SERVER_CERT2 != null) && (process.env.SERVER_CERT2 != "")) { try { ServerCert = fs.readFileSync(process.env.SERVER_CERT2); }}
+console.log("Using Server Key: " + ServerKey);
+console.log("Using Server Certificate: " + ServerCert);
 
 // Main game objects
 var App = ((ServerKey == null) || (ServerCert == null)) ? require("http").createServer() : require("https").createServer({ key: ServerKey, ServerCert });
