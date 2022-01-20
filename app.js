@@ -30,7 +30,7 @@ if ((ServerKey == null) || (ServerCert == null)) {
 const socketio = require("socket.io");
 var IO = new socketio.Server(App, {
 	cors: {
-		origin: ((process.env.CORS_ORIGIN == null) || (process.env.CORS_ORIGIN == "")) ? "*" : process.env.CORS_ORIGIN
+		origin: ((process.env.CORS_ORIGIN0 == null) || (process.env.CORS_ORIGIN0 == "")) ? ["*"] : [process.env.CORS_ORIGIN0 || "", process.env.CORS_ORIGIN1 || "", process.env.CORS_ORIGIN2 || "", process.env.CORS_ORIGIN3 || "", process.env.CORS_ORIGIN4 || "", process.env.CORS_ORIGIN5 || ""]
 	},
 	maxHttpBufferSize: 200000,
 	pingTimeout: 30000,
