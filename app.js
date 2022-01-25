@@ -30,10 +30,7 @@ if ((ServerKey == null) || (ServerCert == null)) {
 
 // Starts socket.io to accept incoming connections on specified origins
 const socketio = require("socket.io");
-var IO = new socketio.Server(App, {
-	cors: {
-		origin: ((process.env.CORS_ORIGIN0 == null) || (process.env.CORS_ORIGIN0 == "")) ? ["*"] : [process.env.CORS_ORIGIN0 || "", process.env.CORS_ORIGIN1 || "", process.env.CORS_ORIGIN2 || "", process.env.CORS_ORIGIN3 || "", process.env.CORS_ORIGIN4 || "", process.env.CORS_ORIGIN5 || ""]
-	},
+var Options = {
 	maxHttpBufferSize: 200000,
 	pingTimeout: 30000,
 	pingInterval: 50000,
@@ -43,7 +40,10 @@ var IO = new socketio.Server(App, {
 	perMessageDeflate: true,
 	allowEIO3: false,
 	secure: UseSecure
-});
+};
+if ((process.env.CORS_ORIGIN0 != null) || (process.env.CORS_ORIGIN0 != ""))
+	Options.cors = { origin: [process.env.CORS_ORIGIN0 || "", process.env.CORS_ORIGIN1 || "", process.env.CORS_ORIGIN2 || "", process.env.CORS_ORIGIN3 || "", process.env.CORS_ORIGIN4 || "", process.env.CORS_ORIGIN5 || ""] };
+var IO = new socketio.Server(App, Options);
 
 // Main game objects
 var BCrypt = require("bcrypt");
