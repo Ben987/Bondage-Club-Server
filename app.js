@@ -41,7 +41,7 @@ var Options = {
 	allowEIO3: false,
 	secure: UseSecure
 };
-if ((process.env.CORS_ORIGIN0 != null) || (process.env.CORS_ORIGIN0 != ""))
+if ((process.env.CORS_ORIGIN0 != null) && (process.env.CORS_ORIGIN0 != ""))
 	Options.cors = { origin: [process.env.CORS_ORIGIN0 || "", process.env.CORS_ORIGIN1 || "", process.env.CORS_ORIGIN2 || "", process.env.CORS_ORIGIN3 || "", process.env.CORS_ORIGIN4 || "", process.env.CORS_ORIGIN5 || ""] };
 var IO = new socketio.Server(App, Options);
 
