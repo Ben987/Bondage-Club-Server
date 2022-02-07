@@ -378,6 +378,20 @@ function AccountLoginRun() {
 	}, err => { throw err; });
 }
 
+// Removes all instances of that character from all chat rooms
+async function AccountRemoveFromChatRoom(MemberNumber) {
+	if ((MemberNumber == null) || (Account == null) || (Account.length == 0) || (ChatRoom == null) || (ChatRoom.length == 0)) return;
+	for (let C = 0; C < ChatRoom.length; C++) {
+		if ((ChatRoom[C] != null) && (ChatRoom[C].Account != null) && (ChatRoom[C].Account.length > 0)) {
+			for (let A = 0; A < ChatRoom[C].Account.length; A++)
+				if ((ChatRoom[C].Account[A] != null) && (ChatRoom[C].Account[A].MemberNumber != null) && (ChatRoom[C].Account[A].MemberNumber == MemberNumber))
+					ChatRoom[C].Account.splice(A, 1);
+			if (ChatRoom[C].Account.length == 0)
+				ChatRoom.splice(C, 1);
+		}
+	}
+}
+
 /**
  * Processes a single login request
  * @param {socketio.Socket} socket
@@ -435,6 +449,7 @@ async function AccountLoginProcess(socket, AccountName, Password) {
 	result.Environment = AccountGetEnvironment(socket);
 	console.log("Login account: " + result.AccountName + " ID: " + socket.id + " " + result.Environment);
 	AccountValidData(result);
+	AccountRemoveFromChatRoom(result.MemberNumber);
 	Account.push(result);
 	OnLogin(socket);
 	delete result.Password;
@@ -443,6 +458,7 @@ async function AccountLoginProcess(socket, AccountName, Password) {
 	result.Socket = socket;
 	AccountSendServerInfo(socket);
 	AccountPurgeInfo(result);
+	
 }
 
 // Returns TRUE if the object is empty
