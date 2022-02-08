@@ -866,9 +866,9 @@ function ChatRoomRemove(Acc, Reason, Dictionary) {
 		Acc.Socket.leave("chatroom-" + Acc.ChatRoom.ID);
 
 		// Removes it from the chat room array
-		for (var A = 0; A < Acc.ChatRoom.Account.length; A++)
-			if (Acc.ChatRoom.Account[A].ID == Acc.ID) {
-				Acc.ChatRoom.Account.splice(A, 1);
+		for (const RoomAcc of Acc.ChatRoom.Account)
+			if (RoomAcc.ID == Acc.ID) {
+				Acc.ChatRoom.Account.splice(Acc.ChatRoom.Account.indexOf(RoomAcc), 1);
 				break;
 			}
 
