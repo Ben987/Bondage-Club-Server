@@ -1409,9 +1409,9 @@ function ChatRoomAllowItem(data, socket) {
 
 // Updates the reset password entry number or creates a new one, this number will have to be entered by the user later
 function PasswordResetSetNumber(AccountName, ResetNumber) {
-	for (var R = 0; R < PasswordResetProgress.length; R++)
-		if (PasswordResetProgress[R].AccountName.trim() == AccountName.trim()) {
-			PasswordResetProgress[R].ResetNumber = ResetNumber;
+	for (const PasswordReset of PasswordResetProgress)
+		if (PasswordReset.AccountName.trim() == AccountName.trim()) {
+			PasswordReset.ResetNumber = ResetNumber;
 			return;
 		}
 	PasswordResetProgress.push({ AccountName: AccountName, ResetNumber: ResetNumber });
