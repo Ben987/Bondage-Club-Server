@@ -1020,12 +1020,12 @@ function ChatRoomSyncToMember(CR, SourceMemberNumber, TargetMemberNumber) {
 	if (CR == null) { return; }
 
 	// Sends the full packet to everyone in the room
-	for (let i = 0; i < CR.Account.length; i++) // For each player in the chat room...
+	for (const RoomAcc of CR.Account) // For each player in the chat room...
 	{
-		if(CR.Account[i].MemberNumber == TargetMemberNumber) // If the player is the one who gets synced...
+		if(RoomAcc.MemberNumber == TargetMemberNumber) // If the player is the one who gets synced...
 		{
 			// Send room data and break loop
-			CR.Account[i].Socket.emit("ChatRoomSync", ChatRoomGetData(CR, SourceMemberNumber, true));
+			RoomAcc.Socket.emit("ChatRoomSync", ChatRoomGetData(CR, SourceMemberNumber, true));
 			break;
 		}
 	}
