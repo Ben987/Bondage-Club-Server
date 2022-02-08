@@ -1473,8 +1473,8 @@ function PasswordResetProcess(data, socket) {
 		if (data.AccountName.match(LN) && data.NewPassword.match(LN) && (data.AccountName.length > 0) && (data.AccountName.length <= 20) && (data.NewPassword.length > 0) && (data.NewPassword.length <= 20)) {
 
 			// Checks if the reset number matches
-			for (var R = 0; R < PasswordResetProgress.length; R++)
-				if ((PasswordResetProgress[R].AccountName == data.AccountName) && (PasswordResetProgress[R].ResetNumber == data.ResetNumber)) {
+			for (const PasswordReset of PasswordResetProgress)
+				if ((PasswordReset.AccountName == data.AccountName) && (PasswordReset.ResetNumber == data.ResetNumber)) {
 
 					// Creates a hashed password and updates the account with it
 					BCrypt.hash(data.NewPassword.toUpperCase(), 10, function( err, hash ) {
