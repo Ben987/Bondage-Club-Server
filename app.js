@@ -1343,9 +1343,9 @@ function ChatRoomAdmin(data, socket) {
 // Returns a specific reputation value for the player
 function ChatRoomDominantValue(Account) {
 	if ((Account.Reputation != null) && (Array.isArray(Account.Reputation)))
-		for (var R = 0; R < Account.Reputation.length; R++)
-			if ((Account.Reputation[R].Type != null) && (Account.Reputation[R].Value != null) && (typeof Account.Reputation[R].Type === "string") && (typeof Account.Reputation[R].Value === "number") && (Account.Reputation[R].Type == "Dominant"))
-				return parseInt(Account.Reputation[R].Value);
+		for (const Rep of Account.Reputation)
+			if ((Rep.Type != null) && (Rep.Value != null) && (typeof Rep.Type === "string") && (typeof Rep.Value === "number") && (Rep.Type == "Dominant"))
+				return parseInt(Rep.Value);
 	return 0;
 }
 
