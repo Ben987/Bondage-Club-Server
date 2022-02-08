@@ -658,9 +658,9 @@ function AccountRemove(ID) {
 
 // Returns the account object related to it's ID
 function AccountGet(ID) {
-	for (var P = 0; P < Account.length; P++)
-		if (Account[P].ID == ID)
-			return Account[P];
+	for (const Acc of Account)
+		if (Acc.ID == ID)
+			return Acc;
 	return null;
 }
 
