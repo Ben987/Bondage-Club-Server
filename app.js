@@ -1181,8 +1181,8 @@ function ChatRoomCharacterItemUpdate(data, socket) {
 		// Make sure the source account isn't banned from the chat room and has access to use items on the target
 		var Acc = AccountGet(socket.id);
 		if ((Acc == null) || (Acc.ChatRoom == null) || (Acc.ChatRoom.Ban.indexOf(Acc.MemberNumber) >= 0)) return;
-		for (var A = 0; (Acc != null) && (Acc.ChatRoom != null) && (Acc.ChatRoom.Account != null) && (A < Acc.ChatRoom.Account.length); A++)
-			if ((Acc.ChatRoom.Account[A].MemberNumber == data.Target) && !ChatRoomGetAllowItem(Acc, Acc.ChatRoom.Account[A]))
+		for (const RoomAcc of Acc.ChatRoom.Account)
+			if (RoomAcc.MemberNumber == data.Target && !ChatRoomGetAllowItem(Acc, RoomAcc))
 				return;
 
 		// Sends the item to use to everyone but the source
