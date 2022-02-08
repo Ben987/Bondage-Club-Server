@@ -419,9 +419,8 @@ async function AccountLoginProcess(socket, AccountName, Password) {
 	}
 
 	// Disconnect duplicated logged accounts
-	for (let A = 0; A < Account.length; A++) {
-		const Acc = Account[A];
-		if (Acc.AccountName === result.AccountName) {
+	for (const Acc of Account) {
+		if (Acc != null && Acc.AccountName === result.AccountName) {
 			Acc.Socket.emit("ForceDisconnect", "ErrorDuplicatedLogin");
 			Acc.Socket.disconnect(true);
 			AccountRemove(Acc.ID);
