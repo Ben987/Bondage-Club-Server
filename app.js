@@ -640,6 +640,8 @@ function AccountBeep(data, socket) {
 							BeepType: (data.BeepType) ? data.BeepType : null,
 							Message: data.Message
 						});
+						break;
+					}
 
 	}
 }
