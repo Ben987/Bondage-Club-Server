@@ -628,10 +628,10 @@ function AccountBeep(data, socket) {
 		// Make sure both accounts are online, friends and sends the beep to the friend
 		var Acc = AccountGet(socket.id);
 		if (Acc != null)
-			for (var A = 0; A < Account.length; A++)
-				if (Account[A].MemberNumber == data.MemberNumber)
-					if ((Account[A].Environment == Acc.Environment) && (((Account[A].FriendList != null) && (Account[A].FriendList.indexOf(Acc.MemberNumber) >= 0)) || ((Account[A].Ownership != null) && (Account[A].Ownership.MemberNumber != null) && (Account[A].Ownership.MemberNumber == Acc.MemberNumber)) || ((data.BeepType != null) && (typeof data.BeepType === "string") && (data.BeepType == "Leash"))))
-						Account[A].Socket.emit("AccountBeep", {
+			for (const OtherAcc of Account)
+				if (OtherAcc.MemberNumber == data.MemberNumber)
+					if ((OtherAcc.Environment == Acc.Environment) && (((OtherAcc.FriendList != null) && (OtherAcc.FriendList.indexOf(Acc.MemberNumber) >= 0)) || ((OtherAcc.Ownership != null) && (OtherAcc.Ownership.MemberNumber != null) && (OtherAcc.Ownership.MemberNumber == Acc.MemberNumber)) || ((data.BeepType != null) && (typeof data.BeepType === "string") && (data.BeepType == "Leash")))) {
+						OtherAcc.Socket.emit("AccountBeep", {
 							MemberNumber: Acc.MemberNumber,
 							MemberName: Acc.Name,
 							ChatRoomSpace: (Acc.ChatRoom == null || data.IsSecret) ? null : Acc.ChatRoom.Space,
