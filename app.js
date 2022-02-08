@@ -379,7 +379,7 @@ function AccountLoginRun() {
 }
 
 // Removes all instances of that character from all chat rooms
-async function AccountRemoveFromChatRoom(MemberNumber) {
+function AccountRemoveFromChatRoom(MemberNumber) {
 	if ((MemberNumber == null) || (Account == null) || (Account.length == 0) || (ChatRoom == null) || (ChatRoom.length == 0)) return;
 	for (let C = 0; C < ChatRoom.length; C++) {
 		if ((ChatRoom[C] != null) && (ChatRoom[C].Account != null) && (ChatRoom[C].Account.length > 0)) {
