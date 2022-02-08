@@ -472,8 +472,8 @@ function ObjectEmpty(obj) {
 // Updates any account data except the basic ones that cannot change
 function AccountUpdate(data, socket) {
 	if ((data != null) && (typeof data === "object") && !Array.isArray(data))
-		for (var P = 0; P < Account.length; P++)
-			if (Account[P].ID == socket.id) {
+		for (const Acc of Account)
+			if (Acc.ID == socket.id) {
 
 				// Some data is never saved or updated from the client
 				delete data.Name;
@@ -493,32 +493,32 @@ function AccountUpdate(data, socket) {
 				delete data.Difficulty;
 
 				// Some data is kept for future use
-				if (data.Inventory != null) Account[P].Inventory = data.Inventory;
-				if (data.ItemPermission != null) Account[P].ItemPermission = data.ItemPermission;
-				if (data.ArousalSettings != null) Account[P].ArousalSettings = data.ArousalSettings;
-				if (data.OnlineSharedSettings != null) Account[P].OnlineSharedSettings = data.OnlineSharedSettings;
-				if (data.Game != null) Account[P].Game = data.Game;
-				if (data.LabelColor != null) Account[P].LabelColor = data.LabelColor;
-				if (data.Appearance != null) Account[P].Appearance = data.Appearance;
-				if (data.Reputation != null) Account[P].Reputation = data.Reputation;
-				if (data.Description != null) Account[P].Description = data.Description;
-				if (data.BlockItems != null) Account[P].BlockItems = data.BlockItems;
-				if (data.LimitedItems != null) Account[P].LimitedItems = data.LimitedItems;
-				if (data.FavoriteItems != null) Account[P].FavoriteItems = data.FavoriteItems;
-				if ((data.WhiteList != null) && Array.isArray(data.WhiteList)) Account[P].WhiteList = data.WhiteList;
-				if ((data.BlackList != null) && Array.isArray(data.BlackList)) Account[P].BlackList = data.BlackList;
-				if ((data.FriendList != null) && Array.isArray(data.FriendList)) Account[P].FriendList = data.FriendList;
-				if ((data.Lover != null) && (Array.isArray(Account[P].Lovership)) && (Account[P].Lovership.length < 5) && data.Lover.startsWith("NPC-")) {
+				if (data.Inventory != null) Acc.Inventory = data.Inventory;
+				if (data.ItemPermission != null) Acc.ItemPermission = data.ItemPermission;
+				if (data.ArousalSettings != null) Acc.ArousalSettings = data.ArousalSettings;
+				if (data.OnlineSharedSettings != null) Acc.OnlineSharedSettings = data.OnlineSharedSettings;
+				if (data.Game != null) Acc.Game = data.Game;
+				if (data.LabelColor != null) Acc.LabelColor = data.LabelColor;
+				if (data.Appearance != null) Acc.Appearance = data.Appearance;
+				if (data.Reputation != null) Acc.Reputation = data.Reputation;
+				if (data.Description != null) Acc.Description = data.Description;
+				if (data.BlockItems != null) Acc.BlockItems = data.BlockItems;
+				if (data.LimitedItems != null) Acc.LimitedItems = data.LimitedItems;
+				if (data.FavoriteItems != null) Acc.FavoriteItems = data.FavoriteItems;
+				if ((data.WhiteList != null) && Array.isArray(data.WhiteList)) Acc.WhiteList = data.WhiteList;
+				if ((data.BlackList != null) && Array.isArray(data.BlackList)) Acc.BlackList = data.BlackList;
+				if ((data.FriendList != null) && Array.isArray(data.FriendList)) Acc.FriendList = data.FriendList;
+				if ((data.Lover != null) && (Array.isArray(Acc.Lovership)) && (Acc.Lovership.length < 5) && data.Lover.startsWith("NPC-")) {
 					var isLoverPresent = false;
-					for (var L = 0; L < Account[P].Lovership.length; L++) {
-						if ((Account[P].Lovership[L].Name != null) && (Account[P].Lovership[L].Name == data.Lover)) {
+					for (var L = 0; L < Acc.Lovership.length; L++) {
+						if ((Acc.Lovership[L].Name != null) && (Acc.Lovership[L].Name == data.Lover)) {
 							isLoverPresent = true;
 							break;
 						}
 					}
 					if (!isLoverPresent) {
-						Account[P].Lovership.push({Name: data.Lover});
-						data.Lovership = Account[P].Lovership;
+						Acc.Lovership.push({Name: data.Lover});
+						data.Lovership = Acc.Lovership;
 						for (var L = 0; L < data.Lovership.length; L++) {
 							delete data.Lovership[L].BeginEngagementOfferedByMemberNumber;
 							delete data.Lovership[L].BeginWeddingOfferedByMemberNumber;
@@ -528,10 +528,9 @@ function AccountUpdate(data, socket) {
 					}
 					delete data.Lover;
 				}
-				if ((data.Title != null)) Account[P].Title = data.Title;
+				if ((data.Title != null)) Acc.Title = data.Title;
 
 				// Some changes should be synched to other players in chatroom
-				const Acc = Account[P];
 				if ((Acc != null) && Acc.ChatRoom && ["AssetFamily", "Title", "Reputation", "Description", "LabelColor", "ItemPermission", "Inventory", "BlockItems", "LimitedItems", "FavoriteItems", "OnlineSharedSettings", "WhiteList", "BlackList"].some(k => data[k] != null))
 					ChatRoomSyncCharacter(Acc.ChatRoom, Acc.MemberNumber, Acc.MemberNumber);
 
