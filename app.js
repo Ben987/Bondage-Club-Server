@@ -1122,13 +1122,13 @@ function ChatRoomCharacterUpdate(data, socket) {
 		var Acc = AccountGet(socket.id);
 		if ((Acc != null) && (Acc.ChatRoom != null))
 			if (Acc.ChatRoom.Ban.indexOf(Acc.MemberNumber) < 0)
-				for (var A = 0; ((Acc.ChatRoom != null) && (A < Acc.ChatRoom.Account.length)); A++)
-					if ((Acc.ChatRoom.Account[A].ID == data.ID) && ChatRoomGetAllowItem(Acc, Acc.ChatRoom.Account[A]))
-						if ((typeof data.Appearance === "object") && Array.isArray(data.Appearance) && (data.Appearance.length >= 5) && (JSON.stringify(data.Appearance).length < 180000)) {
-							Database.collection(AccountCollection).updateOne({ AccountName : Acc.ChatRoom.Account[A].AccountName }, { $set: { Appearance: data.Appearance } }, function(err, res) { if (err) throw err; });
-							Acc.ChatRoom.Account[A].Appearance = data.Appearance;
-							Acc.ChatRoom.Account[A].ActivePose = data.ActivePose;
-							ChatRoomSyncSingle(Acc.ChatRoom.Account[A], Acc.MemberNumber);
+				for (const RoomAcc of Acc.ChatRoom.Account)
+					if ((RoomAcc.ID == data.ID) && ChatRoomGetAllowItem(Acc, RoomAcc))
+						if ((typeof data.Appearance === "object") && Array.isArray(data.Appearance)) {
+							Database.collection(AccountCollection).updateOne({ AccountName: RoomAcc.AccountName }, { $set: { Appearance: data.Appearance } }, function(err, res) { if (err) throw err; });
+							RoomAcc.Appearance = data.Appearance;
+							RoomAcc.ActivePose = data.ActivePose;
+							ChatRoomSyncSingle(RoomAcc, Acc.MemberNumber);
 						}
 	}
 }
