@@ -647,11 +647,13 @@ function AccountBeep(data, socket) {
 // Removes the account from the buffer
 function AccountRemove(ID) {
 	if (ID != null)
-		for (var P = 0; P < Account.length; P++)
-			if (Account[P].ID == ID) {
-				ChatRoomRemove(Account[P], "ServerDisconnect", []);
-				if (Account[P] != null) console.log("Disconnecting account: " + Account[P].AccountName + " ID: " + ID);
-				Account.splice(P, 1);
+		for (const Acc of Account)
+			if (Acc.ID == ID) {
+				console.log("Disconnecting account: " + Acc.AccountName + " ID: " + ID);
+				ChatRoomRemove(Acc, "ServerDisconnect", []);
+				const index = Account.indexOf(Acc);
+				if (index >= 0)
+					Account.splice(index, 1);
 				break;
 			}
 }
