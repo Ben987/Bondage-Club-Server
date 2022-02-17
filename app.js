@@ -522,7 +522,10 @@ function AccountUpdate(data, socket) {
 						for (var L = 0; L < data.Lovership.length; L++) {
 							delete data.Lovership[L].BeginEngagementOfferedByMemberNumber;
 							delete data.Lovership[L].BeginWeddingOfferedByMemberNumber;
-							if (data.Lovership[L].BeginDatingOfferedByMemberNumber) data.Lovership.splice(L, 1);
+							if (data.Lovership[L].BeginDatingOfferedByMemberNumber) {
+								data.Lovership.splice(L, 1);
+								L -= 1;
+							}
 						}
 						socket.emit("AccountLovership", { Lovership: data.Lovership });
 					}
