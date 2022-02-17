@@ -1212,8 +1212,8 @@ function ChatRoomAdmin(data, socket) {
 					data.Room.Name = data.Room.Name.trim();
 					var LN = /^[a-zA-Z0-9 ]+$/;
 					if (data.Room.Name.match(LN) && (data.Room.Name.length >= 1) && (data.Room.Name.length <= 20) && (data.Room.Description.length <= 100) && (data.Room.Background.length <= 100)) {
-						for (var C = 0; C < ChatRoom.length; C++)
-							if (Acc.ChatRoom.Name != data.Room.Name && ChatRoom[C].Name.toUpperCase().trim() == data.Room.Name.toUpperCase().trim()) {
+						for (const Room of ChatRoom)
+							if (Acc.ChatRoom && Acc.ChatRoom.Name != data.Room.Name && Room.Name.toUpperCase().trim() == data.Room.Name.toUpperCase().trim()) {
 								socket.emit("ChatRoomUpdateResponse", "RoomAlreadyExist");
 								return;
 							}
@@ -1254,12 +1254,11 @@ function ChatRoomAdmin(data, socket) {
 				Dictionary.push({ Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber });
 				Dictionary.push({ Tag: "TargetCharacterName", Text: TargetAccount.Name, MemberNumber: TargetAccount.MemberNumber });
 				Dictionary.push({ Tag: "DestinationCharacterName", Text: DestinationAccount.Name, MemberNumber: DestinationAccount.MemberNumber });
-				ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "ServerSwap", "Action", null, Dictionary);
-				if ((Acc != null) && (Acc.ChatRoom != null)) {
-					Acc.ChatRoom.Account[TargetAccountIndex] = DestinationAccount;
-					Acc.ChatRoom.Account[DestinationAccountIndex] = TargetAccount;
-					ChatRoomSyncReorderPlayers(Acc.ChatRoom, Acc.MemberNumber);
-				}
+				Acc.ChatRoom.Account[TargetAccountIndex] = DestinationAccount;
+				Acc.ChatRoom.Account[DestinationAccountIndex] = TargetAccount;
+				ChatRoomSyncReorderPlayers(Acc.ChatRoom, Acc.MemberNumber);
+				if ((Acc != null) && (Acc.ChatRoom != null))
+					ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "ServerSwap", "Action", null, Dictionary);
 				return;
 			}
 
@@ -1278,11 +1277,12 @@ function ChatRoomAdmin(data, socket) {
 						ChatRoomSyncRoomProperties(Acc.ChatRoom, Acc.MemberNumber);
 					}
 					else if (data.Action == "Kick") {
-						Acc.ChatRoom.Account[A].Socket.emit("ChatRoomSearchResponse", "RoomKicked");
+						const kickedAccount = Acc.ChatRoom.Account[A];
+						kickedAccount.Socket.emit("ChatRoomSearchResponse", "RoomKicked");
 						if ((Acc != null) && (Acc.ChatRoom != null) && (Acc.ChatRoom.Account[A] != null)) {
 							Dictionary.push({Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber});
 							Dictionary.push({Tag: "TargetCharacterName", Text: Acc.ChatRoom.Account[A].Name, MemberNumber: Acc.ChatRoom.Account[A].MemberNumber});
-							ChatRoomRemove(Acc.ChatRoom.Account[A], "ServerKick", Dictionary);
+							ChatRoomRemove(kickedAccount, "ServerKick", Dictionary);
 						}
 					}
 					else if ((data.Action == "MoveLeft") && (A != 0)) {
