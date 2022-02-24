@@ -760,8 +760,8 @@ function ChatRoomCreate(data, socket) {
 			}
 
 			// Check if the same name already exists and quits if that's the case
-			for (var C = 0; C < ChatRoom.length; C++)
-				if (ChatRoom[C].Name.toUpperCase().trim() == data.Name.toUpperCase().trim()) {
+			for (const Room of ChatRoom)
+				if (Room.Name.toUpperCase().trim() == data.Name.toUpperCase().trim()) {
 					socket.emit("ChatRoomCreateResponse", "RoomAlreadyExist");
 					return;
 				}
