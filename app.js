@@ -907,9 +907,9 @@ function ChatRoomMessage(CR, Sender, Content, Type, Target, Dictionary) {
 	if (Target == null) {
 		IO.to("chatroom-" + CR.ID).emit("ChatRoomMessage", { Sender: Sender, Content: Content, Type: Type, Dictionary: Dictionary } );
 	} else {
-		for (let A = 0; A < CR.Account.length; A++) {
-			if (Target === CR.Account[A].MemberNumber) {
-				CR.Account[A].Socket.emit("ChatRoomMessage", { Sender: Sender, Content: Content, Type: Type, Dictionary: Dictionary } );
+		for (const Acc of CR.Account) {
+			if (Acc != null && Target === Acc.MemberNumber) {
+				Acc.Socket.emit("ChatRoomMessage", { Sender: Sender, Content: Content, Type: Type, Dictionary: Dictionary } );
 				return;
 			}
 		}
