@@ -818,23 +818,23 @@ function ChatRoomJoin(data, socket) {
 		if (Acc != null) {
 
 			// Finds the room and join it
-			for (var C = 0; C < ChatRoom.length; C++)
-				if (ChatRoom[C].Name.toUpperCase().trim() == data.Name.toUpperCase().trim())
-					if (Acc.Environment == ChatRoom[C].Environment)
-						if (ChatRoom[C].Account.length < ChatRoom[C].Limit) {
-							if (ChatRoom[C].Ban.indexOf(Acc.MemberNumber) < 0) {
+			for (const Room of ChatRoom)
+				if (Room.Name.toUpperCase().trim() == data.Name.toUpperCase().trim())
+					if (Acc.Environment == Room.Environment)
+						if (Room.Account.length < Room.Limit) {
+							if (Room.Ban.indexOf(Acc.MemberNumber) < 0) {
 
 								// If the room is unlocked or the player is an admin, we allow her inside
-								if (!ChatRoom[C].Locked || (ChatRoom[C].Admin.indexOf(Acc.MemberNumber) >= 0)) {
-									if (Acc.ChatRoom == null || Acc.ChatRoom.ID !== ChatRoom[C].ID) {
+								if (!Room.Locked || (Room.Admin.indexOf(Acc.MemberNumber) >= 0)) {
+									if (Acc.ChatRoom == null || Acc.ChatRoom.ID !== Room.ID) {
 										ChatRoomRemove(Acc, "ServerLeave", []);
-										Acc.ChatRoom = ChatRoom[C];
-										if (ChatRoom[C] != null) {
-											ChatRoom[C].Account.push(Acc);
-											socket.join("chatroom-" + ChatRoom[C].ID);
+										Acc.ChatRoom = Room;
+										if (Account.find(A => Acc.MemberNumber === A.MemberNumber)) {
+											Room.Account.push(Acc);
+											socket.join("chatroom-" + Room.ID);
 											socket.emit("ChatRoomSearchResponse", "JoinedRoom");
-											ChatRoomSyncMemberJoin(ChatRoom[C], Acc);
-											ChatRoomMessage(ChatRoom[C], Acc.MemberNumber, "ServerEnter", "Action", null, [{ Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber }]);
+											ChatRoomSyncMemberJoin(Room, Acc);
+											ChatRoomMessage(Room, Acc.MemberNumber, "ServerEnter", "Action", null, [{ Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber }]);
 										}
 										return;
 									} else {
