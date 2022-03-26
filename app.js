@@ -1103,8 +1103,8 @@ function ChatRoomSyncReorderPlayers(CR, SourceMemberNumber) {
 
 	// Builds the room data
 	const newPlayerOrder = [];
-	for (let i = 0; i < CR.Account.length; i++) {
-		newPlayerOrder.push(CR.Account[i].MemberNumber);
+	for (const RoomAcc of CR.Account) {
+		newPlayerOrder.push(RoomAcc.MemberNumber);
 	}
 
 	IO.to("chatroom-" + CR.ID).emit("ChatRoomSyncReorderPlayers", { PlayerOrder: newPlayerOrder });
