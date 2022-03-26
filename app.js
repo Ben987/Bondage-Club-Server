@@ -1405,9 +1405,9 @@ function ChatRoomAllowItem(data, socket) {
 		// Gets the source account and target account to check if we allow or not
 		var Acc = AccountGet(socket.id);
 		if ((Acc != null) && (Acc.ChatRoom != null))
-			for (var A = 0; ((Acc.ChatRoom != null) && (A < Acc.ChatRoom.Account.length)); A++)
-				if (Acc.ChatRoom.Account[A].MemberNumber == data.MemberNumber)
-					socket.emit("ChatRoomAllowItem", { MemberNumber: data.MemberNumber, AllowItem: ChatRoomGetAllowItem(Acc, Acc.ChatRoom.Account[A]) });
+			for (const RoomAcc of Acc.ChatRoom.Account)
+				if (RoomAcc.MemberNumber == data.MemberNumber)
+					socket.emit("ChatRoomAllowItem", { MemberNumber: data.MemberNumber, AllowItem: ChatRoomGetAllowItem(Acc, RoomAcc) });
 
 	}
 }
