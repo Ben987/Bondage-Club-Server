@@ -1381,8 +1381,8 @@ function ChatRoomGetAllowItem(Source, Target) {
 	if ((Target.ItemPermission == 1) && (Target.BlackList.indexOf(Source.MemberNumber) < 0)) return true;
 
 	var LoversNumbers = [];
-	for (var L = 0; L < Target.Lovership.length; L++) {
-		if (Target.Lovership[L].MemberNumber != null) { LoversNumbers.push(Target.Lovership[L].MemberNumber); }
+	for (const Lover of Target.Lovership) {
+		if (Lover.MemberNumber != null) { LoversNumbers.push(Lover.MemberNumber); }
 	}
 	// At two, we allow if the source is Dominant compared to the Target (25 points allowed) or on whitelist or a lover
 	if ((Target.ItemPermission == 2) && (Target.BlackList.indexOf(Source.MemberNumber) < 0) && ((ChatRoomDominantValue(Source) + 25 >= ChatRoomDominantValue(Target)) || (Target.WhiteList.indexOf(Source.MemberNumber) >= 0) || (LoversNumbers.indexOf(Source.MemberNumber) >= 0))) return true;
