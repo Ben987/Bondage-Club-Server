@@ -71,6 +71,8 @@ var LovershipDelay = 604800000; // 7 days delay for lovership events
 var DifficultyDelay = 604800000; // 7 days to activate the higher difficulty tiers
 const IP_CONNECTION_LIMIT = 64; // Limit of connections per IP address
 const IP_CONNECTION_PROXY_HEADER = "x-forwarded-for"; // Header with real IP, if set by trusted proxy (lowercase)
+const IP_CONNECTION_RATE_LIMIT = 2; // Limit of newly established connections per IP address within a second
+const CLIENT_MESSAGE_RATE_LIMIT = 50; // Limit the number of messages received from a client within a second
 
 // DB Access
 var Database;
@@ -111,7 +113,7 @@ process.on('uncaughtException', function(error) {
 	});
 });
 
-const IPConnectionCounts = new Map();
+const IPConnections = new Map();
 
 // Connects to the Mongo Database
 DatabaseClient.connect(DatabaseURL, { useUnifiedTopology: true, useNewUrlParser: true }, function(err, db) {
@@ -145,10 +147,13 @@ DatabaseClient.connect(DatabaseURL, { useUnifiedTopology: true, useNewUrlParser:
 					address = hops[hops.length-1].trim();
 				}
 
-				const sameIPCount = IPConnectionCounts.get(address) || 0;
+				const sameIPConnections = IPConnections.get(address) || [];
 
-				// Reject connection if over limit
-				if (sameIPCount >= IP_CONNECTION_LIMIT) {
+				// True, if there has already been IP_CONNECTION_RATE_LIMIT number of connections in the last second
+				const ipOverRateLimit = sameIPConnections.length >= IP_CONNECTION_RATE_LIMIT && Date.now() - sameIPConnections[sameIPConnections.length - IP_CONNECTION_RATE_LIMIT] <= 1000;
+
+				// Reject connection if over limits (rate & concurrency)
+				if (sameIPConnections.length >= IP_CONNECTION_LIMIT || ipOverRateLimit) {
 					console.log("Rejecting connection (IP connection limit reached) from", address);
 					socket.emit("ForceDisconnect", "ErrorRateLimited");
 					socket.disconnect(true);
@@ -156,13 +161,32 @@ DatabaseClient.connect(DatabaseURL, { useUnifiedTopology: true, useNewUrlParser:
 				}
 
 				// Connection accepted, count it
-				IPConnectionCounts.set(address, sameIPCount + 1);
+				sameIPConnections.push(Date.now());
+				IPConnections.set(address, sameIPConnections);
 				socket.once("disconnect", () => {
-					const sameIPCountDisconnect = IPConnectionCounts.get(address) || 0;
-					if (sameIPCountDisconnect <= 1) {
-						IPConnectionCounts.delete(address);
+					const sameIPConnectionsDisconnect = IPConnections.get(address) || [];
+					if (sameIPConnectionsDisconnect.length <= 1) {
+						IPConnections.delete(address);
 					} else {
-						IPConnectionCounts.set(address, sameIPCountDisconnect - 1);
+						sameIPConnectionsDisconnect.shift(); // Delete first (oldest) from array
+						IPConnections.set(address, sameIPConnectionsDisconnect);
+					}
+				});
+
+				// Rate limit all messages and kill the connection, if limits exceeded.
+				const messageBucket = [];
+				for (let i = 0; i < CLIENT_MESSAGE_RATE_LIMIT; i++) {
+					messageBucket.push(0);
+				}
+				socket.onAny(() => {
+					const lastMessageTime = messageBucket.shift();
+					messageBucket.push(Date.now());
+
+					// More than CLIENT_MESSAGE_RATE_LIMIT number of messages in the last second
+					if (Date.now() - lastMessageTime <= 1000) {
+						// Disconnect and close connection
+						socket.emit("ForceDisconnect", "ErrorRateLimited");
+						socket.disconnect(true);
 					}
 				});
 
