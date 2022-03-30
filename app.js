@@ -1427,7 +1427,7 @@ function PasswordReset(data, socket) {
 	if ((data != null) && (typeof data === "string") && (data != "") && data.match(/^[a-zA-Z0-9@.]+$/) && (data.length >= 5) && (data.length <= 100) && (data.indexOf("@") > 0) && (data.indexOf(".") > 0)) {
 
 		// Gets all accounts that matches the email
-		Database.collection(AccountCollection).find({ Email : data }).toArray(function(err, result) {
+/*		Database.collection(AccountCollection).find({ Email : data }).toArray(function(err, result) {
 
 			// If we found accounts with that email
 			if (err) throw err;
@@ -1464,7 +1464,7 @@ function PasswordReset(data, socket) {
 
 			} else socket.emit("PasswordResetResponse", "NoAccountOnEmail");
 
-		});
+		});*/
 
 	}
 }
