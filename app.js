@@ -66,6 +66,7 @@ var ChatRoomProduction = [
 	process.env.PRODUCTION9 || ""
 ];
 var NextMemberNumber = 1;
+var NextPasswordReset = 0;
 var OwnershipDelay = 604800000; // 7 days delay for ownership events
 var LovershipDelay = 604800000; // 7 days delay for lovership events
 var DifficultyDelay = 604800000; // 7 days to activate the higher difficulty tiers
@@ -1450,8 +1451,12 @@ function PasswordResetSetNumber(AccountName, ResetNumber) {
 function PasswordReset(data, socket) {
 	if ((data != null) && (typeof data === "string") && (data != "") && data.match(/^[a-zA-Z0-9@.]+$/) && (data.length >= 5) && (data.length <= 100) && (data.indexOf("@") > 0) && (data.indexOf(".") > 0)) {
 
+		// One email reset password per 5 seconds to prevent flooding
+		if (NextPasswordReset > CommonTime()) return socket.emit("PasswordResetResponse", "RetryLater");
+		NextPasswordReset = CommonTime() + 5000;
+
 		// Gets all accounts that matches the email
-/*		Database.collection(AccountCollection).find({ Email : data }).toArray(function(err, result) {
+		Database.collection(AccountCollection).find({ Email : data }).toArray(function(err, result) {
 
 			// If we found accounts with that email
 			if (err) throw err;
@@ -1488,7 +1493,7 @@ function PasswordReset(data, socket) {
 
 			} else socket.emit("PasswordResetResponse", "NoAccountOnEmail");
 
-		});*/
+		});
 
 	}
 }
