@@ -1459,10 +1459,10 @@ function PasswordReset(data, socket) {
 
 				// Builds a reset number for each account found and creates the email body
 				var EmailBody = "To reset your account password, enter your account name and the reset number included in this email.  You need to put these in the Bondage Club password reset screen, with your new password.<br /><br />";
-				for (var R = 0; R < result.length; R++) {
+				for (const res of result) {
 					var ResetNumber = (Math.round(Math.random() * 1000000000000)).toString();
-					PasswordResetSetNumber(result[R].AccountName, ResetNumber);
-					EmailBody = EmailBody + "Account Name: " + result[R].AccountName + "<br />";
+					PasswordResetSetNumber(res.AccountName, ResetNumber);
+					EmailBody = EmailBody + "Account Name: " + res.AccountName + "<br />";
 					EmailBody = EmailBody + "Reset Number: " + ResetNumber + "<br /><br />";
 				}
 
