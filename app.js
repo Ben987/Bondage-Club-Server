@@ -1681,7 +1681,10 @@ function AccountLovership(data, socket) {
 			for (var L = newLovership.length - 1; L >= 0; L--) {
 				delete newLovership[L].BeginEngagementOfferedByMemberNumber;
 				delete newLovership[L].BeginWeddingOfferedByMemberNumber;
-				if (newLovership[L].BeginDatingOfferedByMemberNumber) newLovership.splice(L, 1);
+				if (newLovership[L].BeginDatingOfferedByMemberNumber) {
+					newLovership.splice(L, 1);
+					L -= 1;
+				}
 			}
 			var L = { Lovership: newLovership };
 			Database.collection(AccountCollection).updateOne({ MemberNumber : MemberNumber}, { $set: L }, function(err, res) { if (err) throw err; });
@@ -1693,9 +1696,9 @@ function AccountLovership(data, socket) {
 		if ((Acc != null) && (data.Action != null) && (data.Action === "Break")) {
 
 			var AccLoversNumbers = [];
-			for (var L = 0; L < Acc.Lovership.length; L++) {
-				if (Acc.Lovership[L].MemberNumber != null) { AccLoversNumbers.push(Acc.Lovership[L].MemberNumber); }
-				else if (Acc.Lovership[L].Name != null) { AccLoversNumbers.push(Acc.Lovership[L].Name); }
+			for (const Lover of Acc.Lovership) {
+				if (Lover.MemberNumber != null) { AccLoversNumbers.push(Lover.MemberNumber); }
+				else if (Lover.Name != null) { AccLoversNumbers.push(Lover.Name); }
 				else { AccLoversNumbers.push(-1); }
 			}
 			var AL = AccLoversNumbers.indexOf(data.MemberNumber);
@@ -1712,20 +1715,20 @@ function AccountLovership(data, socket) {
 						P = result[0].Lovership;
 
 						var TargetLoversNumbers = [];
-						for (var L = 0; L < P.length; L++) {
-							TargetLoversNumbers.push(P[L].MemberNumber ? P[L].MemberNumber : -1);
+						for (const Lover of P) {
+							TargetLoversNumbers.push(Lover.MemberNumber ? Lover.MemberNumber : -1);
 						}
 
 						if (Array.isArray(P)) P.splice(TargetLoversNumbers.indexOf(Acc.MemberNumber), 1);
 						else P = [];
 
-						for (var A = 0; A < Account.length; A++)
-							if (Account[A].MemberNumber == data.MemberNumber) {
-								Account[A].Lovership = P;
-								Account[A].Socket.emit("AccountLovership", { Lovership: Account[A].Lovership });
-								if (Account[A].ChatRoom != null)
+						for (const OtherAcc of Account)
+							if (OtherAcc.MemberNumber == data.MemberNumber) {
+								OtherAcc.Lovership = P;
+								OtherAcc.Socket.emit("AccountLovership", { Lovership: OtherAcc.Lovership });
+								if (OtherAcc.ChatRoom != null)
 								{
-									ChatRoomSyncCharacter(Account[A].ChatRoom, Account[A].MemberNumber, Account[A].MemberNumber);
+									ChatRoomSyncCharacter(OtherAcc.ChatRoom, OtherAcc.MemberNumber, OtherAcc.MemberNumber);
 								}
 							}
 
@@ -1751,51 +1754,55 @@ function AccountLovership(data, socket) {
 		if ((Acc != null) && (Acc.ChatRoom != null)) {
 
 			var AccLoversNumbers = [];
-			for (var L = 0; L < Acc.Lovership.length; L++) {
-				if (Acc.Lovership[L].MemberNumber != null) { AccLoversNumbers.push(Acc.Lovership[L].MemberNumber); }
-				else if (Acc.Lovership[L].BeginDatingOfferedByMemberNumber) { AccLoversNumbers.push(Acc.Lovership[L].BeginDatingOfferedByMemberNumber); }
+			for (const Lover of Acc.Lovership) {
+				if (Lover.MemberNumber != null) { AccLoversNumbers.push(Lover.MemberNumber); }
+				else if (Lover.BeginDatingOfferedByMemberNumber) { AccLoversNumbers.push(Lover.BeginDatingOfferedByMemberNumber); }
 				else { AccLoversNumbers.push(-1); }
 			}
 			var AL = AccLoversNumbers.indexOf(data.MemberNumber);
 
 			// One player propose to another
 			if (((Acc.Lovership.length < 5) && (AL < 0)) || (AL >= 0)) // Cannot propose if target player is already a lover, up to 5 loverships
-				for (var A = 0; ((Acc.ChatRoom != null) && (A < Acc.ChatRoom.Account.length)); A++)
-					if ((Acc.ChatRoom.Account[A].MemberNumber == data.MemberNumber) && (Acc.ChatRoom.Account[A].BlackList.indexOf(Acc.MemberNumber) < 0)) { // Cannot propose if on blacklist
+				for (const RoomAcc of Acc.ChatRoom.Account)
+					if ((RoomAcc.MemberNumber == data.MemberNumber) && (RoomAcc.BlackList.indexOf(Acc.MemberNumber) < 0)) { // Cannot propose if on blacklist
 
 						var TargetLoversNumbers = [];
-						for (var L = 0; L < Acc.ChatRoom.Account[A].Lovership.length; L++) {
-							if (Acc.ChatRoom.Account[A].Lovership[L].MemberNumber != null) { TargetLoversNumbers.push(Acc.ChatRoom.Account[A].Lovership[L].MemberNumber); }
-							else if (Acc.ChatRoom.Account[A].Lovership[L].BeginDatingOfferedByMemberNumber) { TargetLoversNumbers.push(Acc.ChatRoom.Account[A].Lovership[L].BeginDatingOfferedByMemberNumber); }
+						for (const RoomAccLover of RoomAcc.Lovership) {
+							if (RoomAccLover.MemberNumber != null) {
+								TargetLoversNumbers.push(RoomAccLover.MemberNumber);
+							}
+							else if (RoomAccLover.BeginDatingOfferedByMemberNumber) {
+								TargetLoversNumbers.push(RoomAccLover.BeginDatingOfferedByMemberNumber);
+							}
 							else { TargetLoversNumbers.push(-1); }
 						}
 						var TL = TargetLoversNumbers.indexOf(Acc.MemberNumber);
 
 						// If the target account is not a lover of player yet, can accept up to 5 loverships, one player can propose to start dating (Step 1 / 6)
-						if ((Acc.ChatRoom.Account[A].Lovership.length < 5) && (TL < 0)) {
+						if ((RoomAcc.Lovership.length < 5) && (TL < 0)) {
 							if ((data.Action != null) && (data.Action === "Propose")) {
-								Acc.ChatRoom.Account[A].Lovership.push({ BeginDatingOfferedByMemberNumber: Acc.MemberNumber });
-								ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "OfferBeginDating", "ServerMessage", Acc.ChatRoom.Account[A].MemberNumber, [{ Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber }]);
+								RoomAcc.Lovership.push({ BeginDatingOfferedByMemberNumber: Acc.MemberNumber });
+								ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "OfferBeginDating", "ServerMessage", RoomAcc.MemberNumber, [{ Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber }]);
 							} else socket.emit("AccountLovership", { MemberNumber: data.MemberNumber, Result: "CanOfferBeginDating" });
 						}
 
 						// If dating has started, a player can propose to engage after a delay (Step 3 / 6)
-						if ((TL >= 0) && (Acc.ChatRoom.Account[A].Lovership[TL].BeginEngagementOfferedByMemberNumber == null)
-							&& (Acc.ChatRoom.Account[A].Lovership[TL].Stage != null) && (Acc.ChatRoom.Account[A].Lovership[TL].Start != null)
-							&& (Acc.ChatRoom.Account[A].Lovership[TL].Stage == 0) && (Acc.ChatRoom.Account[A].Lovership[TL].Start + LovershipDelay <= CommonTime())) {
+						if ((TL >= 0) && (RoomAcc.Lovership[TL].BeginEngagementOfferedByMemberNumber == null)
+							&& (RoomAcc.Lovership[TL].Stage != null) && (RoomAcc.Lovership[TL].Start != null)
+							&& (RoomAcc.Lovership[TL].Stage == 0) && (RoomAcc.Lovership[TL].Start + LovershipDelay <= CommonTime())) {
 							if ((data.Action != null) && (data.Action === "Propose")) {
-								Acc.ChatRoom.Account[A].Lovership[TL].BeginEngagementOfferedByMemberNumber = Acc.MemberNumber;
-								ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "OfferBeginEngagement", "ServerMessage", Acc.ChatRoom.Account[A].MemberNumber, [{ Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber }]);
+								RoomAcc.Lovership[TL].BeginEngagementOfferedByMemberNumber = Acc.MemberNumber;
+								ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "OfferBeginEngagement", "ServerMessage", RoomAcc.MemberNumber, [{ Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber }]);
 							} else socket.emit("AccountLovership", { MemberNumber: data.MemberNumber, Result: "CanOfferBeginEngagement" });
 						}
 
 						// If engaged, a player can propose to marry after a delay (Step 5 / 6)
-						if ((TL >= 0) && (Acc.ChatRoom.Account[A].Lovership[TL].BeginWeddingOfferedByMemberNumber == null)
-							&& (Acc.ChatRoom.Account[A].Lovership[TL].Stage != null) && (Acc.ChatRoom.Account[A].Lovership[TL].Start != null)
-							&& (Acc.ChatRoom.Account[A].Lovership[TL].Stage == 1) && (Acc.ChatRoom.Account[A].Lovership[TL].Start + LovershipDelay <= CommonTime())) {
+						if ((TL >= 0) && (RoomAcc.Lovership[TL].BeginWeddingOfferedByMemberNumber == null)
+							&& (RoomAcc.Lovership[TL].Stage != null) && (RoomAcc.Lovership[TL].Start != null)
+							&& (RoomAcc.Lovership[TL].Stage == 1) && (RoomAcc.Lovership[TL].Start + LovershipDelay <= CommonTime())) {
 							if ((data.Action != null) && (data.Action === "Propose")) {
-								Acc.ChatRoom.Account[A].Lovership[TL].BeginWeddingOfferedByMemberNumber = Acc.MemberNumber;
-								ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "OfferBeginWedding", "ServerMessage", Acc.ChatRoom.Account[A].MemberNumber, [{ Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber }]);
+								RoomAcc.Lovership[TL].BeginWeddingOfferedByMemberNumber = Acc.MemberNumber;
+								ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "OfferBeginWedding", "ServerMessage", RoomAcc.MemberNumber, [{ Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber }]);
 							} else socket.emit("AccountLovership", { MemberNumber: data.MemberNumber, Result: "CanOfferBeginWedding" });
 						}
 
@@ -1803,26 +1810,32 @@ function AccountLovership(data, socket) {
 
 			// A player can accept a proposal from another one
 			if (((Acc.Lovership.length <= 5)) && (AL >= 0)) // No possible interaction if the player has reached the number of possible lovership or if isn't already a lover
-				for (var A = 0; ((Acc.ChatRoom != null) && (A < Acc.ChatRoom.Account.length)); A++)
-					if ((Acc.ChatRoom.Account[A].MemberNumber == data.MemberNumber) && (Acc.ChatRoom.Account[A].BlackList.indexOf(Acc.MemberNumber) < 0)) { // Cannot accept if on blacklist
+				for (const AccRoom of Acc.ChatRoom.Account)
+					if ((AccRoom.MemberNumber == data.MemberNumber) && (AccRoom.BlackList.indexOf(Acc.MemberNumber) < 0)) { // Cannot accept if on blacklist
 
 						var TargetLoversNumbers = [];
-						for (var L = 0; L < Acc.ChatRoom.Account[A].Lovership.length; L++) {
-							if (Acc.ChatRoom.Account[A].Lovership[L].MemberNumber) { TargetLoversNumbers.push(Acc.ChatRoom.Account[A].Lovership[L].MemberNumber); }
-							else if (Acc.ChatRoom.Account[A].Lovership[L].BeginDatingOfferedByMemberNumber) { TargetLoversNumbers.push(Acc.ChatRoom.Account[A].Lovership[L].BeginDatingOfferedByMemberNumber); }
-							else { TargetLoversNumbers.push(-1); }
+						for (const AccRoomLover of AccRoom.Lovership) {
+							if (AccRoomLover.MemberNumber) {
+								TargetLoversNumbers.push(AccRoomLover.MemberNumber);
+							}
+							else if (AccRoomLover.BeginDatingOfferedByMemberNumber) {
+								TargetLoversNumbers.push(AccRoomLover.BeginDatingOfferedByMemberNumber);
+							}
+							else {
+								TargetLoversNumbers.push(-1);
+							}
 						}
 						var TL = TargetLoversNumbers.indexOf(Acc.MemberNumber);
 
 						// If a player wants to accept to start dating (Step 2 / 6)
 						if ((Acc.Lovership[AL].BeginDatingOfferedByMemberNumber != null) && (Acc.Lovership[AL].BeginDatingOfferedByMemberNumber == data.MemberNumber)
-							&& ((Acc.ChatRoom.Account[A].Lovership.length < 5) || (TL >= 0))) {
+							&& ((AccRoom.Lovership.length < 5) || (TL >= 0))) {
 							if ((data.Action != null) && (data.Action === "Accept")) {
-								Acc.Lovership[AL] = { MemberNumber: data.MemberNumber, Name: Acc.ChatRoom.Account[A].Name, Start: CommonTime(), Stage: 0 };
-								if (TL >= 0) { Acc.ChatRoom.Account[A].Lovership[TL] = { MemberNumber: Acc.MemberNumber, Name: Acc.Name, Start: CommonTime(), Stage: 0 }; }
-								else { Acc.ChatRoom.Account[A].Lovership.push({ MemberNumber: Acc.MemberNumber, Name: Acc.Name, Start: CommonTime(), Stage: 0 }); }
+								Acc.Lovership[AL] = { MemberNumber: data.MemberNumber, Name: AccRoom.Name, Start: CommonTime(), Stage: 0 };
+								if (TL >= 0) { AccRoom.Lovership[TL] = { MemberNumber: Acc.MemberNumber, Name: Acc.Name, Start: CommonTime(), Stage: 0 }; }
+								else { AccRoom.Lovership.push({ MemberNumber: Acc.MemberNumber, Name: Acc.Name, Start: CommonTime(), Stage: 0 }); }
 								AccountUpdateLovership( Acc.Lovership, Acc.MemberNumber);
-								AccountUpdateLovership( Acc.ChatRoom.Account[A].Lovership, Acc.Lovership[AL].MemberNumber, Acc.ChatRoom.Account[A].Socket);
+								AccountUpdateLovership( AccRoom.Lovership, Acc.Lovership[AL].MemberNumber, AccRoom.Socket);
 								var Dictionary = [];
 								Dictionary.push({ Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber });
 								Dictionary.push({ Tag: "TargetCharacter", Text: Acc.Lovership[AL].Name, MemberNumber: Acc.Lovership[AL].MemberNumber });
@@ -1836,10 +1849,10 @@ function AccountLovership(data, socket) {
 						if ((Acc.Lovership[AL].Stage != null) && (Acc.Lovership[AL].Stage == 0)
 							&& (Acc.Lovership[AL].BeginEngagementOfferedByMemberNumber != null) && (Acc.Lovership[AL].BeginEngagementOfferedByMemberNumber == data.MemberNumber)) {
 							if ((data.Action != null) && (data.Action === "Accept")) {
-								Acc.Lovership[AL] = { MemberNumber: data.MemberNumber, Name: Acc.ChatRoom.Account[A].Name, Start: CommonTime(), Stage: 1 };
-								Acc.ChatRoom.Account[A].Lovership[TL] = { MemberNumber: Acc.MemberNumber, Name: Acc.Name, Start: CommonTime(), Stage: 1 };
+								Acc.Lovership[AL] = { MemberNumber: data.MemberNumber, Name: AccRoom.Name, Start: CommonTime(), Stage: 1 };
+								AccRoom.Lovership[TL] = { MemberNumber: Acc.MemberNumber, Name: Acc.Name, Start: CommonTime(), Stage: 1 };
 								AccountUpdateLovership( Acc.Lovership, Acc.MemberNumber);
-								AccountUpdateLovership( Acc.ChatRoom.Account[A].Lovership, Acc.Lovership[AL].MemberNumber, Acc.ChatRoom.Account[A].Socket);
+								AccountUpdateLovership( AccRoom.Lovership, Acc.Lovership[AL].MemberNumber, AccRoom.Socket);
 								var Dictionary = [];
 								Dictionary.push({ Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber });
 								Dictionary.push({ Tag: "TargetCharacter", Text: Acc.Lovership[AL].Name, MemberNumber: Acc.Lovership[AL].MemberNumber });
@@ -1853,10 +1866,10 @@ function AccountLovership(data, socket) {
 						if ((Acc.Lovership[AL].Stage != null) && (Acc.Lovership[AL].Stage == 1)
 							&& (Acc.Lovership[AL].BeginWeddingOfferedByMemberNumber != null) && (Acc.Lovership[AL].BeginWeddingOfferedByMemberNumber == data.MemberNumber)) {
 							if ((data.Action != null) && (data.Action === "Accept")) {
-								Acc.Lovership[AL] = { MemberNumber: data.MemberNumber, Name: Acc.ChatRoom.Account[A].Name, Start: CommonTime(), Stage: 2 };
-								Acc.ChatRoom.Account[A].Lovership[TL] = { MemberNumber: Acc.MemberNumber, Name: Acc.Name, Start: CommonTime(), Stage: 2 };
+								Acc.Lovership[AL] = { MemberNumber: data.MemberNumber, Name: AccRoom.Name, Start: CommonTime(), Stage: 2 };
+								AccRoom.Lovership[TL] = { MemberNumber: Acc.MemberNumber, Name: Acc.Name, Start: CommonTime(), Stage: 2 };
 								AccountUpdateLovership( Acc.Lovership, Acc.MemberNumber);
-								AccountUpdateLovership( Acc.ChatRoom.Account[A].Lovership, Acc.Lovership[AL].MemberNumber, Acc.ChatRoom.Account[A].Socket);
+								AccountUpdateLovership( AccRoom.Lovership, Acc.Lovership[AL].MemberNumber, AccRoom.Socket);
 								var Dictionary = [];
 								Dictionary.push({ Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber });
 								Dictionary.push({ Tag: "TargetCharacter", Text: Acc.Lovership[AL].Name, MemberNumber: Acc.Lovership[AL].MemberNumber });
