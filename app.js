@@ -722,45 +722,99 @@ function ChatRoomSearch(data, socket) {
 			var LN = /^[a-zA-Z0-9 ]+$/;
 			IgnoredRooms = IgnoredRooms.filter(R => typeof R === "string" && R.match(LN));
 
-			// Builds a list of all public rooms, the last rooms created are shown first
-			var CR = [];
-			var C = 0;
-			for (var C = ChatRoom.length - 1; ((C >= 0) && (CR.length <= 60)); C--)
-				if ((ChatRoom[C] != null) && ((FullRooms) || (ChatRoom[C].Account.length < ChatRoom[C].Limit)))
-					if ((Acc.Environment == ChatRoom[C].Environment) && (Space == ChatRoom[C].Space)) // Must be in same environment (prod/dev) and same space (hall/asylum)
-						if ((Game == "") || (Game == ChatRoom[C].Game)) // If we must filter for a specific game in a chat room
-							if (ChatRoom[C].Ban.indexOf(Acc.MemberNumber) < 0) // The player cannot be banned
-								if ((data.Query == "") || (ChatRoom[C].Name.toUpperCase().indexOf(data.Query) >= 0)) // Room name must contain the searched name, if any
-									if (!ChatRoom[C].Locked || (ChatRoom[C].Admin.indexOf(Acc.MemberNumber) >= 0)) // Must be unlocked, unless the player is an administrator
-										if (!ChatRoom[C].Private || (ChatRoom[C].Name.toUpperCase() == data.Query)) // If it's private, must know the exact name
-											if (IgnoredRooms.indexOf(ChatRoom[C].Name.toUpperCase()) == -1) { // Room name cannot be ignored
+			const maxLimit = 60;
+			let resultLimit = data.Limit || maxLimit;
+			if (resultLimit > maxLimit) {
+				resultLimit = maxLimit;
+			}
+			// Find the index to start from using cursor
+			let first = data.Cursor && typeof data.Cursor == "number" ? ChatRoom.reduce((prev, curr, idx) => {
+				if (curr.Creation <= data.Cursor && (prev == -1 || curr.Creation > ChatRoom[prev].Creation)) {
+					return idx;
+				} else {
+					return -1;
+				}
+			}, -1) : -1;
+			if (first == -1) {
+				first = ChatRoom.length - 1;
+			}
 
-												// Builds the searching account friend list in the current room
-												var Friends = [];
-												for (const RoomAcc of ChatRoom[C].Account)
-													if (RoomAcc != null)
-														if ((RoomAcc.Ownership != null) && (RoomAcc.Ownership.MemberNumber != null) && (RoomAcc.Ownership.MemberNumber == Acc.MemberNumber))
-															Friends.push({ Type: "Submissive", MemberNumber: RoomAcc.MemberNumber, MemberName: RoomAcc.Name});
-														else if ((Acc.FriendList != null) && (RoomAcc.FriendList != null) && (Acc.FriendList.indexOf(RoomAcc.MemberNumber) >= 0) && (RoomAcc.FriendList.indexOf(Acc.MemberNumber) >= 0))
-															Friends.push({ Type: "Friend", MemberNumber: RoomAcc.MemberNumber, MemberName: RoomAcc.Name});
+			// Builds a list of all public rooms, the last rooms created are shown first, get one more than result to reliably return if there are more results
+			let CR = [];
+			let Cursor = null;
+			for (let C = first; ((C >= 0) && (CR.length < resultLimit + 1)); C--) {
+				const Room = ChatRoom[C];
 
-												// Builds a room object with all data
-												CR.push({
-													Name: ChatRoom[C].Name,
-													Creator: ChatRoom[C].Creator,
-													MemberCount: ChatRoom[C].Account.length,
-													MemberLimit: ChatRoom[C].Limit,
-													Description: ChatRoom[C].Description,
-													BlockCategory: ChatRoom[C].BlockCategory,
-													Game: ChatRoom[C].Game,
-													Friends: Friends
-												});
+				// Skip invalid rooms
+				if (!Room) continue;
 
-											}
+				// Skip full rooms
+				if (FullRooms && Room.Account.length >= Room.Limit) continue;
 
-			// Sends the list to the client
+				// Skip mismatched environments (prod/dev)
+				if (Acc.Environment != Room.Environment) continue;
+
+				// Skip mismatched spaces (hall/asylum)
+				if (Space != Room.Space) continue;
+
+				// Skip mismatched game, if game is specified
+				if (Game != "" && Game != Room.Game) continue;
+
+				// Skip rooms, where requester is banned
+				if (Room.Ban.includes(Acc.MemberNumber)) continue;
+
+				// Skip rooms not matching search, if search was provided
+				if (data.Query != "" && Room.Name.toUpperCase().includes(data.Query)) continue;
+
+				// Skip locked rooms, unless requester is admin
+				if (Room.Locked && !Room.Admin.includes(Acc.MemberNumber)) continue;
+
+				// Skip private rooms, unless query matched the name exactly
+				if (Room.Private && Room.Name.toUpperCase() != data.Query) continue;
+
+				// Skip ignored rooms
+				if (IgnoredRooms.includes(Room.Name.toUpperCase())) continue;
+
+				// Builds the searching account friend list in the current room
+				var Friends = [];
+				for (const RoomAcc of Room.Account)
+					if (RoomAcc != null)
+						if ((RoomAcc.Ownership != null) && (RoomAcc.Ownership.MemberNumber != null) && (RoomAcc.Ownership.MemberNumber == Acc.MemberNumber))
+							Friends.push({ Type: "Submissive", MemberNumber: RoomAcc.MemberNumber, MemberName: RoomAcc.Name});
+						else if ((Acc.FriendList != null) && (RoomAcc.FriendList != null) && (Acc.FriendList.includes(RoomAcc.MemberNumber)) && (RoomAcc.FriendList.includes(Acc.MemberNumber)))
+							Friends.push({ Type: "Friend", MemberNumber: RoomAcc.MemberNumber, MemberName: RoomAcc.Name});
+
+				// Builds a room object with all data
+				CR.push({
+					Name: Room.Name,
+					Creator: Room.Creator,
+					MemberCount: Room.Account.length,
+					MemberLimit: Room.Limit,
+					Description: Room.Description,
+					BlockCategory: Room.BlockCategory,
+					Game: Room.Game,
+					Friends: Friends
+				});
+				Cursor = Room.Creation;
+			}
+
+			// Check if next page has results
+			const HasNext = CR.length > resultLimit;
+			if (HasNext) {
+				CR.pop();
+			}
+
+			// Deprecated: Sends the list to the client
 			socket.emit("ChatRoomSearchResult", CR);
 
+			// Send paginated response to the client; this is a new event, because it is not backwards compatible with ChatRoomSearchResult
+			socket.emit("ChatRoomSearchResultV2", {
+				Rooms: CR,
+				PageInfo: {
+					Cursor: Cursor,
+					HasNext: HasNext,
+				},
+			});
 		}
 
 	}
