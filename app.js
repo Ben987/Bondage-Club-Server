@@ -732,7 +732,7 @@ function ChatRoomSearch(data, socket) {
 				if (curr.Creation <= data.Cursor && (prev == -1 || curr.Creation > ChatRoom[prev].Creation)) {
 					return idx;
 				} else {
-					return -1;
+					return prev;
 				}
 			}, -1) : -1;
 			if (first == -1) {
