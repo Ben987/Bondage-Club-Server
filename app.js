@@ -764,7 +764,7 @@ function ChatRoomSearch(data, socket) {
 				if (Room.Ban.includes(Acc.MemberNumber)) continue;
 
 				// Skip rooms not matching search, if search was provided
-				if (data.Query != "" && Room.Name.toUpperCase().includes(data.Query)) continue;
+				if (data.Query != "" && !Room.Name.toUpperCase().includes(data.Query)) continue;
 
 				// Skip locked rooms, unless requester is admin
 				if (Room.Locked && !Room.Admin.includes(Acc.MemberNumber)) continue;
