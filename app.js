@@ -802,19 +802,28 @@ function ChatRoomSearch(data, socket) {
 			const HasNext = CR.length > resultLimit;
 			if (HasNext) {
 				CR.pop();
+			} else {
+				// No cursor, if no next page
+				Cursor = null;
 			}
 
-			// Deprecated: Sends the list to the client
-			socket.emit("ChatRoomSearchResult", CR);
+			let Results;
+			switch (data.Version) {
+				case "2":
+					Results = {
+						Rooms: CR,
+						PageInfo: {
+							Cursor: Cursor,
+							HasNext: HasNext,
+						},
+					};
+					break;
+				default:
+					Results = CR;
+					break;
+			}
 
-			// Send paginated response to the client; this is a new event, because it is not backwards compatible with ChatRoomSearchResult
-			socket.emit("ChatRoomSearchResultV2", {
-				Rooms: CR,
-				PageInfo: {
-					Cursor: Cursor,
-					HasNext: HasNext,
-				},
-			});
+			socket.emit("ChatRoomSearchResult", Results);
 		}
 
 	}
