@@ -788,6 +788,7 @@ function ChatRoomSearch(data, socket) {
 				CR.push({
 					Name: Room.Name,
 					Creator: Room.Creator,
+					Creation: Room.Creation,
 					MemberCount: Room.Account.length,
 					MemberLimit: Room.Limit,
 					Description: Room.Description,
