@@ -722,7 +722,7 @@ function ChatRoomSearch(data, socket) {
 			var LN = /^[a-zA-Z0-9 ]+$/;
 			IgnoredRooms = IgnoredRooms.filter(R => typeof R === "string" && R.match(LN));
 
-			const maxLimit = 60;
+			const maxLimit = 61;
 			let resultLimit = data.Limit || maxLimit;
 			if (resultLimit > maxLimit) {
 				resultLimit = maxLimit;
