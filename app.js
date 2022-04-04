@@ -749,7 +749,7 @@ function ChatRoomSearch(data, socket) {
 				if (!Room) continue;
 
 				// Skip full rooms
-				if (FullRooms && Room.Account.length >= Room.Limit) continue;
+				if (!FullRooms && Room.Account.length >= Room.Limit) continue;
 
 				// Skip mismatched environments (prod/dev)
 				if (Acc.Environment != Room.Environment) continue;
