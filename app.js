@@ -739,7 +739,7 @@ function ChatRoomSearch(data, socket) {
 				first = ChatRoom.length - 1;
 			}
 
-			// Builds a list of all public rooms, the last rooms created are shown first, get one more than result to reliably return if there are more results
+			// Builds a list of all public rooms, the last rooms created are shown first, get +1 more than result for hasNext logic below the loop
 			let CR = [];
 			let Cursor = null;
 			for (let C = first; ((C >= 0) && (CR.length < resultLimit + 1)); C--) {
@@ -795,16 +795,13 @@ function ChatRoomSearch(data, socket) {
 					Game: Room.Game,
 					Friends: Friends
 				});
-				Cursor = Room.Creation;
 			}
 
-			// Check if next page has results and removes the first result of the next page if so
+			// Check if next page has results; see comment above loop
 			const HasNext = CR.length > resultLimit;
 			if (HasNext) {
-				CR.pop();
-			} else {
-				// No cursor, if no next page
-				Cursor = null;
+				// Remove next page's first result and use its creation time as the cursor
+				Cursor = CR.pop().Creation;
 			}
 
 			let Results;
