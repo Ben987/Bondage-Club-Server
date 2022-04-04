@@ -788,7 +788,6 @@ function ChatRoomSearch(data, socket) {
 				CR.push({
 					Name: Room.Name,
 					Creator: Room.Creator,
-					Creation: Room.Creation,
 					MemberCount: Room.Account.length,
 					MemberLimit: Room.Limit,
 					Description: Room.Description,
@@ -796,13 +795,18 @@ function ChatRoomSearch(data, socket) {
 					Game: Room.Game,
 					Friends: Friends
 				});
+				
+				// Save latest room's creation time as the cursor
+				Cursor = Room.Creation;
 			}
 
 			// Check if next page has results; see comment above loop
 			const HasNext = CR.length > resultLimit;
 			if (HasNext) {
-				// Remove next page's first result and use its creation time as the cursor
-				Cursor = CR.pop().Creation;
+				// Remove next page's first result
+				CR.pop();
+			} else {
+				Cursor = null;
 			}
 
 			let Results;
