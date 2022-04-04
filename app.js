@@ -798,7 +798,7 @@ function ChatRoomSearch(data, socket) {
 				Cursor = Room.Creation;
 			}
 
-			// Check if next page has results
+			// Check if next page has results and removes the first result of the next page if so
 			const HasNext = CR.length > resultLimit;
 			if (HasNext) {
 				CR.pop();
