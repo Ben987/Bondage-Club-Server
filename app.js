@@ -777,7 +777,7 @@ function ChatRoomSearch(data, socket) {
 			const Start = data.Offset || 0;
 			const End = Start + ResultLimit;
 			let HasNext = false;
-			if (End + 1 < Rooms.length) {
+			if (End < Rooms.length) {
 				HasNext = true;
 			}
 
