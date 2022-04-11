@@ -751,27 +751,28 @@ function ChatRoomSearch(data, socket) {
 			});
 
 			// Room filters
-			Rooms = Rooms
+			Rooms = Rooms.filter(r => {
 				// Only include non-null rooms
-				.filter(r => r)
-				// Full rooms requested or not full
-				.filter(r => FullRooms || r.Account.length < r.Limit)
-				// Environment matches
-				.filter(r => r.Environment == Acc.Environment)
-				// Room space matches
-				.filter(r => r.Space == Space)
-				// Game matches, if specified
-				.filter(r => Game == "" || Game == r.Game)
-				// Acc not banned
-				.filter(r => !r.Ban?.includes(Acc.MemberNumber))
-				// Match searched word, if provided
-				.filter(r => !data.Query || r.Name.toUpperCase().includes(data.Query))
-				// Filter locked rooms, unless admin
-				.filter(r => !r.Locked || r.Admin.includes(Acc.MemberNumber))
-				// Filter private rooms, unless query matches exactly
-				.filter(r => !r.Private || r.Name.toUpperCase() === data.Query)
-				// Filter ignored rooms
-				.filter(r => !IgnoredRooms.includes(r.Name.toUpperCase()))
+				return (r)
+					// Full rooms requested or not full
+					&& (FullRooms || r.Account.length < r.Limit)
+					// Environment matches
+					&& (r.Environment == Acc.Environment)
+					// Room space matches
+					&& (r.Space == Space)
+					// Game matches, if specified
+					&& (Game == "" || Game == r.Game)
+					// Acc not banned
+					&& (!r.Ban?.includes(Acc.MemberNumber))
+					// Match searched word, if provided
+					&& (!data.Query || r.Name.toUpperCase().includes(data.Query))
+					// Filter locked rooms, unless admin
+					&& (!r.Locked || r.Admin.includes(Acc.MemberNumber))
+					// Filter private rooms, unless query matches exactly
+					&& (!r.Private || r.Name.toUpperCase() === data.Query)
+					// Filter ignored rooms
+					&& (!IgnoredRooms.includes(r.Name.toUpperCase()));
+			});
 
 			// Get requested page information
 			const Start = data.Offset || 0;
