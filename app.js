@@ -722,59 +722,68 @@ function ChatRoomSearch(data, socket) {
 			var LN = /^[a-zA-Z0-9 ]+$/;
 			IgnoredRooms = IgnoredRooms.filter(R => typeof R === "string" && R.match(LN));
 
-			const maxLimit = 61;
-			let resultLimit = data.Limit || maxLimit;
-			if (resultLimit > maxLimit) {
-				resultLimit = maxLimit;
+			const MaxLimit = 100;
+			let ResultLimit = data.Limit || MaxLimit;
+			if (ResultLimit > MaxLimit) {
+				ResultLimit = MaxLimit;
 			}
-			// Find the index to start from using cursor
-			let first = data.Cursor && typeof data.Cursor == "number" ? ChatRoom.reduce((prev, curr, idx) => {
-				if (curr.Creation <= data.Cursor && (prev == -1 || curr.Creation > ChatRoom[prev].Creation)) {
-					return idx;
-				} else {
-					return prev;
+
+			// Sort rooms
+			let Rooms = [...ChatRoom];
+			Rooms.sort((a, b) => {
+				// Sort rooms with friends before other rooms, if requested
+				if (data.FriendsFirst) {
+					const hasFriends = (r) => r.Account.some(RoomAcc =>
+						RoomAcc.Ownership?.MemberNumber === Acc.MemberNumber
+						||
+						Acc.FriendList?.includes(RoomAcc.MemberNumber) && RoomAcc.FriendList?.includes(Acc.MemberNumber)
+						);
+					const aHasFriends = hasFriends(a);
+					const bHasFriends = hasFriends(b);
+					if (aHasFriends && !bHasFriends) return -1;
+					if (!aHasFriends && bHasFriends) return 1;
 				}
-			}, -1) : -1;
-			if (first == -1) {
-				first = ChatRoom.length - 1;
+				const aIsFull = a.Account.length >= a.Limit;
+				const bIsFull = a.Account.length >= b.Limit;
+				if (aIsFull && bIsFull) return 0;
+				if (aIsFull) return 1;
+				return -1;
+			});
+
+			// Room filters
+			Rooms = Rooms
+				// Only include non-null rooms
+				.filter(r => r)
+				// Full rooms requested or not full
+				.filter(r => FullRooms || r.Account.length < r.Limit)
+				// Environment matches
+				.filter(r => r.Environment == Acc.Environment)
+				// Room space matches
+				.filter(r => r.Space == Space)
+				// Game matches, if specified
+				.filter(r => Game == "" || Game == r.Game)
+				// Acc not banned
+				.filter(r => !r.Ban?.includes(Acc.MemberNumber))
+				// Match searched word, if provided
+				.filter(r => !data.Query || r.Name.toUpperCase().includes(data.Query))
+				// Filter locked rooms, unless admin
+				.filter(r => !r.Locked || r.Admin.includes(Acc.MemberNumber))
+				// Filter private rooms, unless query matches exactly
+				.filter(r => !r.Private || r.Name.toUpperCase() === data.Query)
+				// Filter ignored rooms
+				.filter(r => !IgnoredRooms.includes(r.Name.toUpperCase()))
+
+			// Get requested page information
+			const Start = data.Offset || 0;
+			const End = Start + ResultLimit;
+			let HasNext = false;
+			if (End + 1 < Rooms.length) {
+				HasNext = true;
 			}
 
-			// Builds a list of all public rooms, the last rooms created are shown first, get +1 more than result for hasNext logic below the loop
-			let CR = [];
-			let Cursor = null;
-			for (let C = first; ((C >= 0) && (CR.length < resultLimit + 1)); C--) {
-				const Room = ChatRoom[C];
-
-				// Skip invalid rooms
-				if (!Room) continue;
-
-				// Skip full rooms
-				if (!FullRooms && Room.Account.length >= Room.Limit) continue;
-
-				// Skip mismatched environments (prod/dev)
-				if (Acc.Environment != Room.Environment) continue;
-
-				// Skip mismatched spaces (hall/asylum)
-				if (Space != Room.Space) continue;
-
-				// Skip mismatched game, if game is specified
-				if (Game != "" && Game != Room.Game) continue;
-
-				// Skip rooms, where requester is banned
-				if (Room.Ban.includes(Acc.MemberNumber)) continue;
-
-				// Skip rooms not matching search, if search was provided
-				if (data.Query != "" && !Room.Name.toUpperCase().includes(data.Query)) continue;
-
-				// Skip locked rooms, unless requester is admin
-				if (Room.Locked && !Room.Admin.includes(Acc.MemberNumber)) continue;
-
-				// Skip private rooms, unless query matched the name exactly
-				if (Room.Private && Room.Name.toUpperCase() != data.Query) continue;
-
-				// Skip ignored rooms
-				if (IgnoredRooms.includes(Room.Name.toUpperCase())) continue;
-
+			// Build the requested page from the filtered rooms
+			const CR = Rooms.slice(Start, End).map(Room => {
+			
 				// Builds the searching account friend list in the current room
 				var Friends = [];
 				for (const RoomAcc of Room.Account)
@@ -785,7 +794,7 @@ function ChatRoomSearch(data, socket) {
 							Friends.push({ Type: "Friend", MemberNumber: RoomAcc.MemberNumber, MemberName: RoomAcc.Name});
 
 				// Builds a room object with all data
-				CR.push({
+				return {
 					Name: Room.Name,
 					Creator: Room.Creator,
 					MemberCount: Room.Account.length,
@@ -794,20 +803,8 @@ function ChatRoomSearch(data, socket) {
 					BlockCategory: Room.BlockCategory,
 					Game: Room.Game,
 					Friends: Friends
-				});
-				
-				// Save latest room's creation time as the cursor
-				Cursor = Room.Creation;
-			}
-
-			// Check if next page has results; see comment above loop
-			const HasNext = CR.length > resultLimit;
-			if (HasNext) {
-				// Remove next page's first result
-				CR.pop();
-			} else {
-				Cursor = null;
-			}
+				};
+			});
 
 			let Results;
 			switch (data.Version) {
@@ -815,7 +812,6 @@ function ChatRoomSearch(data, socket) {
 					Results = {
 						Rooms: CR,
 						PageInfo: {
-							Cursor: Cursor,
 							HasNext: HasNext,
 						},
 					};
