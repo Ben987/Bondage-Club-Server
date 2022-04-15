@@ -725,7 +725,7 @@ function ChatRoomSearch(data, socket) {
 			// Builds a list of all public rooms, the last rooms created are shown first
 			var CR = [];
 			var C = 0;
-			for (var C = ChatRoom.length - 1; ((C >= 0) && (CR.length <= 60)); C--)
+			for (var C = ChatRoom.length - 1; ((C >= 0) && (CR.length <= 120)); C--)
 				if ((ChatRoom[C] != null) && ((FullRooms) || (ChatRoom[C].Account.length < ChatRoom[C].Limit)))
 					if ((Acc.Environment == ChatRoom[C].Environment) && (Space == ChatRoom[C].Space)) // Must be in same environment (prod/dev) and same space (hall/asylum)
 						if ((Game == "") || (Game == ChatRoom[C].Game)) // If we must filter for a specific game in a chat room
