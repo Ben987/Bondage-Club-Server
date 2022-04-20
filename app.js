@@ -556,9 +556,10 @@ function AccountUpdate(data, socket) {
 					delete data.Lover;
 				}
 				if ((data.Title != null)) Acc.Title = data.Title;
+				if ((data.Nickname != null)) Acc.Nickname = data.Nickname;
 
 				// Some changes should be synched to other players in chatroom
-				if ((Acc != null) && Acc.ChatRoom && ["AssetFamily", "Title", "Reputation", "Description", "LabelColor", "ItemPermission", "Inventory", "BlockItems", "LimitedItems", "FavoriteItems", "OnlineSharedSettings", "WhiteList", "BlackList"].some(k => data[k] != null))
+				if ((Acc != null) && Acc.ChatRoom && ["AssetFamily", "Title", "Nickname", "Reputation", "Description", "LabelColor", "ItemPermission", "Inventory", "BlockItems", "LimitedItems", "FavoriteItems", "OnlineSharedSettings", "WhiteList", "BlackList"].some(k => data[k] != null))
 					ChatRoomSyncCharacter(Acc.ChatRoom, Acc.MemberNumber, Acc.MemberNumber);
 
 				// If we have data to push
@@ -722,7 +723,7 @@ function ChatRoomSearch(data, socket) {
 			var LN = /^[a-zA-Z0-9 ]+$/;
 			IgnoredRooms = IgnoredRooms.filter(R => typeof R === "string" && R.match(LN));
 
-			const MaxLimit = 121;
+			const MaxLimit = 120;
 			let ResultLimit = data.Limit || MaxLimit;
 			if (ResultLimit > MaxLimit) {
 				ResultLimit = MaxLimit;
@@ -1044,6 +1045,7 @@ function ChatRoomSyncGetCharSharedData(Acc) {
 		Name: Acc.Name,
 		AssetFamily: Acc.AssetFamily,
 		Title: Acc.Title,
+		Nickname: Acc.Nickname,
 		Appearance: Acc.Appearance,
 		ActivePose: Acc.ActivePose,
 		Reputation: Acc.Reputation,
