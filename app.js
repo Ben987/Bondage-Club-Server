@@ -731,34 +731,35 @@ function ChatRoomSearch(data, socket) {
 					if ((Acc.Environment == ChatRoom[C].Environment) && (Space == ChatRoom[C].Space)) // Must be in same environment (prod/dev) and same space (hall/asylum)
 						if ((Game == "") || (Game == ChatRoom[C].Game)) // If we must filter for a specific game in a chat room
 							if (ChatRoom[C].Ban.indexOf(Acc.MemberNumber) < 0) // The player cannot be banned
-								if ((data.Query == "") || (ChatRoom[C].Name.toUpperCase().indexOf(data.Query) >= 0)) // Room name must contain the searched name, if any
-									if (!ChatRoom[C].Locked || (ChatRoom[C].Admin.indexOf(Acc.MemberNumber) >= 0)) // Must be unlocked, unless the player is an administrator
-										if (!ChatRoom[C].Private || (ChatRoom[C].Name.toUpperCase() == data.Query)) // If it's private, must know the exact name
-											if (IgnoredRooms.indexOf(ChatRoom[C].Name.toUpperCase()) == -1) { // Room name cannot be ignored
+								if ((data.Language == null) || (typeof data.Language !== "string") || (data.Language == "") || (data.Language === ChatRoom[C].Language)) // Filters by language
+									if ((data.Query == "") || (ChatRoom[C].Name.toUpperCase().indexOf(data.Query) >= 0)) // Room name must contain the searched name, if any
+										if (!ChatRoom[C].Locked || (ChatRoom[C].Admin.indexOf(Acc.MemberNumber) >= 0)) // Must be unlocked, unless the player is an administrator
+											if (!ChatRoom[C].Private || (ChatRoom[C].Name.toUpperCase() == data.Query)) // If it's private, must know the exact name
+												if (IgnoredRooms.indexOf(ChatRoom[C].Name.toUpperCase()) == -1) { // Room name cannot be ignored
 
-												// Builds the searching account friend list in the current room
-												var Friends = [];
-												for (const RoomAcc of ChatRoom[C].Account)
-													if (RoomAcc != null)
-														if ((RoomAcc.Ownership != null) && (RoomAcc.Ownership.MemberNumber != null) && (RoomAcc.Ownership.MemberNumber == Acc.MemberNumber))
-															Friends.push({ Type: "Submissive", MemberNumber: RoomAcc.MemberNumber, MemberName: RoomAcc.Name});
-														else if ((Acc.FriendList != null) && (RoomAcc.FriendList != null) && (Acc.FriendList.indexOf(RoomAcc.MemberNumber) >= 0) && (RoomAcc.FriendList.indexOf(Acc.MemberNumber) >= 0))
-															Friends.push({ Type: "Friend", MemberNumber: RoomAcc.MemberNumber, MemberName: RoomAcc.Name});
+													// Builds the searching account friend list in the current room
+													var Friends = [];
+													for (const RoomAcc of ChatRoom[C].Account)
+														if (RoomAcc != null)
+															if ((RoomAcc.Ownership != null) && (RoomAcc.Ownership.MemberNumber != null) && (RoomAcc.Ownership.MemberNumber == Acc.MemberNumber))
+																Friends.push({ Type: "Submissive", MemberNumber: RoomAcc.MemberNumber, MemberName: RoomAcc.Name});
+															else if ((Acc.FriendList != null) && (RoomAcc.FriendList != null) && (Acc.FriendList.indexOf(RoomAcc.MemberNumber) >= 0) && (RoomAcc.FriendList.indexOf(Acc.MemberNumber) >= 0))
+																Friends.push({ Type: "Friend", MemberNumber: RoomAcc.MemberNumber, MemberName: RoomAcc.Name});
 
-												// Builds a room object with all data
-												CR.push({
-													Name: ChatRoom[C].Name,
-													Language: ChatRoom[C].Language,
-													Creator: ChatRoom[C].Creator,
-													MemberCount: ChatRoom[C].Account.length,
-													MemberLimit: ChatRoom[C].Limit,
-													Description: ChatRoom[C].Description,
-													BlockCategory: ChatRoom[C].BlockCategory,
-													Game: ChatRoom[C].Game,
-													Friends: Friends
-												});
+													// Builds a room object with all data
+													CR.push({
+														Name: ChatRoom[C].Name,
+														Language: ChatRoom[C].Language,
+														Creator: ChatRoom[C].Creator,
+														MemberCount: ChatRoom[C].Account.length,
+														MemberLimit: ChatRoom[C].Limit,
+														Description: ChatRoom[C].Description,
+														BlockCategory: ChatRoom[C].BlockCategory,
+														Game: ChatRoom[C].Game,
+														Friends: Friends
+													});
 
-											}
+												}
 
 			// Sends the list to the client
 			socket.emit("ChatRoomSearchResult", CR);
