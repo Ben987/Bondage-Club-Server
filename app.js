@@ -748,6 +748,7 @@ function ChatRoomSearch(data, socket) {
 												// Builds a room object with all data
 												CR.push({
 													Name: ChatRoom[C].Name,
+													Language: ChatRoom[C].Language,
 													Creator: ChatRoom[C].Creator,
 													MemberCount: ChatRoom[C].Account.length,
 													MemberLimit: ChatRoom[C].Limit,
@@ -804,6 +805,7 @@ function ChatRoomCreate(data, socket) {
 			var NewRoom = {
 				ID: base64id.generateId(),
 				Name: data.Name,
+				Language: data.Language,
 				Description: data.Description,
 				Background: data.Background,
 				Limit: ((data.Limit == null) || (typeof data.Limit !== "string") || isNaN(parseInt(data.Limit)) || (parseInt(data.Limit) < 2) || (parseInt(data.Limit) > 10)) ? 10 : parseInt(data.Limit),
@@ -1017,6 +1019,7 @@ function ChatRoomGetData(CR, SourceMemberNumber, IncludeCharacters)
 	// Builds the room data
 	const R = {
 		Name: CR.Name,
+		Language: CR.Language,
 		Description: CR.Description,
 		Admin: CR.Admin,
 		Ban: CR.Ban,
@@ -1248,6 +1251,7 @@ function ChatRoomAdmin(data, socket) {
 								return;
 							}
 						Acc.ChatRoom.Name = data.Room.Name;
+						Acc.ChatRoom.Language = data.Room.Language;
 						Acc.ChatRoom.Background = data.Room.Background;
 						Acc.ChatRoom.Description = data.Room.Description;
 						if ((data.Room.BlockCategory == null) || !Array.isArray(data.Room.BlockCategory)) data.Room.BlockCategory = [];
