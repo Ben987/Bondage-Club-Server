@@ -1727,9 +1727,9 @@ function AccountLovership(data, socket) {
 						P = result[0].Lovership;
 
 						var TargetLoversNumbers = [];
-						for (const Lover of P) {
-							TargetLoversNumbers.push(Lover.MemberNumber ? Lover.MemberNumber : -1);
-						}
+						if ((P != null) && Array.isArray(P))
+							for (const Lover of P)
+								TargetLoversNumbers.push(Lover.MemberNumber ? Lover.MemberNumber : -1);
 
 						if (Array.isArray(P)) P.splice(TargetLoversNumbers.indexOf(Acc.MemberNumber), 1);
 						else P = [];
@@ -1739,9 +1739,7 @@ function AccountLovership(data, socket) {
 								OtherAcc.Lovership = P;
 								OtherAcc.Socket.emit("AccountLovership", { Lovership: OtherAcc.Lovership });
 								if (OtherAcc.ChatRoom != null)
-								{
 									ChatRoomSyncCharacter(OtherAcc.ChatRoom, OtherAcc.MemberNumber, OtherAcc.MemberNumber);
-								}
 							}
 
 						AccountUpdateLovership(P, data.MemberNumber, null,false);
