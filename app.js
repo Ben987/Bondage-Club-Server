@@ -933,6 +933,7 @@ function ChatRoomLeave(socket) {
 // Sends a text message to everyone in the room or a specific target
 function ChatRoomMessage(CR, Sender, Content, Type, Target, Dictionary) {
 	if (CR == null) return;
+	if (Type == 'Whisper' && Target == null) return;
 	if (Target == null) {
 		IO.to("chatroom-" + CR.ID).emit("ChatRoomMessage", { Sender: Sender, Content: Content, Type: Type, Dictionary: Dictionary } );
 	} else {
