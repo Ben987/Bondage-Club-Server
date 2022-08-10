@@ -532,7 +532,7 @@ function AccountUpdate(data, socket) {
 				if ((data.WhiteList != null) && Array.isArray(data.WhiteList)) Acc.WhiteList = data.WhiteList;
 				if ((data.BlackList != null) && Array.isArray(data.BlackList)) Acc.BlackList = data.BlackList;
 				if ((data.FriendList != null) && Array.isArray(data.FriendList)) Acc.FriendList = data.FriendList;
-				if ((data.Lover != null) && (Array.isArray(Acc.Lovership)) && (Acc.Lovership.length < 5) && data.Lover.startsWith("NPC-")) {
+				if ((data.Lover != null) && (Array.isArray(Acc.Lovership)) && (Acc.Lovership.length < 5) && (typeof data.Lover === "string") && data.Lover.startsWith("NPC-")) {
 					var isLoverPresent = false;
 					for (var L = 0; L < Acc.Lovership.length; L++) {
 						if ((Acc.Lovership[L].Name != null) && (Acc.Lovership[L].Name == data.Lover)) {
