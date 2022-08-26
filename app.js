@@ -557,9 +557,10 @@ function AccountUpdate(data, socket) {
 				}
 				if ((data.Title != null)) Acc.Title = data.Title;
 				if ((data.Nickname != null)) Acc.Nickname = data.Nickname;
+				if ((data.Crafting != null)) Acc.Crafting = data.Crafting;
 
 				// Some changes should be synched to other players in chatroom
-				if ((Acc != null) && Acc.ChatRoom && ["AssetFamily", "Title", "Nickname", "Reputation", "Description", "LabelColor", "ItemPermission", "Inventory", "BlockItems", "LimitedItems", "FavoriteItems", "OnlineSharedSettings", "WhiteList", "BlackList"].some(k => data[k] != null))
+				if ((Acc != null) && Acc.ChatRoom && ["AssetFamily", "Title", "Nickname", "Crafting", "Reputation", "Description", "LabelColor", "ItemPermission", "Inventory", "BlockItems", "LimitedItems", "FavoriteItems", "OnlineSharedSettings", "WhiteList", "BlackList"].some(k => data[k] != null))
 					ChatRoomSyncCharacter(Acc.ChatRoom, Acc.MemberNumber, Acc.MemberNumber);
 
 				// If we have data to push
@@ -1009,6 +1010,7 @@ function ChatRoomSyncGetCharSharedData(Acc) {
 		WhiteList,
 		BlackList,
 		Game: Acc.Game,
+		Crafting: Acc.Crafting,
 		Difficulty: Acc.Difficulty
 	};
 }
