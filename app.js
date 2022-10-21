@@ -1583,7 +1583,7 @@ function AccountOwnership(data, socket) {
 					if (!Target) return;
 					Target.Owner = "";
 					Target.Ownership = null;
-					TargetAcc.Socket.emit("AccountOwnership", { ClearOwnership: true });
+					Target.Socket.emit("AccountOwnership", { ClearOwnership: true });
 					if (Target.ChatRoom != null) ChatRoomSyncCharacter(Target.ChatRoom, Target.MemberNumber, Target.MemberNumber);
 				} else ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "ReleaseOfflineSubFail", "ServerMessage", Acc.MemberNumber);
 			});
