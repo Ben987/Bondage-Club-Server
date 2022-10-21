@@ -1577,15 +1577,15 @@ function AccountOwnership(data, socket) {
 			Database.collection(AccountCollection).findOne({ MemberNumber : data.MemberNumber }, function(err, result) {
 				if (err) throw err;
 				if ((result != null) && (result.MemberNumber != null) && (result.MemberNumber === data.MemberNumber) && (result.Ownership != null) && (result.Ownership.MemberNumber === Acc.MemberNumber)) {
-					let Data = { Owner: "", Ownership: null };
-					Database.collection(AccountCollection).updateOne({ AccountName : result.AccountName }, { $set: { Data } }, function(err, res) { if (err) throw err; });
+					Database.collection(AccountCollection).updateOne({ AccountName : result.AccountName }, { $set: { Owner: "", Ownership: null } }, function(err, res) { if (err) throw err; });
 					ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "ReleaseOfflineSubSuccess", "ServerMessage", Acc.MemberNumber);
-					const Target = Account.find(A => A.MemberNumber === data.MemberNumber);
+					let Target = Account.find(A => A.MemberNumber === data.MemberNumber);
 					if (!Target) return;
+					Target.Owner = "";
+					Target.Ownership = null;
 					TargetAcc.Socket.emit("AccountOwnership", { ClearOwnership: true });
-				} else {
-					ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "ReleaseOfflineSubFail", "ServerMessage", Acc.MemberNumber);
-				}
+					if (Target.ChatRoom != null) ChatRoomSyncCharacter(Target.ChatRoom, Target.MemberNumber, Target.MemberNumber);
+				} else ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "ReleaseOfflineSubFail", "ServerMessage", Acc.MemberNumber);
 			});
 
 		}
