@@ -1555,22 +1555,8 @@ function AccountOwnership(data, socket) {
 		// The submissive can flush it's owner at any time in the trial, or after a delay if collared.  Players on Extreme mode cannot break the full ownership.
 		const Acc = AccountGet(socket.id);
 		if (Acc == null) return;
-
-		if (Acc.Ownership != null &&
-			Acc.Ownership.Stage != null &&
-			Acc.Ownership.Start != null &&
-			(Acc.Ownership.Stage == 0 || Acc.Ownership.Start + OwnershipDelay <= CommonTime()) &&
-			data.Action === "Break"
-		) {
-			if (Acc.Difficulty == null ||
-				Acc.Difficulty.Level == null ||
-				typeof Acc.Difficulty.Level !== "number" ||
-				Acc.Difficulty.Level <= 2 ||
-				Acc.Ownership == null ||
-				Acc.Ownership.Stage == null ||
-				typeof Acc.Ownership.Stage !== "number" ||
-				Acc.Ownership.Stage == 0
-			) {
+		if (Acc.Ownership != null && Acc.Ownership.Stage != null && Acc.Ownership.Start != null && (Acc.Ownership.Stage == 0 || Acc.Ownership.Start + OwnershipDelay <= CommonTime()) && data.Action === "Break") {
+			if (Acc.Difficulty == null || Acc.Difficulty.Level == null || typeof Acc.Difficulty.Level !== "number" || Acc.Difficulty.Level <= 2 || Acc.Ownership == null || Acc.Ownership.Stage == null || typeof Acc.Ownership.Stage !== "number" || Acc.Ownership.Stage == 0) {
 				Acc.Owner = "";
 				Acc.Ownership = null;
 				let O = { Ownership: Acc.Ownership, Owner: Acc.Owner };
@@ -1580,19 +1566,35 @@ function AccountOwnership(data, socket) {
 			}
 		}
 
-		// Rest of actions require being in chatroom and a target
+		// Get the target within the chatroom
 		if (Acc.ChatRoom == null) return;
-
 		const TargetAcc = Acc.ChatRoom.Account.find(A => A.MemberNumber === data.MemberNumber);
+
+		// Can release a target that's not in the chatroom
+		if (!TargetAcc && (data.Action === "Release") && (Acc.MemberNumber != null) && (data.MemberNumber != null)) {
+
+			// Gets the account linked to that member number, make sure 
+			Database.collection(AccountCollection).findOne({ MemberNumber : data.MemberNumber }, function(err, result) {
+				if (err) throw err;
+				if ((result != null) && (result.MemberNumber != null) && (result.MemberNumber === data.MemberNumber) && (result.Ownership != null) && (result.Ownership.MemberNumber === Acc.MemberNumber)) {
+					let Data = { Owner: "", Ownership: null };
+					Database.collection(AccountCollection).updateOne({ AccountName : result.AccountName }, { $set: { Data } }, function(err, res) { if (err) throw err; });
+					ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "ReleaseOfflineSubSuccess", "ServerMessage", Acc.MemberNumber);
+					const Target = Account.find(A => A.MemberNumber === data.MemberNumber);
+					if (!Target) return;
+					TargetAcc.Socket.emit("AccountOwnership", { ClearOwnership: true });
+				} else {
+					ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "ReleaseOfflineSubFail", "ServerMessage", Acc.MemberNumber);
+				}
+			});
+
+		}
+
+		// Exit if there's no target
 		if (!TargetAcc) return;
 
-		// In a chatroom, the dominant and submissive can enter in a BDSM relationship (4 steps to complete)
-
 		// The dominant can release the submissive player at any time
-		if (data.Action === "Release" &&
-			TargetAcc.Ownership != null &&
-			TargetAcc.Ownership.MemberNumber === Acc.MemberNumber
-		) {
+		if (data.Action === "Release" && TargetAcc.Ownership != null && TargetAcc.Ownership.MemberNumber === Acc.MemberNumber) {
 			const isTrial = typeof TargetAcc.Ownership.Stage !== "number" || TargetAcc.Ownership.Stage == 0;
 			TargetAcc.Owner = "";
 			TargetAcc.Ownership = null;
@@ -1607,8 +1609,8 @@ function AccountOwnership(data, socket) {
 			return;
 		}
 
-		// The dominant player proposes to the submissive player
-		// Cannot propose if target player is already owner
+		// In a chatroom, the dominant and submissive can enter in a BDSM relationship (4 steps to complete)
+		// The dominant player proposes to the submissive player, cannot propose if target player is already owner
 		if (Acc.Ownership == null ||
 			Acc.Ownership.MemberNumber == null ||
 			Acc.Ownership.MemberNumber != data.MemberNumber
