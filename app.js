@@ -1302,7 +1302,7 @@ function ChatRoomAdmin(data, socket) {
 			}
 
 			// If the account to act upon is in the room, an administrator can ban, kick, move, promote or demote him
-			for (var A = 0; A < Acc.ChatRoom.Account.length; A++)
+			for (var A = 0; (Acc.ChatRoom != null) && (A < Acc.ChatRoom.Account.length); A++)
 				if (Acc.ChatRoom.Account[A].MemberNumber == data.MemberNumber) {
 					var Dictionary = [];
 					if (data.Action == "Ban") {
@@ -1366,12 +1366,12 @@ function ChatRoomAdmin(data, socket) {
 				}
 
 			// Can also ban or unban without having the player in the room, there's no visible output
-			if ((data.Action == "Ban") && (Acc.ChatRoom.Ban.indexOf(data.MemberNumber) < 0))
+			if ((data.Action == "Ban") && (Acc.ChatRoom != null) && (Acc.ChatRoom.Ban.indexOf(data.MemberNumber) < 0))
 			{
 				Acc.ChatRoom.Ban.push(data.MemberNumber);
 				ChatRoomSyncRoomProperties(Acc.ChatRoom, Acc.MemberNumber);
 			}
-			if ((data.Action == "Unban") && (Acc.ChatRoom.Ban.indexOf(data.MemberNumber) >= 0))
+			if ((data.Action == "Unban") && (Acc.ChatRoom != null) && (Acc.ChatRoom.Ban.indexOf(data.MemberNumber) >= 0))
 			{
 				Acc.ChatRoom.Ban.splice(Acc.ChatRoom.Ban.indexOf(data.MemberNumber), 1);
 				ChatRoomSyncRoomProperties(Acc.ChatRoom, Acc.MemberNumber);
