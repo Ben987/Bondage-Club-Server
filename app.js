@@ -704,9 +704,11 @@ function ChatRoomSearch(data, socket) {
 		var Acc = AccountGet(socket.id);
 		if (Acc != null) {
 
-			// Gets the space of the chat room (empty for public, asylum, etc.)
-			var Space = "";
-			if ((data.Space != null) && (typeof data.Space === "string") && (data.Space.length <= 100)) Space = data.Space;
+			// Gets the chat room spaces to return (empty for public, asylum, etc.)
+			var Spaces = [];
+			if ((data.Space != null) && (typeof data.Space === "string") && (data.Space.length <= 100)) Spaces = [data.Space];
+			else if ((data.Space != null) && (Array.isArray(data.Space)))
+				data.Space.forEach(space => { if (typeof space === "string" && space.length <= 100) Spaces.push(space) });
 
 			// Gets the game name currently being played in the chat room (empty for all games and non-games rooms)
 			var Game = "";
@@ -729,7 +731,7 @@ function ChatRoomSearch(data, socket) {
 			var C = 0;
 			for (var C = ChatRoom.length - 1; ((C >= 0) && (CR.length <= 119)); C--)
 				if ((ChatRoom[C] != null) && ((FullRooms) || (ChatRoom[C].Account.length < ChatRoom[C].Limit)))
-					if ((Acc.Environment == ChatRoom[C].Environment) && (Space == ChatRoom[C].Space)) // Must be in same environment (prod/dev) and same space (hall/asylum)
+					if ((Acc.Environment == ChatRoom[C].Environment) && (Spaces.includes(ChatRoom[C].Space))) // Must be in same environment (prod/dev) and same space (hall/asylum)
 						if ((Game == "") || (Game == ChatRoom[C].Game)) // If we must filter for a specific game in a chat room
 							if (ChatRoom[C].Ban.indexOf(Acc.MemberNumber) < 0) // The player cannot be banned
 								if ((data.Language == null) || (typeof data.Language !== "string") || (data.Language == "") || (data.Language === ChatRoom[C].Language)) // Filters by language
@@ -758,7 +760,8 @@ function ChatRoomSearch(data, socket) {
 														Description: ChatRoom[C].Description,
 														BlockCategory: ChatRoom[C].BlockCategory,
 														Game: ChatRoom[C].Game,
-														Friends: Friends
+														Friends: Friends,
+														Space: ChatRoom[C].Space
 													});
 
 												}
