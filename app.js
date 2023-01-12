@@ -1038,6 +1038,7 @@ function ChatRoomGetData(CR, SourceMemberNumber, IncludeCharacters)
 		Locked: CR.Locked,
 		Private: CR.Private,
 		BlockCategory: CR.BlockCategory,
+		Space: CR.Space,
 	};
 
 	if (IncludeCharacters) {
