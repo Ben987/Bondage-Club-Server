@@ -43,7 +43,7 @@ var Options = {
 };
 if ((process.env.CORS_ORIGIN0 != null) && (process.env.CORS_ORIGIN0 != ""))
 	Options.cors = { origin: [process.env.CORS_ORIGIN0 || "", process.env.CORS_ORIGIN1 || "", process.env.CORS_ORIGIN2 || "", process.env.CORS_ORIGIN3 || "", process.env.CORS_ORIGIN4 || "", process.env.CORS_ORIGIN5 || ""] };
-else 
+else
 	Options.cors = { origin: '*' };
 var IO = new socketio.Server(App, Options);
 
@@ -482,7 +482,7 @@ async function AccountLoginProcess(socket, AccountName, Password) {
 	result.Socket = socket;
 	AccountSendServerInfo(socket);
 	AccountPurgeInfo(result);
-	
+
 }
 
 // Returns TRUE if the object is empty
@@ -1576,7 +1576,7 @@ function AccountOwnership(data, socket) {
 		// Can release a target that's not in the chatroom
 		if (!TargetAcc && (data.Action === "Release") && (Acc.MemberNumber != null) && (data.MemberNumber != null)) {
 
-			// Gets the account linked to that member number, make sure 
+			// Gets the account linked to that member number, make sure
 			Database.collection(AccountCollection).findOne({ MemberNumber : data.MemberNumber }, function(err, result) {
 				if (err) throw err;
 				if ((result != null) && (result.MemberNumber != null) && (result.MemberNumber === data.MemberNumber) && (result.Ownership != null) && (result.Ownership.MemberNumber === Acc.MemberNumber)) {
@@ -1628,6 +1628,9 @@ function AccountOwnership(data, socket) {
 
 					// If there's no ownership, the dominant can propose to start a trial (Step 1 / 4)
 					if (TargetAcc.Ownership == null || TargetAcc.Ownership.MemberNumber == null) {
+						// Ignore requests for self-owners
+						if (Acc.MemberNumber === data.MemberNumber) return;
+
 						if (data.Action === "Propose") {
 							TargetAcc.Owner = "";
 							TargetAcc.Ownership = { StartTrialOfferedByMemberNumber: Acc.MemberNumber };
@@ -1799,6 +1802,9 @@ function AccountLovership(data, socket) {
 							else { TargetLoversNumbers.push(-1); }
 						}
 						var TL = TargetLoversNumbers.indexOf(Acc.MemberNumber);
+
+						// Ignore requests for self-lovers
+						if (Acc.MemberNumber === RoomAcc.MemberNumber) return;
 
 						// If the target account is not a lover of player yet, can accept up to 5 loverships, one player can propose to start dating (Step 1 / 6)
 						if ((RoomAcc.Lovership.length < 5) && (TL < 0)) {
