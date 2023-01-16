@@ -1760,6 +1760,10 @@ function AccountLovership(data, socket) {
 						AccountUpdateLovership(P, data.MemberNumber, null,false);
 
 					}
+
+					// Make sure we don't do a double-delete in the odd case where we're breaking up with ourselves
+					if (data.MemberNumber === Acc.MemberNumber) return;
+
 					// Updates the account that triggered the break up
 					if (Array.isArray(Acc.Lovership)) Acc.Lovership.splice(AL, 1);
 					else Acc.Lovership = [];
