@@ -1293,10 +1293,11 @@ function ChatRoomAdmin(data, socket) {
 				if ((TargetAccountIndex < 0) || (DestinationAccountIndex < 0)) return;
 				var TargetAccount = Acc.ChatRoom.Account[TargetAccountIndex];
 				var DestinationAccount = Acc.ChatRoom.Account[DestinationAccountIndex];
-				var Dictionary = [];
-				Dictionary.push({ Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber });
-				Dictionary.push({ Tag: "TargetCharacterName", Text: TargetAccount.Name, MemberNumber: TargetAccount.MemberNumber });
-				Dictionary.push({ Tag: "DestinationCharacterName", Text: DestinationAccount.Name, MemberNumber: DestinationAccount.MemberNumber });
+				const Dictionary = [
+					{SourceCharacter: Acc.MemberNumber},
+					{TargetCharacter: TargetAccount.MemberNumber},
+					{TargetCharacter: DestinationAccount.MemberNumber, Index: 1},
+				];
 				Acc.ChatRoom.Account[TargetAccountIndex] = DestinationAccount;
 				Acc.ChatRoom.Account[DestinationAccountIndex] = TargetAccount;
 				ChatRoomSyncReorderPlayers(Acc.ChatRoom, Acc.MemberNumber);
