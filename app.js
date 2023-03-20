@@ -280,6 +280,7 @@ function AccountCreate(data, socket) {
 						data.LastLogin = CommonTime();
 						data.MemberNumber = NextMemberNumber;
 						data.Lovership = [];
+						delete data._id;
 						NextMemberNumber++;
 						Database.collection(AccountCollection).insertOne(data, function(err, res) { if (err) throw err; });
 						data.Environment = AccountGetEnvironment(socket);
@@ -510,6 +511,7 @@ function AccountUpdate(data, socket) {
 				delete data.ActivePose;
 				delete data.ChatRoom;
 				delete data.ID;
+				delete data._id;
 				delete data.MemberNumber;
 				delete data.Environment;
 				delete data.Ownership;
