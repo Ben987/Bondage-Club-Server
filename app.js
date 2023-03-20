@@ -43,7 +43,7 @@ var Options = {
 };
 if ((process.env.CORS_ORIGIN0 != null) && (process.env.CORS_ORIGIN0 != ""))
 	Options.cors = { origin: [process.env.CORS_ORIGIN0 || "", process.env.CORS_ORIGIN1 || "", process.env.CORS_ORIGIN2 || "", process.env.CORS_ORIGIN3 || "", process.env.CORS_ORIGIN4 || "", process.env.CORS_ORIGIN5 || ""] };
-else 
+else
 	Options.cors = { origin: '*' };
 var IO = new socketio.Server(App, Options);
 
@@ -483,7 +483,7 @@ async function AccountLoginProcess(socket, AccountName, Password) {
 	result.Socket = socket;
 	AccountSendServerInfo(socket);
 	AccountPurgeInfo(result);
-	
+
 }
 
 // Returns TRUE if the object is empty
@@ -534,7 +534,7 @@ function AccountUpdate(data, socket) {
 				if ((data.WhiteList != null) && Array.isArray(data.WhiteList)) Acc.WhiteList = data.WhiteList;
 				if ((data.BlackList != null) && Array.isArray(data.BlackList)) Acc.BlackList = data.BlackList;
 				if ((data.FriendList != null) && Array.isArray(data.FriendList)) Acc.FriendList = data.FriendList;
-				if ((data.Lover != null) && (Array.isArray(Acc.Lovership)) && (Acc.Lovership.length < 5) && data.Lover.startsWith("NPC-")) {
+				if ((data.Lover != null) && (Array.isArray(Acc.Lovership)) && (Acc.Lovership.length < 5) && (typeof data.Lover === "string") && data.Lover.startsWith("NPC-")) {
 					var isLoverPresent = false;
 					for (var L = 0; L < Acc.Lovership.length; L++) {
 						if ((Acc.Lovership[L].Name != null) && (Acc.Lovership[L].Name == data.Lover)) {
@@ -558,9 +558,11 @@ function AccountUpdate(data, socket) {
 					delete data.Lover;
 				}
 				if ((data.Title != null)) Acc.Title = data.Title;
+				if ((data.Nickname != null)) Acc.Nickname = data.Nickname;
+				if ((data.Crafting != null)) Acc.Crafting = data.Crafting;
 
 				// Some changes should be synched to other players in chatroom
-				if ((Acc != null) && Acc.ChatRoom && ["AssetFamily", "Title", "Reputation", "Description", "LabelColor", "ItemPermission", "Inventory", "BlockItems", "LimitedItems", "FavoriteItems", "OnlineSharedSettings", "WhiteList", "BlackList"].some(k => data[k] != null))
+				if ((Acc != null) && Acc.ChatRoom && ["AssetFamily", "Title", "Nickname", "Crafting", "Reputation", "Description", "LabelColor", "ItemPermission", "Inventory", "BlockItems", "LimitedItems", "FavoriteItems", "OnlineSharedSettings", "WhiteList", "BlackList"].some(k => data[k] != null))
 					ChatRoomSyncCharacter(Acc.ChatRoom, Acc.MemberNumber, Acc.MemberNumber);
 
 				// If we have data to push
@@ -704,9 +706,11 @@ function ChatRoomSearch(data, socket) {
 		var Acc = AccountGet(socket.id);
 		if (Acc != null) {
 
-			// Gets the space of the chat room (empty for public, asylum, etc.)
-			var Space = "";
-			if ((data.Space != null) && (typeof data.Space === "string") && (data.Space.length <= 100)) Space = data.Space;
+			// Gets the chat room spaces to return (empty for public, asylum, etc.)
+			var Spaces = [];
+			if ((data.Space != null) && (typeof data.Space === "string") && (data.Space.length <= 100)) Spaces = [data.Space];
+			else if ((data.Space != null) && (Array.isArray(data.Space)))
+				data.Space.forEach(space => { if (typeof space === "string" && space.length <= 100) Spaces.push(space) });
 
 			// Gets the game name currently being played in the chat room (empty for all games and non-games rooms)
 			var Game = "";
@@ -727,38 +731,42 @@ function ChatRoomSearch(data, socket) {
 			// Builds a list of all public rooms, the last rooms created are shown first
 			var CR = [];
 			var C = 0;
-			for (var C = ChatRoom.length - 1; ((C >= 0) && (CR.length <= 60)); C--)
+			for (var C = ChatRoom.length - 1; ((C >= 0) && (CR.length <= 119)); C--)
 				if ((ChatRoom[C] != null) && ((FullRooms) || (ChatRoom[C].Account.length < ChatRoom[C].Limit)))
-					if ((Acc.Environment == ChatRoom[C].Environment) && (Space == ChatRoom[C].Space)) // Must be in same environment (prod/dev) and same space (hall/asylum)
+					if ((Acc.Environment == ChatRoom[C].Environment) && (Spaces.includes(ChatRoom[C].Space))) // Must be in same environment (prod/dev) and same space (hall/asylum)
 						if ((Game == "") || (Game == ChatRoom[C].Game)) // If we must filter for a specific game in a chat room
 							if (ChatRoom[C].Ban.indexOf(Acc.MemberNumber) < 0) // The player cannot be banned
-								if ((data.Query == "") || (ChatRoom[C].Name.toUpperCase().indexOf(data.Query) >= 0)) // Room name must contain the searched name, if any
-									if (!ChatRoom[C].Locked || (ChatRoom[C].Admin.indexOf(Acc.MemberNumber) >= 0)) // Must be unlocked, unless the player is an administrator
-										if (!ChatRoom[C].Private || (ChatRoom[C].Name.toUpperCase() == data.Query)) // If it's private, must know the exact name
-											if (IgnoredRooms.indexOf(ChatRoom[C].Name.toUpperCase()) == -1) { // Room name cannot be ignored
+								if ((data.Language == null) || (typeof data.Language !== "string") || (data.Language == "") || (data.Language === ChatRoom[C].Language)) // Filters by language
+									if ((data.Query == "") || (ChatRoom[C].Name.toUpperCase().indexOf(data.Query) >= 0)) // Room name must contain the searched name, if any
+										if (!ChatRoom[C].Locked || (ChatRoom[C].Admin.indexOf(Acc.MemberNumber) >= 0)) // Must be unlocked, unless the player is an administrator
+											if (!ChatRoom[C].Private || (ChatRoom[C].Name.toUpperCase() == data.Query)) // If it's private, must know the exact name
+												if (IgnoredRooms.indexOf(ChatRoom[C].Name.toUpperCase()) == -1) { // Room name cannot be ignored
 
-												// Builds the searching account friend list in the current room
-												var Friends = [];
-												for (const RoomAcc of ChatRoom[C].Account)
-													if (RoomAcc != null)
-														if ((RoomAcc.Ownership != null) && (RoomAcc.Ownership.MemberNumber != null) && (RoomAcc.Ownership.MemberNumber == Acc.MemberNumber))
-															Friends.push({ Type: "Submissive", MemberNumber: RoomAcc.MemberNumber, MemberName: RoomAcc.Name});
-														else if ((Acc.FriendList != null) && (RoomAcc.FriendList != null) && (Acc.FriendList.indexOf(RoomAcc.MemberNumber) >= 0) && (RoomAcc.FriendList.indexOf(Acc.MemberNumber) >= 0))
-															Friends.push({ Type: "Friend", MemberNumber: RoomAcc.MemberNumber, MemberName: RoomAcc.Name});
+													// Builds the searching account friend list in the current room
+													var Friends = [];
+													for (const RoomAcc of ChatRoom[C].Account)
+														if (RoomAcc != null)
+															if ((RoomAcc.Ownership != null) && (RoomAcc.Ownership.MemberNumber != null) && (RoomAcc.Ownership.MemberNumber == Acc.MemberNumber))
+																Friends.push({ Type: "Submissive", MemberNumber: RoomAcc.MemberNumber, MemberName: RoomAcc.Name});
+															else if ((Acc.FriendList != null) && (RoomAcc.FriendList != null) && (Acc.FriendList.indexOf(RoomAcc.MemberNumber) >= 0) && (RoomAcc.FriendList.indexOf(Acc.MemberNumber) >= 0))
+																Friends.push({ Type: "Friend", MemberNumber: RoomAcc.MemberNumber, MemberName: RoomAcc.Name});
 
-												// Builds a room object with all data
-												CR.push({
-													Name: ChatRoom[C].Name,
-													Creator: ChatRoom[C].Creator,
-													MemberCount: ChatRoom[C].Account.length,
-													MemberLimit: ChatRoom[C].Limit,
-													Description: ChatRoom[C].Description,
-													BlockCategory: ChatRoom[C].BlockCategory,
-													Game: ChatRoom[C].Game,
-													Friends: Friends
-												});
+													// Builds a room object with all data
+													CR.push({
+														Name: ChatRoom[C].Name,
+														Language: ChatRoom[C].Language,
+														Creator: ChatRoom[C].Creator,
+														CreatorMemberNumber: ChatRoom[C].CreatorMemberNumber,
+														MemberCount: ChatRoom[C].Account.length,
+														MemberLimit: ChatRoom[C].Limit,
+														Description: ChatRoom[C].Description,
+														BlockCategory: ChatRoom[C].BlockCategory,
+														Game: ChatRoom[C].Game,
+														Friends: Friends,
+														Space: ChatRoom[C].Space
+													});
 
-											}
+												}
 
 			// Sends the list to the client
 			socket.emit("ChatRoomSearchResult", CR);
@@ -805,6 +813,7 @@ function ChatRoomCreate(data, socket) {
 			var NewRoom = {
 				ID: base64id.generateId(),
 				Name: data.Name,
+				Language: data.Language,
 				Description: data.Description,
 				Background: data.Background,
 				Limit: ((data.Limit == null) || (typeof data.Limit !== "string") || isNaN(parseInt(data.Limit)) || (parseInt(data.Limit) < 2) || (parseInt(data.Limit) > 10)) ? 10 : parseInt(data.Limit),
@@ -814,6 +823,7 @@ function ChatRoomCreate(data, socket) {
 				Space: Space,
 				Game: Game,
 				Creator: Acc.Name,
+				CreatorMemberNumber: Acc.MemberNumber,
 				Creation: CommonTime(),
 				Account: [],
 				Ban: data.Ban,
@@ -984,6 +994,7 @@ function ChatRoomSyncGetCharSharedData(Acc) {
 		Name: Acc.Name,
 		AssetFamily: Acc.AssetFamily,
 		Title: Acc.Title,
+		Nickname: Acc.Nickname,
 		Appearance: Acc.Appearance,
 		ActivePose: Acc.ActivePose,
 		Reputation: Acc.Reputation,
@@ -1004,6 +1015,7 @@ function ChatRoomSyncGetCharSharedData(Acc) {
 		WhiteList,
 		BlackList,
 		Game: Acc.Game,
+		Crafting: Acc.Crafting,
 		Difficulty: Acc.Difficulty
 	};
 }
@@ -1017,6 +1029,7 @@ function ChatRoomGetData(CR, SourceMemberNumber, IncludeCharacters)
 	// Builds the room data
 	const R = {
 		Name: CR.Name,
+		Language: CR.Language,
 		Description: CR.Description,
 		Admin: CR.Admin,
 		Ban: CR.Ban,
@@ -1027,6 +1040,7 @@ function ChatRoomGetData(CR, SourceMemberNumber, IncludeCharacters)
 		Locked: CR.Locked,
 		Private: CR.Private,
 		BlockCategory: CR.BlockCategory,
+		Space: CR.Space,
 	};
 
 	if (IncludeCharacters) {
@@ -1248,6 +1262,7 @@ function ChatRoomAdmin(data, socket) {
 								return;
 							}
 						Acc.ChatRoom.Name = data.Room.Name;
+						Acc.ChatRoom.Language = data.Room.Language;
 						Acc.ChatRoom.Background = data.Room.Background;
 						Acc.ChatRoom.Description = data.Room.Description;
 						if ((data.Room.BlockCategory == null) || !Array.isArray(data.Room.BlockCategory)) data.Room.BlockCategory = [];
@@ -1280,10 +1295,11 @@ function ChatRoomAdmin(data, socket) {
 				if ((TargetAccountIndex < 0) || (DestinationAccountIndex < 0)) return;
 				var TargetAccount = Acc.ChatRoom.Account[TargetAccountIndex];
 				var DestinationAccount = Acc.ChatRoom.Account[DestinationAccountIndex];
-				var Dictionary = [];
-				Dictionary.push({ Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber });
-				Dictionary.push({ Tag: "TargetCharacterName", Text: TargetAccount.Name, MemberNumber: TargetAccount.MemberNumber });
-				Dictionary.push({ Tag: "DestinationCharacterName", Text: DestinationAccount.Name, MemberNumber: DestinationAccount.MemberNumber });
+				const Dictionary = [
+					{SourceCharacter: Acc.MemberNumber},
+					{TargetCharacter: TargetAccount.MemberNumber},
+					{TargetCharacter: DestinationAccount.MemberNumber, Index: 1},
+				];
 				Acc.ChatRoom.Account[TargetAccountIndex] = DestinationAccount;
 				Acc.ChatRoom.Account[DestinationAccountIndex] = TargetAccount;
 				ChatRoomSyncReorderPlayers(Acc.ChatRoom, Acc.MemberNumber);
@@ -1293,7 +1309,7 @@ function ChatRoomAdmin(data, socket) {
 			}
 
 			// If the account to act upon is in the room, an administrator can ban, kick, move, promote or demote him
-			for (var A = 0; A < Acc.ChatRoom.Account.length; A++)
+			for (var A = 0; (Acc.ChatRoom != null) && (A < Acc.ChatRoom.Account.length); A++)
 				if (Acc.ChatRoom.Account[A].MemberNumber == data.MemberNumber) {
 					var Dictionary = [];
 					if (data.Action == "Ban") {
@@ -1357,12 +1373,12 @@ function ChatRoomAdmin(data, socket) {
 				}
 
 			// Can also ban or unban without having the player in the room, there's no visible output
-			if ((data.Action == "Ban") && (Acc.ChatRoom.Ban.indexOf(data.MemberNumber) < 0))
+			if ((data.Action == "Ban") && (Acc.ChatRoom != null) && (Acc.ChatRoom.Ban.indexOf(data.MemberNumber) < 0))
 			{
 				Acc.ChatRoom.Ban.push(data.MemberNumber);
 				ChatRoomSyncRoomProperties(Acc.ChatRoom, Acc.MemberNumber);
 			}
-			if ((data.Action == "Unban") && (Acc.ChatRoom.Ban.indexOf(data.MemberNumber) >= 0))
+			if ((data.Action == "Unban") && (Acc.ChatRoom != null) && (Acc.ChatRoom.Ban.indexOf(data.MemberNumber) >= 0))
 			{
 				Acc.ChatRoom.Ban.splice(Acc.ChatRoom.Ban.indexOf(data.MemberNumber), 1);
 				ChatRoomSyncRoomProperties(Acc.ChatRoom, Acc.MemberNumber);
@@ -1546,22 +1562,8 @@ function AccountOwnership(data, socket) {
 		// The submissive can flush it's owner at any time in the trial, or after a delay if collared.  Players on Extreme mode cannot break the full ownership.
 		const Acc = AccountGet(socket.id);
 		if (Acc == null) return;
-
-		if (Acc.Ownership != null &&
-			Acc.Ownership.Stage != null &&
-			Acc.Ownership.Start != null &&
-			(Acc.Ownership.Stage == 0 || Acc.Ownership.Start + OwnershipDelay <= CommonTime()) &&
-			data.Action === "Break"
-		) {
-			if (Acc.Difficulty == null ||
-				Acc.Difficulty.Level == null ||
-				typeof Acc.Difficulty.Level !== "number" ||
-				Acc.Difficulty.Level <= 2 ||
-				Acc.Ownership == null ||
-				Acc.Ownership.Stage == null ||
-				typeof Acc.Ownership.Stage !== "number" ||
-				Acc.Ownership.Stage == 0
-			) {
+		if (Acc.Ownership != null && Acc.Ownership.Stage != null && Acc.Ownership.Start != null && (Acc.Ownership.Stage == 0 || Acc.Ownership.Start + OwnershipDelay <= CommonTime()) && data.Action === "Break") {
+			if (Acc.Difficulty == null || Acc.Difficulty.Level == null || typeof Acc.Difficulty.Level !== "number" || Acc.Difficulty.Level <= 2 || Acc.Ownership == null || Acc.Ownership.Stage == null || typeof Acc.Ownership.Stage !== "number" || Acc.Ownership.Stage == 0) {
 				Acc.Owner = "";
 				Acc.Ownership = null;
 				let O = { Ownership: Acc.Ownership, Owner: Acc.Owner };
@@ -1571,19 +1573,38 @@ function AccountOwnership(data, socket) {
 			}
 		}
 
-		// Rest of actions require being in chatroom and a target
+		// Get the target within the chatroom
 		if (Acc.ChatRoom == null) return;
-
 		const TargetAcc = Acc.ChatRoom.Account.find(A => A.MemberNumber === data.MemberNumber);
+
+		// Can release a target that's not in the chatroom
+		if (!TargetAcc && (data.Action === "Release") && (Acc.MemberNumber != null) && (data.MemberNumber != null)) {
+
+			// Gets the account linked to that member number, make sure
+			Database.collection(AccountCollection).findOne({ MemberNumber : data.MemberNumber }, function(err, result) {
+				if (err) throw err;
+				if ((result != null) && (result.MemberNumber != null) && (result.MemberNumber === data.MemberNumber) && (result.Ownership != null) && (result.Ownership.MemberNumber === Acc.MemberNumber)) {
+					Database.collection(AccountCollection).updateOne({ AccountName : result.AccountName }, { $set: { Owner: "", Ownership: null } }, function(err, res) { if (err) throw err; });
+					ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "ReleaseSuccess", "ServerMessage", Acc.MemberNumber);
+					let Target = Account.find(A => A.MemberNumber === data.MemberNumber);
+					if (!Target) return;
+					Target.Owner = "";
+					Target.Ownership = null;
+					Target.Socket.emit("AccountOwnership", { ClearOwnership: true });
+					if (Target.ChatRoom != null) {
+						ChatRoomSyncCharacter(Target.ChatRoom, Target.MemberNumber, Target.MemberNumber);
+						ChatRoomMessage(Target.ChatRoom, Target.MemberNumber, "ReleaseByOwner", "ServerMessage", Target.MemberNumber);
+					}
+				} else ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "ReleaseFail", "ServerMessage", Acc.MemberNumber);
+			});
+
+		}
+
+		// Exit if there's no target
 		if (!TargetAcc) return;
 
-		// In a chatroom, the dominant and submissive can enter in a BDSM relationship (4 steps to complete)
-
 		// The dominant can release the submissive player at any time
-		if (data.Action === "Release" &&
-			TargetAcc.Ownership != null &&
-			TargetAcc.Ownership.MemberNumber === Acc.MemberNumber
-		) {
+		if (data.Action === "Release" && TargetAcc.Ownership != null && TargetAcc.Ownership.MemberNumber === Acc.MemberNumber) {
 			const isTrial = typeof TargetAcc.Ownership.Stage !== "number" || TargetAcc.Ownership.Stage == 0;
 			TargetAcc.Owner = "";
 			TargetAcc.Ownership = null;
@@ -1598,8 +1619,8 @@ function AccountOwnership(data, socket) {
 			return;
 		}
 
-		// The dominant player proposes to the submissive player
-		// Cannot propose if target player is already owner
+		// In a chatroom, the dominant and submissive can enter in a BDSM relationship (4 steps to complete)
+		// The dominant player proposes to the submissive player, cannot propose if target player is already owner
 		if (Acc.Ownership == null ||
 			Acc.Ownership.MemberNumber == null ||
 			Acc.Ownership.MemberNumber != data.MemberNumber
@@ -1611,6 +1632,9 @@ function AccountOwnership(data, socket) {
 
 					// If there's no ownership, the dominant can propose to start a trial (Step 1 / 4)
 					if (TargetAcc.Ownership == null || TargetAcc.Ownership.MemberNumber == null) {
+						// Ignore requests for self-owners
+						if (Acc.MemberNumber === data.MemberNumber) return;
+
 						if (data.Action === "Propose") {
 							TargetAcc.Owner = "";
 							TargetAcc.Ownership = { StartTrialOfferedByMemberNumber: Acc.MemberNumber };
@@ -1722,9 +1746,9 @@ function AccountLovership(data, socket) {
 						P = result[0].Lovership;
 
 						var TargetLoversNumbers = [];
-						for (const Lover of P) {
-							TargetLoversNumbers.push(Lover.MemberNumber ? Lover.MemberNumber : -1);
-						}
+						if ((P != null) && Array.isArray(P))
+							for (const Lover of P)
+								TargetLoversNumbers.push(Lover.MemberNumber ? Lover.MemberNumber : -1);
 
 						if (Array.isArray(P)) P.splice(TargetLoversNumbers.indexOf(Acc.MemberNumber), 1);
 						else P = [];
@@ -1734,14 +1758,16 @@ function AccountLovership(data, socket) {
 								OtherAcc.Lovership = P;
 								OtherAcc.Socket.emit("AccountLovership", { Lovership: OtherAcc.Lovership });
 								if (OtherAcc.ChatRoom != null)
-								{
 									ChatRoomSyncCharacter(OtherAcc.ChatRoom, OtherAcc.MemberNumber, OtherAcc.MemberNumber);
-								}
 							}
 
 						AccountUpdateLovership(P, data.MemberNumber, null,false);
 
 					}
+
+					// Make sure we don't do a double-delete in the odd case where we're breaking up with ourselves
+					if (data.MemberNumber === Acc.MemberNumber) return;
+
 					// Updates the account that triggered the break up
 					if (Array.isArray(Acc.Lovership)) Acc.Lovership.splice(AL, 1);
 					else Acc.Lovership = [];
@@ -1784,6 +1810,9 @@ function AccountLovership(data, socket) {
 							else { TargetLoversNumbers.push(-1); }
 						}
 						var TL = TargetLoversNumbers.indexOf(Acc.MemberNumber);
+
+						// Ignore requests for self-lovers
+						if (Acc.MemberNumber === RoomAcc.MemberNumber) return;
 
 						// If the target account is not a lover of player yet, can accept up to 5 loverships, one player can propose to start dating (Step 1 / 6)
 						if ((RoomAcc.Lovership.length < 5) && (TL < 0)) {
