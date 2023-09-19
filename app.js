@@ -229,65 +229,8 @@ DatabaseClient.connect(DatabaseURL, { useUnifiedTopology: true, useNewUrlParser:
 			// Sets up the Client/Server events
 			console.log("Bondage Club server is listening on " + (ServerPort).toString());
 			console.log("****************************************");
-			IO.on("connection", function ( /** @type {ServerSocket} */ socket) {
-				/** @type {string} */
-				let address = socket.conn.remoteAddress;
-
-				// If there is trusted forward header set by proxy, use that instead
-				// But only trust the last hop!
-				if (IP_CONNECTION_PROXY_HEADER && typeof socket.handshake.headers[IP_CONNECTION_PROXY_HEADER] === "string") {
-					const hops = /** @type {string} */ (socket.handshake.headers[IP_CONNECTION_PROXY_HEADER]).split(",");
-					address = hops[hops.length-1].trim();
-				}
-
-				const sameIPConnections = IPConnections.get(address) || [];
-
-				// True, if there has already been IP_CONNECTION_RATE_LIMIT number of connections in the last second
-				const ipOverRateLimit = sameIPConnections.length >= IP_CONNECTION_RATE_LIMIT && Date.now() - sameIPConnections[sameIPConnections.length - IP_CONNECTION_RATE_LIMIT] <= 1000;
-
-				// Reject connection if over limits (rate & concurrency)
-				if (sameIPConnections.length >= IP_CONNECTION_LIMIT || ipOverRateLimit) {
-					console.log("Rejecting connection (IP connection limit reached) from", address);
-					socket.emit("ForceDisconnect", "ErrorRateLimited");
-					socket.disconnect(true);
-					return;
-				}
-
-				// Connection accepted, count it
-				sameIPConnections.push(Date.now());
-				IPConnections.set(address, sameIPConnections);
-				socket.once("disconnect", () => {
-					const sameIPConnectionsDisconnect = IPConnections.get(address) || [];
-					if (sameIPConnectionsDisconnect.length <= 1) {
-						IPConnections.delete(address);
-					} else {
-						sameIPConnectionsDisconnect.shift(); // Delete first (oldest) from array
-						IPConnections.set(address, sameIPConnectionsDisconnect);
-					}
-				});
-
-				// Rate limit all messages and kill the connection, if limits exceeded.
-				const messageBucket = [];
-				for (let i = 0; i < CLIENT_MESSAGE_RATE_LIMIT; i++) {
-					messageBucket.push(0);
-				}
-				socket.onAny(() => {
-					const lastMessageTime = messageBucket.shift();
-					messageBucket.push(Date.now());
-
-					// More than CLIENT_MESSAGE_RATE_LIMIT number of messages in the last second
-					if (Date.now() - lastMessageTime <= 1000) {
-						// Disconnect and close connection
-						socket.emit("ForceDisconnect", "ErrorRateLimited");
-						socket.disconnect(true);
-					}
-				});
-
-				socket.on("AccountCreate", function (data) { AccountCreate(data, socket); });
-				socket.on("AccountLogin", function (data) { AccountLogin(data, socket); });
-				socket.on("PasswordReset", function(data) { PasswordReset(data, socket); });
-				socket.on("PasswordResetProcess", function(data) { PasswordResetProcess(data, socket); });
-				AccountSendServerInfo(socket);
+			IO.on("connection", function (/** @type {ServerSocket} */ socket) {
+				OnConnect(socket);
 			});
 
 			// Refreshes the server information to clients each 60 seconds
@@ -299,6 +242,72 @@ DatabaseClient.connect(DatabaseURL, { useUnifiedTopology: true, useNewUrlParser:
 		});
 	});
 });
+
+/**
+ * Handles a socket initial connection
+ * @param {ServerSocket} socket
+ * @returns
+ */
+function OnConnect(socket) {
+	/** @type {string} */
+	let address = socket.conn.remoteAddress;
+
+	// If there is trusted forward header set by proxy, use that instead
+	// But only trust the last hop!
+	if (IP_CONNECTION_PROXY_HEADER && typeof socket.handshake.headers[IP_CONNECTION_PROXY_HEADER] === "string") {
+		const hops = /** @type {string} */ (socket.handshake.headers[IP_CONNECTION_PROXY_HEADER]).split(",");
+		address = hops[hops.length-1].trim();
+	}
+
+	const sameIPConnections = IPConnections.get(address) || [];
+
+	// True, if there has already been IP_CONNECTION_RATE_LIMIT number of connections in the last second
+	const ipOverRateLimit = sameIPConnections.length >= IP_CONNECTION_RATE_LIMIT && Date.now() - sameIPConnections[sameIPConnections.length - IP_CONNECTION_RATE_LIMIT] <= 1000;
+
+	// Reject connection if over limits (rate & concurrency)
+	if (sameIPConnections.length >= IP_CONNECTION_LIMIT || ipOverRateLimit) {
+		console.log("Rejecting connection (IP connection limit reached) from", address);
+		socket.emit("ForceDisconnect", "ErrorRateLimited");
+		socket.disconnect(true);
+		return;
+	}
+
+	// Connection accepted, count it
+	sameIPConnections.push(Date.now());
+	IPConnections.set(address, sameIPConnections);
+	socket.once("disconnect", () => {
+		const sameIPConnectionsDisconnect = IPConnections.get(address) || [];
+		if (sameIPConnectionsDisconnect.length <= 1) {
+			IPConnections.delete(address);
+		} else {
+			sameIPConnectionsDisconnect.shift(); // Delete first (oldest) from array
+			IPConnections.set(address, sameIPConnectionsDisconnect);
+		}
+	});
+
+	// Rate limit all messages and kill the connection, if limits exceeded.
+	const messageBucket = [];
+	for (let i = 0; i < CLIENT_MESSAGE_RATE_LIMIT; i++) {
+		messageBucket.push(0);
+	}
+	socket.onAny(() => {
+		const lastMessageTime = messageBucket.shift();
+		messageBucket.push(Date.now());
+
+		// More than CLIENT_MESSAGE_RATE_LIMIT number of messages in the last second
+		if (Date.now() - lastMessageTime <= 1000) {
+			// Disconnect and close connection
+			socket.emit("ForceDisconnect", "ErrorRateLimited");
+			socket.disconnect(true);
+		}
+	});
+
+	socket.on("AccountCreate", function (data) { AccountCreate(data, socket); });
+	socket.on("AccountLogin", function (data) { AccountLogin(data, socket); });
+	socket.on("PasswordReset", function(data) { PasswordReset(data, socket); });
+	socket.on("PasswordResetProcess", function(data) { PasswordResetProcess(data, socket); });
+	AccountSendServerInfo(socket);
+}
 
 /**
  * Setups socket on successful login or account creation
