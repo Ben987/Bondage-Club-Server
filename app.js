@@ -31,7 +31,7 @@ if ((ServerKey == null) || (ServerCert == null)) {
 // Starts socket.io to accept incoming connections on specified origins
 const socketio = require("socket.io");
 var Options = {
-	maxHttpBufferSize: 200000,
+	maxHttpBufferSize: 180000,
 	pingTimeout: 30000,
 	pingInterval: 50000,
 	upgradeTimeout: 30000,
@@ -816,6 +816,7 @@ function ChatRoomCreate(data, socket) {
 				Language: data.Language,
 				Description: data.Description,
 				Background: data.Background,
+				Custom: data.Custom,
 				Limit: ((data.Limit == null) || (typeof data.Limit !== "string") || isNaN(parseInt(data.Limit)) || (parseInt(data.Limit) < 2) || (parseInt(data.Limit) > 10)) ? 10 : parseInt(data.Limit),
 				Private: data.Private || false,
 				Locked : data.Locked || false,
@@ -1034,6 +1035,7 @@ function ChatRoomGetData(CR, SourceMemberNumber, IncludeCharacters)
 		Admin: CR.Admin,
 		Ban: CR.Ban,
 		Background: CR.Background,
+		Custom: CR.Custom,
 		Limit: CR.Limit,
 		Game: CR.Game,
 		SourceMemberNumber,
@@ -1264,6 +1266,7 @@ function ChatRoomAdmin(data, socket) {
 						Acc.ChatRoom.Name = data.Room.Name;
 						Acc.ChatRoom.Language = data.Room.Language;
 						Acc.ChatRoom.Background = data.Room.Background;
+						Acc.ChatRoom.Custom = data.Room.Custom;
 						Acc.ChatRoom.Description = data.Room.Description;
 						if ((data.Room.BlockCategory == null) || !Array.isArray(data.Room.BlockCategory)) data.Room.BlockCategory = [];
 						Acc.ChatRoom.BlockCategory = data.Room.BlockCategory;
