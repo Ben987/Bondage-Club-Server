@@ -3,3 +3,4 @@ log.txt
 restart.bat
 *.bat
 .idea
+newrelic_agent.log

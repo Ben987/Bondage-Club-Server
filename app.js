@@ -110,8 +110,36 @@ process.on('uncaughtException', function(error) {
 	MailTransporter.sendMail(mailOptions, function (err, info) {
 		if (err) console.log("Error while sending error email: " + err);
 		else console.log("Error email was sent");
+		try {
+			AccountDelayedUpdate();
+		} catch (error) {
+			console.log("Error while doing delayed updates");
+		}
 		process.exit(1);
 	});
+});
+
+// When SIGTERM is received, we send a warning to all logged accounts
+process.on('SIGTERM', function() {
+	console.log("***********************");
+	console.log("HEROKU SIGTERM DETECTED");
+	console.log("***********************");
+	for (const Acc of Account)
+		if ((Acc != null) && (Acc.Socket != null))
+			Acc.Socket.emit("ServerMessage", "Server will reboot in 30 seconds." );
+});
+
+// When SIGKILL is received, we do the final updates
+process.on('SIGKILL', function() {
+	console.log("***********************");
+	console.log("HEROKU SIGKILL DETECTED");
+	console.log("***********************");
+	try {
+		AccountDelayedUpdate();
+	} catch (error) {
+		console.log("Error while doing delayed updates");
+	}
+	process.exit(2);
 });
 
 const IPConnections = new Map();
@@ -198,8 +226,12 @@ DatabaseClient.connect(DatabaseURL, { useUnifiedTopology: true, useNewUrlParser:
 				AccountSendServerInfo(socket);
 			});
 
-			// Refreshes the server information to clients each 30 seconds
-			setInterval(AccountSendServerInfo, 30000);
+			// Refreshes the server information to clients each 60 seconds
+			setInterval(AccountSendServerInfo, 60000);
+
+			// Updates the database appearance & skills every 100 seconds
+			setInterval(AccountDelayedUpdate, 100000);
+
 		});
 	});
 });
@@ -517,6 +549,10 @@ function AccountUpdate(data, socket) {
 				delete data.Ownership;
 				delete data.Lovership;
 				delete data.Difficulty;
+				delete data.AssetFamily;
+				delete data.DelayedAppearanceUpdate;
+				delete data.DelayedSkillUpdate;
+				delete data.DelayedGameUpdate;
 
 				// Some data is kept for future use
 				if (data.Inventory != null) Acc.Inventory = data.Inventory;
@@ -564,6 +600,29 @@ function AccountUpdate(data, socket) {
 				// Some changes should be synched to other players in chatroom
 				if ((Acc != null) && Acc.ChatRoom && ["AssetFamily", "Title", "Nickname", "Crafting", "Reputation", "Description", "LabelColor", "ItemPermission", "Inventory", "BlockItems", "LimitedItems", "FavoriteItems", "OnlineSharedSettings", "WhiteList", "BlackList"].some(k => data[k] != null))
 					ChatRoomSyncCharacter(Acc.ChatRoom, Acc.MemberNumber, Acc.MemberNumber);
+
+				// If only the appearance is updated, we keep the change in memory and do not update the database right away
+				if ((Acc != null) && !ObjectEmpty(data) && (Object.keys(data).length == 1) && (data.Appearance != null)) {
+					Acc.DelayedAppearanceUpdate = data.Appearance;
+					console.log("TO REMOVE - Keeping Appearance in memory for account: " + Acc.AccountName);
+					return;
+				}
+
+				// If only the skill is updated, we keep the change in memory and do not update the database right away
+				if ((Acc != null) && !ObjectEmpty(data) && (Object.keys(data).length == 1) && (data.Skill != null)) {
+					Acc.DelayedSkillUpdate = data.Skill;
+					console.log("TO REMOVE - Keeping Skill in memory for account: " + Acc.AccountName);
+					return;
+				}
+
+				// If only the game is updated, we keep the change in memory and do not update the database right away
+				if ((Acc != null) && !ObjectEmpty(data) && (Object.keys(data).length == 1) && (data.Game != null)) {
+					Acc.DelayedGameUpdate = data.Game;
+					console.log("TO REMOVE - Keeping Game in memory for account: " + Acc.AccountName);
+					return;
+				}
+
+				console.log(data);
 
 				// If we have data to push
 				if ((Acc != null) && !ObjectEmpty(data)) Database.collection(AccountCollection).updateOne({ AccountName : Acc.AccountName }, { $set: data }, function(err, res) { if (err) throw err; });
@@ -676,16 +735,45 @@ function AccountBeep(data, socket) {
 	}
 }
 
+// Updates an account appearance if needed
+function AccountDelayedUpdateOne(AccountName, NewAppearance, NewSkill, NewGame) {
+	if ((AccountName == null) || ((NewAppearance == null) && (NewSkill == null) && (NewGame == null))) return;
+	console.log("TO REMOVE - Updating Appearance, Skill or Game in database for account: " + AccountName);
+	let UpdateObj = {};
+	if (NewAppearance != null) UpdateObj.Appearance = NewAppearance;
+	if (NewSkill != null) UpdateObj.Skill = NewSkill;
+	if (NewGame != null) UpdateObj.Game = NewGame;
+	Database.collection(AccountCollection).updateOne({ AccountName: AccountName }, { $set: UpdateObj }, function(err, res) { if (err) throw err; });
+}
+
+// Called every X seconds to update the database with appearance updates
+function AccountDelayedUpdate() {
+	console.log("TO REMOVE - Scanning for account delayed updates");
+	for (const Acc of Account) {
+		if (Acc != null) {
+			AccountDelayedUpdateOne(Acc.AccountName, Acc.DelayedAppearanceUpdate, Acc.DelayedSkillUpdate, Acc.DelayedGameUpdate);
+			delete Acc.DelayedAppearanceUpdate;
+			delete Acc.DelayedSkillUpdate;
+			delete Acc.DelayedGameUpdate;
+		}
+	}
+}
+
 // Removes the account from the buffer
 function AccountRemove(ID) {
 	if (ID != null)
 		for (const Acc of Account)
 			if (Acc.ID == ID) {
-				console.log("Disconnecting account: " + Acc.AccountName + " ID: " + ID);
+				let AccName = Acc.AccountName;
+				let AccDelayedAppearanceUpdate = Acc.DelayedAppearanceUpdate;
+				let AccDelayedSkillUpdate = Acc.DelayedSkillUpdate;
+				let AccDelayedGameUpdate = Acc.DelayedGameUpdate;
+				console.log("Disconnecting account: " + Acc.AccountName + " ID: " + ID);				
 				ChatRoomRemove(Acc, "ServerDisconnect", []);
 				const index = Account.indexOf(Acc);
 				if (index >= 0)
 					Account.splice(index, 1);
+				AccountDelayedUpdateOne(AccName, AccDelayedAppearanceUpdate, AccDelayedSkillUpdate, AccDelayedGameUpdate);
 				break;
 			}
 }
@@ -1133,14 +1221,16 @@ function ChatRoomSyncMemberLeave(CR, SourceMemberNumber) {
 
 // Syncs the room data with all of it's members
 function ChatRoomSyncRoomProperties(CR, SourceMemberNumber) {
+
 	// Exits right away if the chat room was destroyed
 	if (CR == null) return;
-
 	IO.to("chatroom-" + CR.ID).emit("ChatRoomSyncRoomProperties", ChatRoomGetData(CR, SourceMemberNumber, false));
+
 }
 
 // Syncs the room data with all of it's members
 function ChatRoomSyncReorderPlayers(CR, SourceMemberNumber) {
+
 	// Exits right away if the chat room was destroyed
 	if (CR == null) return;
 
@@ -1151,6 +1241,7 @@ function ChatRoomSyncReorderPlayers(CR, SourceMemberNumber) {
 	}
 
 	IO.to("chatroom-" + CR.ID).emit("ChatRoomSyncReorderPlayers", { PlayerOrder: newPlayerOrder });
+
 }
 
 // Syncs a single character data with all room members
@@ -1159,9 +1250,8 @@ function ChatRoomSyncSingle(Acc, SourceMemberNumber) {
 		SourceMemberNumber,
 		Character: ChatRoomSyncGetCharSharedData(Acc)
 	};
-	if (Acc.ChatRoom) {
+	if (Acc.ChatRoom)
 		IO.to("chatroom-" + Acc.ChatRoom.ID).emit("ChatRoomSyncSingle", R);
-	}
 }
 
 // Updates a character from the chat room
@@ -1173,7 +1263,9 @@ function ChatRoomCharacterUpdate(data, socket) {
 				for (const RoomAcc of Acc.ChatRoom.Account)
 					if ((RoomAcc.ID == data.ID) && ChatRoomGetAllowItem(Acc, RoomAcc))
 						if ((typeof data.Appearance === "object") && Array.isArray(data.Appearance)) {
-							Database.collection(AccountCollection).updateOne({ AccountName: RoomAcc.AccountName }, { $set: { Appearance: data.Appearance } }, function(err, res) { if (err) throw err; });
+							// Database.collection(AccountCollection).updateOne({ AccountName: RoomAcc.AccountName }, { $set: { Appearance: data.Appearance } }, function(err, res) { if (err) throw err; });
+							console.log("TO REMOVE - Keeping Appearance in memory for account: " + Acc.AccountName);
+							if (data.Appearance != null) RoomAcc.DelayedAppearanceUpdate = data.Appearance;
 							RoomAcc.Appearance = data.Appearance;
 							RoomAcc.ActivePose = data.ActivePose;
 							ChatRoomSyncSingle(RoomAcc, Acc.MemberNumber);
