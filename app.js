@@ -124,13 +124,18 @@ process.on('SIGTERM', function() {
 	console.log("***********************");
 	console.log("HEROKU SIGTERM DETECTED");
 	console.log("***********************");
+	try {
+		AccountDelayedUpdate();
+	} catch (error) {
+		console.log("Error while doing delayed updates");
+	}
 	for (const Acc of Account)
 		if ((Acc != null) && (Acc.Socket != null))
 			Acc.Socket.emit("ServerMessage", "Server will reboot in 30 seconds." );
 });
 
 // When SIGKILL is received, we do the final updates
-process.on('SIGKILL', function() {
+/*process.on('SIGKILL', function() {
 	console.log("***********************");
 	console.log("HEROKU SIGKILL DETECTED");
 	console.log("***********************");
@@ -140,7 +145,7 @@ process.on('SIGKILL', function() {
 		console.log("Error while doing delayed updates");
 	}
 	process.exit(2);
-});
+});*/
 
 const IPConnections = new Map();
 
