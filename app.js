@@ -234,8 +234,8 @@ DatabaseClient.connect(DatabaseURL, { useUnifiedTopology: true, useNewUrlParser:
 			// Refreshes the server information to clients each 60 seconds
 			setInterval(AccountSendServerInfo, 60000);
 
-			// Updates the database appearance & skills every 100 seconds
-			setInterval(AccountDelayedUpdate, 100000);
+			// Updates the database appearance & skills every 150 seconds
+			setInterval(AccountDelayedUpdate, 150000);
 
 		});
 	});
@@ -609,25 +609,30 @@ function AccountUpdate(data, socket) {
 				// If only the appearance is updated, we keep the change in memory and do not update the database right away
 				if ((Acc != null) && !ObjectEmpty(data) && (Object.keys(data).length == 1) && (data.Appearance != null)) {
 					Acc.DelayedAppearanceUpdate = data.Appearance;
-					console.log("TO REMOVE - Keeping Appearance in memory for account: " + Acc.AccountName);
+					//console.log("TO REMOVE - Keeping Appearance in memory for account: " + Acc.AccountName);
 					return;
 				}
 
 				// If only the skill is updated, we keep the change in memory and do not update the database right away
 				if ((Acc != null) && !ObjectEmpty(data) && (Object.keys(data).length == 1) && (data.Skill != null)) {
 					Acc.DelayedSkillUpdate = data.Skill;
-					console.log("TO REMOVE - Keeping Skill in memory for account: " + Acc.AccountName);
+					//console.log("TO REMOVE - Keeping Skill in memory for account: " + Acc.AccountName);
 					return;
 				}
 
 				// If only the game is updated, we keep the change in memory and do not update the database right away
 				if ((Acc != null) && !ObjectEmpty(data) && (Object.keys(data).length == 1) && (data.Game != null)) {
 					Acc.DelayedGameUpdate = data.Game;
-					console.log("TO REMOVE - Keeping Game in memory for account: " + Acc.AccountName);
+					//console.log("TO REMOVE - Keeping Game in memory for account: " + Acc.AccountName);
 					return;
 				}
 
-				console.log(data);
+				// Removes the delayed data to update if we update that property right now
+				if ((Acc != null) && !ObjectEmpty(data) && (Object.keys(data).length > 1)) {
+					if ((data.Appearance != null) && (Acc.DelayedAppearanceUpdate != null)) delete Acc.DelayedAppearanceUpdate;
+					if ((data.Skill != null) && (Acc.DelayedSkillUpdate != null)) delete Acc.DelayedSkillUpdate;
+					if ((data.Game != null) && (Acc.DelayedGameUpdate != null)) delete Acc.DelayedGameUpdate;
+				}
 
 				// If we have data to push
 				if ((Acc != null) && !ObjectEmpty(data)) Database.collection(AccountCollection).updateOne({ AccountName : Acc.AccountName }, { $set: data }, function(err, res) { if (err) throw err; });
@@ -743,7 +748,7 @@ function AccountBeep(data, socket) {
 // Updates an account appearance if needed
 function AccountDelayedUpdateOne(AccountName, NewAppearance, NewSkill, NewGame) {
 	if ((AccountName == null) || ((NewAppearance == null) && (NewSkill == null) && (NewGame == null))) return;
-	console.log("TO REMOVE - Updating Appearance, Skill or Game in database for account: " + AccountName);
+	//console.log("TO REMOVE - Updating Appearance, Skill or Game in database for account: " + AccountName);
 	let UpdateObj = {};
 	if (NewAppearance != null) UpdateObj.Appearance = NewAppearance;
 	if (NewSkill != null) UpdateObj.Skill = NewSkill;
@@ -753,7 +758,7 @@ function AccountDelayedUpdateOne(AccountName, NewAppearance, NewSkill, NewGame) 
 
 // Called every X seconds to update the database with appearance updates
 function AccountDelayedUpdate() {
-	console.log("TO REMOVE - Scanning for account delayed updates");
+	//console.log("TO REMOVE - Scanning for account delayed updates");
 	for (const Acc of Account) {
 		if (Acc != null) {
 			AccountDelayedUpdateOne(Acc.AccountName, Acc.DelayedAppearanceUpdate, Acc.DelayedSkillUpdate, Acc.DelayedGameUpdate);
@@ -1269,7 +1274,7 @@ function ChatRoomCharacterUpdate(data, socket) {
 					if ((RoomAcc.ID == data.ID) && ChatRoomGetAllowItem(Acc, RoomAcc))
 						if ((typeof data.Appearance === "object") && Array.isArray(data.Appearance)) {
 							// Database.collection(AccountCollection).updateOne({ AccountName: RoomAcc.AccountName }, { $set: { Appearance: data.Appearance } }, function(err, res) { if (err) throw err; });
-							console.log("TO REMOVE - Keeping Appearance in memory for account: " + Acc.AccountName);
+							//console.log("TO REMOVE - Keeping Appearance in memory for account: " + Acc.AccountName);
 							if (data.Appearance != null) RoomAcc.DelayedAppearanceUpdate = data.Appearance;
 							RoomAcc.Appearance = data.Appearance;
 							RoomAcc.ActivePose = data.ActivePose;
