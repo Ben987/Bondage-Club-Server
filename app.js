@@ -73,7 +73,7 @@ var DifficultyDelay = 604800000; // 7 days to activate the higher difficulty tie
 const IP_CONNECTION_LIMIT = 64; // Limit of connections per IP address
 const IP_CONNECTION_PROXY_HEADER = "x-forwarded-for"; // Header with real IP, if set by trusted proxy (lowercase)
 const IP_CONNECTION_RATE_LIMIT = 2; // Limit of newly established connections per IP address within a second
-const CLIENT_MESSAGE_RATE_LIMIT = 50; // Limit the number of messages received from a client within a second
+const CLIENT_MESSAGE_RATE_LIMIT = 20; // Limit the number of messages received from a client within a second
 
 // DB Access
 var Database;
