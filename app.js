@@ -918,6 +918,7 @@ function ChatRoomCreate(data, socket) {
 				Limit: ((data.Limit == null) || (typeof data.Limit !== "string") || isNaN(parseInt(data.Limit)) || (parseInt(data.Limit) < 2) || (parseInt(data.Limit) > 10)) ? 10 : parseInt(data.Limit),
 				Private: data.Private || false,
 				Locked : data.Locked || false,
+				MapData : data.MapData,
 				Environment: Acc.Environment,
 				Space: Space,
 				Game: Game,
@@ -1137,8 +1138,9 @@ function ChatRoomGetData(CR, SourceMemberNumber, IncludeCharacters)
 		Limit: CR.Limit,
 		Game: CR.Game,
 		SourceMemberNumber,
-		Locked: CR.Locked,
 		Private: CR.Private,
+		Locked: CR.Locked,
+		MapData: CR.MapData,
 		BlockCategory: CR.BlockCategory,
 		Space: CR.Space,
 	};
@@ -1378,6 +1380,7 @@ function ChatRoomAdmin(data, socket) {
 						Acc.ChatRoom.Limit = ((data.Room.Limit == null) || (typeof data.Room.Limit !== "string") || isNaN(parseInt(data.Room.Limit)) || (parseInt(data.Room.Limit) < 2) || (parseInt(data.Room.Limit) > 10)) ? 10 : parseInt(data.Room.Limit);
 						if ((data.Room.Private != null) && (typeof data.Room.Private === "boolean")) Acc.ChatRoom.Private = data.Room.Private;
 						if ((data.Room.Locked != null) && (typeof data.Room.Locked === "boolean")) Acc.ChatRoom.Locked = data.Room.Locked;
+						Acc.ChatRoom.MapData = data.Room.MapData;
 						socket.emit("ChatRoomUpdateResponse", "Updated");
 						if ((Acc != null) && (Acc.ChatRoom != null)) {
 							var Dictionary = [];
