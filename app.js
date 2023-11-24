@@ -565,6 +565,7 @@ function AccountUpdate(data, socket) {
 				if (data.ArousalSettings != null) Acc.ArousalSettings = data.ArousalSettings;
 				if (data.OnlineSharedSettings != null) Acc.OnlineSharedSettings = data.OnlineSharedSettings;
 				if (data.Game != null) Acc.Game = data.Game;
+				if (data.MapData != null) Acc.MapData = data.MapData;
 				if (data.LabelColor != null) Acc.LabelColor = data.LabelColor;
 				if (data.Appearance != null) Acc.Appearance = data.Appearance;
 				if (data.Reputation != null) Acc.Reputation = data.Reputation;
@@ -603,7 +604,7 @@ function AccountUpdate(data, socket) {
 				if ((data.Crafting != null)) Acc.Crafting = data.Crafting;
 
 				// Some changes should be synched to other players in chatroom
-				if ((Acc != null) && Acc.ChatRoom && ["AssetFamily", "Title", "Nickname", "Crafting", "Reputation", "Description", "LabelColor", "ItemPermission", "Inventory", "BlockItems", "LimitedItems", "FavoriteItems", "OnlineSharedSettings", "WhiteList", "BlackList"].some(k => data[k] != null))
+				if ((Acc != null) && Acc.ChatRoom && ["MapData", "Title", "Nickname", "Crafting", "Reputation", "Description", "LabelColor", "ItemPermission", "Inventory", "BlockItems", "LimitedItems", "FavoriteItems", "OnlineSharedSettings", "WhiteList", "BlackList"].some(k => data[k] != null))
 					ChatRoomSyncCharacter(Acc.ChatRoom, Acc.MemberNumber, Acc.MemberNumber);
 
 				// If only the appearance is updated, we keep the change in memory and do not update the database right away
@@ -633,6 +634,9 @@ function AccountUpdate(data, socket) {
 					if ((data.Skill != null) && (Acc.DelayedSkillUpdate != null)) delete Acc.DelayedSkillUpdate;
 					if ((data.Game != null) && (Acc.DelayedGameUpdate != null)) delete Acc.DelayedGameUpdate;
 				}
+
+				// Do not save the map in the database
+				delete data.MapData;
 
 				// If we have data to push
 				if ((Acc != null) && !ObjectEmpty(data)) Database.collection(AccountCollection).updateOne({ AccountName : Acc.AccountName }, { $set: data }, function(err, res) { if (err) throw err; });
@@ -1115,6 +1119,7 @@ function ChatRoomSyncGetCharSharedData(Acc) {
 		WhiteList,
 		BlackList,
 		Game: Acc.Game,
+		MapData: Acc.MapData,
 		Crafting: Acc.Crafting,
 		Difficulty: Acc.Difficulty
 	};
