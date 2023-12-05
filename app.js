@@ -509,7 +509,7 @@ async function AccountLoginProcess(socket, AccountName, Password) {
 	// Logs the account
 	result.ID = socket.id;
 	result.Environment = AccountGetEnvironment(socket);
-	console.log("Login account: " + result.AccountName + " ID: " + socket.id + " " + result.Environment);
+	//console.log("Login account: " + result.AccountName + " ID: " + socket.id + " " + result.Environment);
 	AccountValidData(result);
 	AccountRemoveFromChatRoom(result.MemberNumber);
 	Account.push(result);
@@ -782,7 +782,7 @@ function AccountRemove(ID) {
 				let AccDelayedAppearanceUpdate = Acc.DelayedAppearanceUpdate;
 				let AccDelayedSkillUpdate = Acc.DelayedSkillUpdate;
 				let AccDelayedGameUpdate = Acc.DelayedGameUpdate;
-				console.log("Disconnecting account: " + Acc.AccountName + " ID: " + ID);				
+				//console.log("Disconnecting account: " + Acc.AccountName + " ID: " + ID);				
 				ChatRoomRemove(Acc, "ServerDisconnect", []);
 				const index = Account.indexOf(Acc);
 				if (index >= 0)
@@ -937,7 +937,7 @@ function ChatRoomCreate(data, socket) {
 			ChatRoom.push(NewRoom);
 			Acc.ChatRoom = NewRoom;
 			NewRoom.Account.push(Acc);
-			console.log("Chat room (" + ChatRoom.length.toString() + ") " + data.Name + " created by account " + Acc.AccountName + ", ID: " + socket.id);
+			//console.log("Chat room (" + ChatRoom.length.toString() + ") " + data.Name + " created by account " + Acc.AccountName + ", ID: " + socket.id);
 			socket.join("chatroom-" + NewRoom.ID);
 			socket.emit("ChatRoomCreateResponse", "ChatRoomCreated");
 			ChatRoomSync(NewRoom, Acc.MemberNumber);
@@ -1022,7 +1022,7 @@ function ChatRoomRemove(Acc, Reason, Dictionary) {
 		if (Acc.ChatRoom.Account.length == 0) {
 			for (var C = 0; C < ChatRoom.length; C++)
 				if (Acc.ChatRoom.Name == ChatRoom[C].Name) {
-					console.log("Chat room " + Acc.ChatRoom.Name + " was destroyed. Rooms left: " + (ChatRoom.length - 1).toString());
+					//console.log("Chat room " + Acc.ChatRoom.Name + " was destroyed. Rooms left: " + (ChatRoom.length - 1).toString());
 					ChatRoom.splice(C, 1);
 					break;
 				}
@@ -2049,7 +2049,7 @@ function AccountDifficulty(data, socket) {
 				// Updates the account and the database
 				var NewDifficulty = { Difficulty: { Level: data, LastChange: CommonTime() } };
 				Acc.Difficulty = NewDifficulty.Difficulty;
-				console.log("Updating account " + Acc.AccountName + " difficulty to " + NewDifficulty.Difficulty.Level);
+				//console.log("Updating account " + Acc.AccountName + " difficulty to " + NewDifficulty.Difficulty.Level);
 				Database.collection(AccountCollection).updateOne({ AccountName : Acc.AccountName }, { $set: NewDifficulty }, function(err, res) { if (err) throw err; });
 
 			}
