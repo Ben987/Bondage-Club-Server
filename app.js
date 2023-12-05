@@ -911,6 +911,10 @@ function ChatRoomCreate(data, socket) {
 			if (!Array.isArray(data.Ban) || data.Ban.some(i => !Number.isInteger(i))) data.Ban = [];
 			if (!Array.isArray(data.Admin) || data.Admin.some(i => !Number.isInteger(i))) data.Admin = [Acc.MemberNumber];
 
+			let Limit = parseInt(data.Limit, 10);
+			if (isNaN(Limit) || Limit < 2 || Limit > 10) {
+				Limit = 10;
+			}
 			ChatRoomRemove(Acc, "ServerLeave", []);
 			var NewRoom = {
 				ID: base64id.generateId(),
@@ -919,7 +923,7 @@ function ChatRoomCreate(data, socket) {
 				Description: data.Description,
 				Background: data.Background,
 				Custom: data.Custom,
-				Limit: ((data.Limit == null) || (typeof data.Limit !== "string") || isNaN(parseInt(data.Limit)) || (parseInt(data.Limit) < 2) || (parseInt(data.Limit) > 10)) ? 10 : parseInt(data.Limit),
+				Limit: Limit,
 				Private: data.Private || false,
 				Locked : data.Locked || false,
 				MapData : data.MapData,
@@ -1382,7 +1386,11 @@ function ChatRoomAdmin(data, socket) {
 						Acc.ChatRoom.Ban = data.Room.Ban;
 						Acc.ChatRoom.Admin = data.Room.Admin;
 						Acc.ChatRoom.Game = ((data.Room.Game == null) || (typeof data.Room.Game !== "string") || (data.Room.Game.length > 100)) ? "" : data.Room.Game;
-						Acc.ChatRoom.Limit = ((data.Room.Limit == null) || (typeof data.Room.Limit !== "string") || isNaN(parseInt(data.Room.Limit)) || (parseInt(data.Room.Limit) < 2) || (parseInt(data.Room.Limit) > 10)) ? 10 : parseInt(data.Room.Limit);
+						let Limit = parseInt(data.Room.Limit, 10);
+						if (isNaN(Limit) || Limit < 2 || Limit > 10) {
+							Limit = 10;
+						}
+						Acc.ChatRoom.Limit = Limit;
 						if ((data.Room.Private != null) && (typeof data.Room.Private === "boolean")) Acc.ChatRoom.Private = data.Room.Private;
 						if ((data.Room.Locked != null) && (typeof data.Room.Locked === "boolean")) Acc.ChatRoom.Locked = data.Room.Locked;
 						Acc.ChatRoom.MapData = data.Room.MapData;
@@ -1391,7 +1399,7 @@ function ChatRoomAdmin(data, socket) {
 							var Dictionary = [];
 							Dictionary.push({Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber});
 							Dictionary.push({Tag: "ChatRoomName", Text: Acc.ChatRoom.Name});
-							Dictionary.push({Tag: "ChatRoomLimit", Text: Acc.ChatRoom.Limit});
+							Dictionary.push({Tag: "ChatRoomLimit", Text: Acc.ChatRoom.Limit.toString()});
 							Dictionary.push({Tag: "ChatRoomPrivacy", TextToLookUp: (Acc.ChatRoom.Private ? "Private" : "Public")});
 							Dictionary.push({Tag: "ChatRoomLocked", TextToLookUp: (Acc.ChatRoom.Locked ? "Locked" : "Unlocked")});
 							ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "ServerUpdateRoom", "Action", null, Dictionary);
