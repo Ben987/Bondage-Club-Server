@@ -1822,7 +1822,7 @@ function AccountLovership(data, socket) {
 		// Update the lovership and delete all unnecessary information
 		function AccountUpdateLovership(Lovership, MemberNumber, CurrentSocket = socket, Emit = true) {
 			var newLovership = Lovership.slice();
-			for (var L = newLovership.length - 1; L >= 0; L--) {
+			for (let L = newLovership.length - 1; L >= 0; L--) {
 				delete newLovership[L].BeginEngagementOfferedByMemberNumber;
 				delete newLovership[L].BeginWeddingOfferedByMemberNumber;
 				if (newLovership[L].BeginDatingOfferedByMemberNumber) {
@@ -1830,7 +1830,7 @@ function AccountLovership(data, socket) {
 					L -= 1;
 				}
 			}
-			var L = { Lovership: newLovership };
+			const L = { Lovership: newLovership };
 			Database.collection(AccountCollection).updateOne({ MemberNumber : MemberNumber}, { $set: L }, function(err, res) { if (err) throw err; });
 			if (Emit) CurrentSocket.emit("AccountLovership", L);
 		}
