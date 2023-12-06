@@ -286,6 +286,19 @@ function CommonTime() {
 	return new Date().getTime();
 }
 
+/**
+ * Parses a integer out of something, with a default value
+ * @param {unknown} thing
+ * @param {number} defaultValue
+ * @returns {number}
+ */
+function CommonParseInt(thing, defaultValue = 0, base = 10) {
+	if (typeof thing !== "string" && typeof thing !== "number") return defaultValue;
+	let int = parseInt(thing, base);
+	if (!Number.isInteger(int)) int = defaultValue;
+	return int;
+}
+
 // Creates a new account by creating its file
 function AccountCreate(data, socket) {
 
@@ -911,8 +924,8 @@ function ChatRoomCreate(data, socket) {
 			if (!Array.isArray(data.Ban) || data.Ban.some(i => !Number.isInteger(i))) data.Ban = [];
 			if (!Array.isArray(data.Admin) || data.Admin.some(i => !Number.isInteger(i))) data.Admin = [Acc.MemberNumber];
 
-			let Limit = parseInt(data.Limit, 10);
-			if (isNaN(Limit) || Limit < 2 || Limit > 10) {
+			let Limit = CommonParseInt(data.Limit, 10);
+			if (Limit < 2 || Limit > 10) {
 				Limit = 10;
 			}
 			ChatRoomRemove(Acc, "ServerLeave", []);
@@ -1386,8 +1399,8 @@ function ChatRoomAdmin(data, socket) {
 						Acc.ChatRoom.Ban = data.Room.Ban;
 						Acc.ChatRoom.Admin = data.Room.Admin;
 						Acc.ChatRoom.Game = ((data.Room.Game == null) || (typeof data.Room.Game !== "string") || (data.Room.Game.length > 100)) ? "" : data.Room.Game;
-						let Limit = parseInt(data.Room.Limit, 10);
-						if (isNaN(Limit) || Limit < 2 || Limit > 10) {
+						let Limit = CommonParseInt(data.Room.Limit, 10);
+						if (Limit < 2 || Limit > 10) {
 							Limit = 10;
 						}
 						Acc.ChatRoom.Limit = Limit;
@@ -1514,7 +1527,7 @@ function ChatRoomDominantValue(Account) {
 	if ((Account.Reputation != null) && (Array.isArray(Account.Reputation)))
 		for (const Rep of Account.Reputation)
 			if ((Rep.Type != null) && (Rep.Value != null) && (typeof Rep.Type === "string") && (typeof Rep.Value === "number") && (Rep.Type == "Dominant"))
-				return parseInt(Rep.Value);
+				return CommonParseInt(Rep.Value, 0);
 	return 0;
 }
 
