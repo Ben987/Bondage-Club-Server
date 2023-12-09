@@ -10,7 +10,11 @@
   "private": true,
   "scripts": {
     "start": "node --unhandled-rejections=throw app.js",
-    "check": "tsc -p jsconfig.json"
+    "check": "tsc -p jsconfig.json",
+    "docker:start": "docker-compose up -d --build",
+    "docker:stop": "docker-compose down",
+    "docker:restart": "npm run docker:stop && npm run docker:start",
+    "docker:logs": "docker-compose logs -f app db"
   },
   "dependencies": {
     "base64id": "^2.0.0",
