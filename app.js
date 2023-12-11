@@ -878,7 +878,8 @@ function ChatRoomSearch(data, socket) {
 														BlockCategory: ChatRoom[C].BlockCategory,
 														Game: ChatRoom[C].Game,
 														Friends: Friends,
-														Space: ChatRoom[C].Space
+														Space: ChatRoom[C].Space,
+														MapType: ((ChatRoom[C].MapData != null) && (ChatRoom[C].MapData.Type != null)) ? ChatRoom[C].MapData.Type : "Never"
 													});
 
 												}
