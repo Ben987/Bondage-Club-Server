@@ -80,13 +80,21 @@ var NextPasswordReset = 0;
 var OwnershipDelay = 604800000; // 7 days delay for ownership events
 var LovershipDelay = 604800000; // 7 days delay for lovership events
 var DifficultyDelay = 604800000; // 7 days to activate the higher difficulty tiers
-const IP_CONNECTION_LIMIT = parseInt(process.env.IP_CONNECTION_LIMIT, 10) || 64; // Limit of connections per IP address
+const IP_CONNECTION_LIMIT = parseInt(process.env.IP_CONNECTION_LIMIT, 10) || 64; // Limit of newly established connections per IP address within a second
 const IP_CONNECTION_RATE_LIMIT = parseInt(process.env.IP_CONNECTION_RATE_LIMIT, 10) || 2; // Limit of newly established connections per IP address within a second
 const CLIENT_MESSAGE_RATE_LIMIT = parseInt(process.env.CLIENT_MESSAGE_RATE_LIMIT, 10) || 20; // Limit the number of messages received from a client within a second
 const IP_CONNECTION_PROXY_HEADER = "x-forwarded-for"; // Header with real IP, if set by trusted proxy (lowercase)
 const ROOM_LIMIT_DEFAULT = 10; // The default number of players in an online chat room
 const ROOM_LIMIT_MINIMUM = 2; // The minimum number of players in an online chat room
 const ROOM_LIMIT_MAXIMUM = 20; // The maximum number of players in an online chat room
+
+// Trust client timestamps within this period (ms) to be accurate
+// This is done to prevent processing delays on the server or network, which are out of the client's control.
+// A malicious client could abuse this to send ONE larger burst than the CLIENT_MESSAGE_RATE_LIMIT normally allows.
+// With current values (20/second and trust period of 2000), this would allow sending a single burst of 80 over the
+// lifetime of the connection. Due to its one-off nature and requiring a specially crafted client with highly
+// accurate timings, this is not a problem.
+const CLIENT_MESSAGE_RATE_LIMIT_TRUST_PERIOD = 2000;
 
 // Limits the number of accounts created on each hour & day
 var AccountCreationIP = [];
@@ -267,16 +275,53 @@ DatabaseClient.connect(DatabaseURL, { useUnifiedTopology: true, useNewUrlParser:
 				});
 
 				// Rate limit all messages and kill the connection, if limits exceeded.
-				const messageBucket = [];
-				for (let i = 0; i < CLIENT_MESSAGE_RATE_LIMIT; i++) {
-					messageBucket.push(0);
+				/** @type {number[]} */
+				let messageBucket = [];
+				function resetRatelimitBucket() {
+					messageBucket = [];
+					for (let i = 0; i < CLIENT_MESSAGE_RATE_LIMIT; i++) {
+						messageBucket.push(0);
+					}
 				}
-				socket.onAny(() => {
+				resetRatelimitBucket();
+				let usingClientTimestamps = false;
+				let clientSkew = 0;
+				socket.onAny((event, ...data) => {
+					// Ignore socket.io's own events
+					if (["disconnect", "disconnecting", "newListener", "removeListener", "connect", "connect_error"].includes(event)) return;
+
+					const serverTime = Date.now();
+					let newMessageTime = serverTime;
+					const clientTimestamp = CommonParseInt(data && data[data.length - 1]?._metadata?.timestamp, 0, 10);
+					if (clientTimestamp) {
+						if (usingClientTimestamps) {
+							newMessageTime = clientTimestamp;
+							// Check for trust period
+							if (Math.abs(serverTime - clientSkew - clientTimestamp) > CLIENT_MESSAGE_RATE_LIMIT_TRUST_PERIOD) {
+								socket.emit("ForceDisconnect", "ErrorRateLimited");
+								socket.disconnect(true);
+								return;
+							}
+						} else if (Math.abs(newMessageTime - clientTimestamp) < CLIENT_MESSAGE_RATE_LIMIT_TRUST_PERIOD) {
+							newMessageTime = clientTimestamp;
+							usingClientTimestamps = true;
+							clientSkew = serverTime - clientTimestamp;
+							resetRatelimitBucket();
+						}
+					}
+
+					// Check for out of order messages
+					if (newMessageTime < messageBucket[messageBucket.length - 1]) {
+						socket.emit("ForceDisconnect", "ErrorRateLimited");
+						socket.disconnect(true);
+						return;
+					}
+
+					messageBucket.push(newMessageTime);
 					const lastMessageTime = messageBucket.shift();
-					messageBucket.push(Date.now());
 
 					// More than CLIENT_MESSAGE_RATE_LIMIT number of messages in the last second
-					if (Date.now() - lastMessageTime <= 1000) {
+					if (newMessageTime - lastMessageTime <= 1000) {
 						// Disconnect and close connection
 						socket.emit("ForceDisconnect", "ErrorRateLimited");
 						socket.disconnect(true);
@@ -750,6 +795,8 @@ function AccountUpdate(data, socket) {
 				delete data.Inventory;
 				// @ts-expect-error This is MongoDB's primary key
 				delete data._id;
+				// @ts-expect-error This is MongoDB's primary key
+				delete data._metadata;
 				delete data.MemberNumber;
 				delete data.Environment;
 				delete data.Ownership;
