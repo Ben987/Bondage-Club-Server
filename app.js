@@ -263,6 +263,7 @@ function OnLogin(socket) {
 	socket.on("ChatRoomChat", function(data) { ChatRoomChat(data, socket); });
 	socket.on("ChatRoomCharacterUpdate", function(data) { ChatRoomCharacterUpdate(data, socket); });
 	socket.on("ChatRoomCharacterExpressionUpdate", function(data) { ChatRoomCharacterExpressionUpdate(data, socket); });
+	socket.on("ChatRoomCharacterMapDataUpdate", function(data) { ChatRoomCharacterMapDataUpdate(data, socket); });
 	socket.on("ChatRoomCharacterPoseUpdate", function(data) { ChatRoomCharacterPoseUpdate(data, socket); });
 	socket.on("ChatRoomCharacterArousalUpdate", function(data) { ChatRoomCharacterArousalUpdate(data, socket); });
 	socket.on("ChatRoomCharacterItemUpdate", function(data) { ChatRoomCharacterItemUpdate(data, socket); });
@@ -1316,6 +1317,17 @@ function ChatRoomCharacterExpressionUpdate(data, socket) {
 			Acc.Appearance = data.Appearance;
 		if (Acc && Acc.ChatRoom) {
 			socket.to("chatroom-" + Acc.ChatRoom.ID).emit("ChatRoomSyncExpression", { MemberNumber: Acc.MemberNumber, Name: data.Name, Group: data.Group });
+		}
+	}
+}
+
+// Updates a character MapData for a chat room, this does not update the database
+function ChatRoomCharacterMapDataUpdate(data, socket) {
+	if ((data != null) && (typeof data === "object")) {
+		const Acc = AccountGet(socket.id);
+		if (Acc && Acc.ChatRoom) {
+			Acc.MapData = data;
+			socket.to("chatroom-" + Acc.ChatRoom.ID).emit("ChatRoomSyncMapData", { MemberNumber: Acc.MemberNumber, MapData: data });
 		}
 	}
 }
