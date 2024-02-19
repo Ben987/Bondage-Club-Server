@@ -316,6 +316,7 @@ interface ServerChatRoomSearchRequest {
     Ignore?: string[];
     Language: string;
 	SearchDescs?: boolean;
+	MapTypes?: string[];
 }
 
 interface ServerChatRoomSearchData {
