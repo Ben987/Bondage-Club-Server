@@ -1106,6 +1106,12 @@ function ChatRoomSearch(data, socket) {
 	// Whether we also search the room descriptions
 	const SearchDescs = typeof data.SearchDescs === "boolean" ? data.SearchDescs : false;
 
+	// Check if we have a map type filter
+	let MapTypes = [];
+	if (Array.isArray(data.MapTypes)) {
+		MapTypes = data.MapTypes.filter(t => typeof t === "string" && t.length < 20);
+	}
+
 	// Builds a list of all public rooms, the last rooms created are shown first
 	const CR = [];
 	for (const room of ChatRoom) {
@@ -1150,6 +1156,9 @@ function ChatRoomSearch(data, socket) {
 
 		// Room is in our ignore list, skip
 		if (IgnoredRooms.includes(roomName)) continue;
+
+		// Only allow requested map types
+		if (MapTypes.length > 0 && !MapTypes.includes(room.MapData?.Type)) continue;
 
 		const result = ChatRoomSearchAddResult(Acc, room);
 		if (!result) continue;
