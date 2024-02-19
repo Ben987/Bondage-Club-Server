@@ -381,6 +381,15 @@ function CommonTime() {
 }
 
 /**
+ * Type guard which checks that a value is a simple object (i.e. a non-null object which is not an array)
+ * @param {unknown} value - The value to test
+ * @returns {value is Record<string, unknown>}
+ */
+function CommonIsObject(value) {
+	return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
+/**
  * Parses a integer out of something, with a default value
  * @param {unknown} thing
  * @param {number} defaultValue
@@ -1049,86 +1058,140 @@ function AccountGet(ID) {
 }
 
 /**
+ * The maximum number of search results to return at once
+ */
+const ChatRoomSearchMaxResults = 120;
+
+/**
  * When a user searches for a chat room
  * @param {ServerChatRoomSearchRequest} data
  * @param {ServerSocket} socket
  */
 function ChatRoomSearch(data, socket) {
-	if ((data != null) && (typeof data === "object") && (data.Query != null) && (typeof data.Query === "string") && (data.Query.length <= 20)) {
+	if (!CommonIsObject(data) || typeof data.Query !== "string" || data.Query.length > 20) {
+		return;
+	}
 
-		// Finds the current account
-		var Acc = AccountGet(socket.id);
-		if (Acc != null) {
+	// Finds the current account
+	const Acc = AccountGet(socket.id);
+	if (!Acc) return;
 
-			// Gets the chat room spaces to return (empty for public, asylum, etc.)
-			var Spaces = [];
-			if ((data.Space != null) && (typeof data.Space === "string") && (data.Space.length <= 100)) Spaces = [data.Space];
-			else if ((data.Space != null) && (Array.isArray(data.Space)))
-				data.Space.forEach(space => { if (typeof space === "string" && space.length <= 100) Spaces.push(space) });
+	// Our search query
+	const Query = data.Query.trim();
 
-			// Gets the game name currently being played in the chat room (empty for all games and non-games rooms)
-			var Game = "";
-			if ((data.Game != null) && (typeof data.Game === "string") && (data.Game.length <= 100)) Game = data.Game;
+	// Gets the chat room spaces to return (empty for public, asylum, etc.)
+	let Spaces = [];
+	if (typeof data.Space === "string" && data.Space.length <= 100) {
+		Spaces = [data.Space];
+	} else if (Array.isArray(data.Space)) {
+		Spaces = data.Space.filter(space => typeof space === "string" && space.length <= 100);
+	}
 
-			// Checks if the user requested full rooms
-			var FullRooms = false;
-			if ((data.FullRooms != null) && (typeof data.FullRooms === "boolean")) FullRooms = data.FullRooms;
+	// Gets the game name currently being played in the chat room (empty for all games and non-games rooms)
+	const Game = typeof data.Game === "string" && data.Game.length <= 100 ? data.Game : "";
 
-			// Checks if the user opted to ignore certain rooms
-			/** @type {string[]} */
-			var IgnoredRooms = [];
-			if ((data.Ignore != null) && (Array.isArray(data.Ignore))) IgnoredRooms = data.Ignore;
+	// Checks if the user allows full rooms to show up
+	const FullRooms = typeof data.FullRooms === "boolean" ? data.FullRooms : false;
 
-			// Validate array, only strings are valid.
-			IgnoredRooms = IgnoredRooms.filter(R => typeof R === "string" && R.match(ServerChatRoomNameRegex));
+	// Checks if the user opted to ignore certain rooms
+	let IgnoredRooms = [];
+	if (Array.isArray(data.Ignore)) {
+		// Validate array, only strings are valid.
+		IgnoredRooms = data.Ignore.filter(R => typeof R === "string" && R.match(ServerChatRoomNameRegex)).map(r => r.toUpperCase());
+	}
 
-			// Builds a list of all public rooms, the last rooms created are shown first
-			var CR = [];
-			var C = 0;
-			for (var C = ChatRoom.length - 1; ((C >= 0) && (CR.length <= 119)); C--)
-				if ((ChatRoom[C] != null) && ((FullRooms) || (ChatRoom[C].Account.length < ChatRoom[C].Limit)))
-					if ((Acc.Environment == ChatRoom[C].Environment) && (Spaces.includes(ChatRoom[C].Space))) // Must be in same environment (prod/dev) and same space (hall/asylum)
-						if ((Game == "") || (Game == ChatRoom[C].Game)) // If we must filter for a specific game in a chat room
-							if (ChatRoom[C].Ban.indexOf(Acc.MemberNumber) < 0) // The player cannot be banned
-								if ((data.Language == null) || (typeof data.Language !== "string") || (data.Language == "") || (data.Language === ChatRoom[C].Language)) // Filters by language
-									if ((data.Query == "") || (ChatRoom[C].Name.toUpperCase().indexOf(data.Query) >= 0)) // Room name must contain the searched name, if any
-										if (!ChatRoom[C].Locked || (ChatRoom[C].Admin.indexOf(Acc.MemberNumber) >= 0) || (ChatRoom[C].Whitelist.indexOf(Acc.MemberNumber) >= 0)) // Must be unlocked, unless the player is an administrator or on the whitelist
-											if (!ChatRoom[C].Private || (ChatRoom[C].Name.toUpperCase() == data.Query) || (ChatRoom[C].Whitelist.indexOf(Acc.MemberNumber) >= 0)) // If it's private, must know the exact name or be whitelisted
-												if (IgnoredRooms.indexOf(ChatRoom[C].Name.toUpperCase()) == -1) { // Room name cannot be ignored
+	// Grab the search language
+	const Language = typeof data.Language === "string" ? data.Language : "";
 
-													// Builds the searching account friend list in the current room
-													/** @type {ServerFriendInfo[]} */
-													var Friends = [];
-													for (const RoomAcc of ChatRoom[C].Account)
-														if (RoomAcc != null)
-															if ((RoomAcc.Ownership != null) && (RoomAcc.Ownership.MemberNumber != null) && (RoomAcc.Ownership.MemberNumber == Acc.MemberNumber))
-																Friends.push({ Type: "Submissive", MemberNumber: RoomAcc.MemberNumber, MemberName: RoomAcc.Name});
-															else if ((Acc.FriendList != null) && (RoomAcc.FriendList != null) && (Acc.FriendList.indexOf(RoomAcc.MemberNumber) >= 0) && (RoomAcc.FriendList.indexOf(Acc.MemberNumber) >= 0))
-																Friends.push({ Type: "Friend", MemberNumber: RoomAcc.MemberNumber, MemberName: RoomAcc.Name});
+	// Builds a list of all public rooms, the last rooms created are shown first
+	const CR = [];
+	for (const room of ChatRoom) {
+		if (!room) continue;
 
-													// Builds a room object with all data
-													CR.push({
-														Name: ChatRoom[C].Name,
-														Language: ChatRoom[C].Language,
-														Creator: ChatRoom[C].Creator,
-														CreatorMemberNumber: ChatRoom[C].CreatorMemberNumber,
-														MemberCount: ChatRoom[C].Account.length,
-														MemberLimit: ChatRoom[C].Limit,
-														Description: ChatRoom[C].Description,
-														BlockCategory: ChatRoom[C].BlockCategory,
-														Game: ChatRoom[C].Game,
-														Friends: Friends,
-														Space: ChatRoom[C].Space,
-														MapType: ((ChatRoom[C].MapData != null) && (ChatRoom[C].MapData.Type != null)) ? ChatRoom[C].MapData.Type : "Never"
-													});
+		const roomName = room.Name.toUpperCase();
 
-												}
+		// Room is not in the correct environment, skip
+		if (Acc.Environment !== room.Environment) continue;
 
-			// Sends the list to the client
-			socket.emit("ChatRoomSearchResult", CR);
+		// We're looking for a specific game and the room's doesn't match, skip
+		if (Game !== "" && room.Game !== Game) continue;
 
+		// The room is full and we don't want those, skip
+		if (room.Account.length >= room.Limit && !FullRooms) continue;
+
+		// Room isn't in the correct space, skip
+		if (!Spaces.includes(room.Space)) continue;
+
+		// Player is banned from the room, skip
+		if (room.Ban.includes(Acc.MemberNumber)) continue;
+
+		// Room is for a different language than requested, skip
+		if (Language !== "" && room.Language !== Language) continue;
+
+		// We have a search query
+		if (Query !== "") {
+			// Query doesn't match the room, skip
+			if (!roomName.includes(Query)) continue;
 		}
 
+		// Room is private, and query isn't an exact name match or player isn't in the whitelist, skip
+		if (room.Private && !(roomName === Query || room.Whitelist.includes(Acc.MemberNumber))) continue;
+
+		// Room is locked and player isn't an admin or in the whitelist, skip
+		if (room.Locked && !(room.Admin.includes(Acc.MemberNumber) || room.Whitelist.includes(Acc.MemberNumber))) continue;
+
+		// Room is in our ignore list, skip
+		if (IgnoredRooms.includes(roomName)) continue;
+
+		const result = ChatRoomSearchAddResult(Acc, room);
+		if (!result) continue;
+
+		CR.push(result);
+
+		// We got enough results for one batch, return those
+		if (CR.length >= ChatRoomSearchMaxResults) break;
+	}
+
+	// Sends the list to the client
+	socket.emit("ChatRoomSearchResult", CR);
+}
+
+/**
+ * Transform a chatroom into its search result form
+ * @param {Account} Acc
+ * @param {Chatroom} room
+ * @returns {ServerChatRoomSearchData}
+ */
+function ChatRoomSearchAddResult(Acc, room) {
+
+	// Builds the searching account's list of known individuals in the current room
+	/** @type {ServerFriendInfo[]} */
+	const Friends = [];
+	for (const RoomAcc of room.Account) {
+		if (!RoomAcc) continue;
+		if (RoomAcc?.Ownership?.MemberNumber === Acc.MemberNumber) {
+			Friends.push({ Type: "Submissive", MemberNumber: RoomAcc.MemberNumber, MemberName: RoomAcc.Name });
+		} else if (Acc?.FriendList?.includes(RoomAcc.MemberNumber) && RoomAcc?.FriendList?.includes(Acc.MemberNumber)) {
+			Friends.push({ Type: "Friend", MemberNumber: RoomAcc.MemberNumber, MemberName: RoomAcc.Name });
+		}
+	}
+
+	const MapType = room?.MapData?.Type ? room.MapData.Type : "Never";
+
+	// Builds a search result object with the room data
+	return {
+		Name: room.Name,
+		Language: room.Language,
+		Creator: room.Creator,
+		CreatorMemberNumber: room.CreatorMemberNumber,
+		MemberCount: room.Account.length,
+		MemberLimit: room.Limit,
+		Description: room.Description,
+		BlockCategory: room.BlockCategory,
+		Game: room.Game,
+		Friends: Friends,
+		Space: room.Space,
+		MapType
 	}
 }
 
