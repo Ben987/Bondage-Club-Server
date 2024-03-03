@@ -20,7 +20,7 @@
     "heroku": "^7.66.4",
     "mongodb": "^3.4.1",
     "newrelic": "^7.1.2",
-    "nodemailer": "^6.6.1",
+    "nodemailer": "^6.9.9",
     "socket.io": "^4.6.1",
     "sync-request": "^6.1.0"
   }
