@@ -74,6 +74,9 @@ const IP_CONNECTION_LIMIT = 64; // Limit of connections per IP address
 const IP_CONNECTION_PROXY_HEADER = "x-forwarded-for"; // Header with real IP, if set by trusted proxy (lowercase)
 const IP_CONNECTION_RATE_LIMIT = 2; // Limit of newly established connections per IP address within a second
 const CLIENT_MESSAGE_RATE_LIMIT = 20; // Limit the number of messages received from a client within a second
+const ROOM_LIMIT_DEFAULT = 10; // The default number of players in an online chat room 
+const ROOM_LIMIT_MINIMUM = 2; // The minimum number of players in an online chat room
+const ROOM_LIMIT_MAXIMUM = 20; // The maximum number of players in an online chat room
 
 // DB Access
 var Database;
@@ -926,10 +929,11 @@ function ChatRoomCreate(data, socket) {
 			if (!Array.isArray(data.Ban) || data.Ban.some(i => !Number.isInteger(i))) data.Ban = [];
 			if (!Array.isArray(data.Admin) || data.Admin.some(i => !Number.isInteger(i))) data.Admin = [Acc.MemberNumber];
 
-			let Limit = CommonParseInt(data.Limit, 10);
-			if (Limit < 2 || Limit > 10) {
-				Limit = 10;
-			}
+			// Makes sure the limit is valid
+			let Limit = CommonParseInt(data.Limit, ROOM_LIMIT_DEFAULT);
+			if (Limit < ROOM_LIMIT_MINIMUM || Limit > ROOM_LIMIT_MAXIMUM) Limit = ROOM_LIMIT_DEFAULT;
+
+			// Prepares the room object
 			ChatRoomRemove(Acc, "ServerLeave", []);
 			var NewRoom = {
 				ID: base64id.generateId(),
@@ -1412,10 +1416,8 @@ function ChatRoomAdmin(data, socket) {
 						Acc.ChatRoom.Ban = data.Room.Ban;
 						Acc.ChatRoom.Admin = data.Room.Admin;
 						Acc.ChatRoom.Game = ((data.Room.Game == null) || (typeof data.Room.Game !== "string") || (data.Room.Game.length > 100)) ? "" : data.Room.Game;
-						let Limit = CommonParseInt(data.Room.Limit, 10);
-						if (Limit < 2 || Limit > 10) {
-							Limit = 10;
-						}
+						let Limit = CommonParseInt(data.Room.Limit, ROOM_LIMIT_DEFAULT);
+						if (Limit < ROOM_LIMIT_MINIMUM || Limit > ROOM_LIMIT_MAXIMUM) Limit = ROOM_LIMIT_DEFAULT;
 						Acc.ChatRoom.Limit = Limit;
 						if ((data.Room.Private != null) && (typeof data.Room.Private === "boolean")) Acc.ChatRoom.Private = data.Room.Private;
 						if ((data.Room.Locked != null) && (typeof data.Room.Locked === "boolean")) Acc.ChatRoom.Locked = data.Room.Locked;
