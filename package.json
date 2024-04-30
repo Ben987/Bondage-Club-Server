@@ -9,7 +9,8 @@
   "main": "app.js",
   "private": true,
   "scripts": {
-    "start": "node --unhandled-rejections=throw app.js"
+    "start": "node --unhandled-rejections=throw app.js",
+    "check": "tsc -p jsconfig.json"
   },
   "dependencies": {
     "base64id": "^2.0.0",
@@ -20,5 +21,8 @@
     "nodemailer": "^6.9.9",
     "socket.io": "^4.6.1",
     "sync-request": "^6.1.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3"
   }
 }
