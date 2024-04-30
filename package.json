@@ -14,7 +14,7 @@
   "dependencies": {
     "base64id": "^2.0.0",
     "bcrypt": "^5.0.1",
-    "heroku": "^7.66.4",
+    "heroku": "^8.11.5",
     "mongodb": "^3.4.1",
     "newrelic": "^7.1.2",
     "nodemailer": "^6.9.9",
