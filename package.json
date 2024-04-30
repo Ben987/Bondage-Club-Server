@@ -1,18 +1,15 @@
 {
-  "name": "BondageClubServer",
+  "name": "bondage-club-server",
   "version": "1.0.0",
   "author": "Ben987",
   "engines": {
-    "node": "14.x"
+    "node": "20.x"
   },
-  "repository": "https://github.com/GoogleCloudPlatform/nodejs-getting-started",
+  "repository": "https://github.com/Ben987/Bondage-Club-Server",
   "main": "app.js",
   "private": true,
   "scripts": {
-    "start": "node --unhandled-rejections=throw app.js",
-    "e2e": "repo-tools test deploy",
-    "test": "repo-tools test app",
-    "cover": "nyc --cache npm test; nyc report --reporter=html"
+    "start": "node --unhandled-rejections=throw app.js"
   },
   "dependencies": {
     "base64id": "^2.0.0",
