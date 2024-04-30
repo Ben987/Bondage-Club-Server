@@ -799,7 +799,7 @@ function AccountRemove(ID) {
 				let AccDelayedAppearanceUpdate = Acc.DelayedAppearanceUpdate;
 				let AccDelayedSkillUpdate = Acc.DelayedSkillUpdate;
 				let AccDelayedGameUpdate = Acc.DelayedGameUpdate;
-				//console.log("Disconnecting account: " + Acc.AccountName + " ID: " + ID);				
+				//console.log("Disconnecting account: " + Acc.AccountName + " ID: " + ID);
 				ChatRoomRemove(Acc, "ServerDisconnect", []);
 				const index = Account.indexOf(Acc);
 				if (index >= 0)
