@@ -12,7 +12,8 @@
     "start": "node --unhandled-rejections=throw app.js",
     "e2e": "repo-tools test deploy",
     "test": "repo-tools test app",
-    "cover": "nyc --cache npm test; nyc report --reporter=html"
+    "cover": "nyc --cache npm test; nyc report --reporter=html",
+    "check": "tsc -p jsconfig.json"
   },
   "dependencies": {
     "base64id": "^2.0.0",
@@ -23,5 +24,8 @@
     "nodemailer": "^6.9.9",
     "socket.io": "^4.6.1",
     "sync-request": "^6.1.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3"
   }
 }
