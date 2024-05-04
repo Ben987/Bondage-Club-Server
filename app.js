@@ -3,7 +3,7 @@ require('newrelic');
 const base64id = require("base64id");
 
 // Reads the SSL key and certificate, if there's no file available, we switch to regular http
-var SyncRequest = require("sync-request");
+/*var SyncRequest = require("sync-request");
 var ServerKey = null;
 if ((process.env.SERVER_KEY0 != null) && (process.env.SERVER_KEY0 != "")) { try { ServerKey = SyncRequest("GET", process.env.SERVER_KEY0).getBody(); } catch(err) {} }
 if ((ServerKey == null) && (process.env.SERVER_KEY1 != null) && (process.env.SERVER_KEY1 != "")) { try { ServerKey = SyncRequest("GET", process.env.SERVER_KEY1).getBody(); } catch(err) {} }
@@ -13,20 +13,21 @@ if ((process.env.SERVER_CERT0 != null) && (process.env.SERVER_CERT0 != "")) { tr
 if ((ServerCert == null) && (process.env.SERVER_CERT1 != null) && (process.env.SERVER_CERT1 != "")) { try { ServerCert = SyncRequest("GET", process.env.SERVER_CERT1).getBody(); } catch(err) {} }
 if ((ServerCert == null) && (process.env.SERVER_CERT2 != null) && (process.env.SERVER_CERT2 != "")) { try { ServerCert = SyncRequest("GET", process.env.SERVER_CERT2).getBody(); } catch(err) {} }
 console.log("Using Server Key: " + ServerKey);
-console.log("Using Server Certificate: " + ServerCert);
+console.log("Using Server Certificate: " + ServerCert);*/
 
 // Enforce https with a certificate
 var App;
 var UseSecure;
-if ((ServerKey == null) || (ServerCert == null)) {
+UseSecure = false;
+App = require("http").createServer();
+
+/*if ((ServerKey == null) || (ServerCert == null)) {
 	console.log("No key or certificate found, starting http server with origin " + process.env.CORS_ORIGIN0);
-	UseSecure = false;
-	App = require("http").createServer();
 } else {
 	console.log("Starting https server for certificate with origin " + process.env.CORS_ORIGIN0);
 	UseSecure = true;
 	App = require("https").createServer({ key: ServerKey, cert: ServerCert, requestCert: false, rejectUnauthorized: false });
-}
+}*/
 
 // Starts socket.io to accept incoming connections on specified origins
 const socketio = require("socket.io");
@@ -150,7 +151,7 @@ process.on('SIGTERM', function() {
 	process.exit(2);
 });*/
 
-const IPConnections = new Map();
+const IPConnections = new Map(); 
 
 // Connects to the Mongo Database
 DatabaseClient.connect(DatabaseURL, { useUnifiedTopology: true, useNewUrlParser: true }, function(err, db) {
