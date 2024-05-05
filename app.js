@@ -100,6 +100,7 @@ var MailTransporter = NodeMailer.createTransport({
 });
 
 // If the server received an unhandled error, we log it through console for future review, send an email and exit so the application can restart
+Error.stackTraceLimit = 100;
 process.on('uncaughtException', function(error) {
 	console.log("*************************");
 	console.log("Unhandled error occurred:");
