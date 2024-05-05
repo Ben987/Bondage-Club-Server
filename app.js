@@ -154,7 +154,7 @@ process.on('SIGTERM', function() {
 const IPConnections = new Map(); 
 
 // Connects to the Mongo Database
-DatabaseClient.connect(DatabaseURL, { useUnifiedTopology: true, useNewUrlParser: true }, function(err, db) {
+DatabaseClient.connect(DatabaseURL, { useUnifiedTopology: true, useNewUrlParser: true, autoIndex: false }, function(err, db) {
 
 	// Keeps the database object
 	if (err) throw err;
