@@ -338,7 +338,7 @@ function AccountCreate(data, socket) {
 						data.Lovership = [];
 						delete data._id;
 						NextMemberNumber++;
-						Database.collection(AccountCollection).insertOne(data, function(err, res) { if (err) throw err; });
+						Database.collection(AccountCollection).insertOne({...data}, function(err, res) { if (err) throw err; });
 						data.Environment = AccountGetEnvironment(socket);
 						console.log("Creating new account: " + data.AccountName + " ID: " + socket.id + " " + data.Environment);
 						data.ID = socket.id;
