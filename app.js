@@ -50,6 +50,7 @@ var IO = new socketio.Server(App, Options);
 
 // Main game objects
 var BCrypt = require("bcrypt");
+var MaxHeapUsage = process.env.MAX_HEAP_USAGE || 16000000000; // 16 gigs allocated by default, can be altered server side
 var AccountCollection = process.env.ACCOUNT_COLLECTION || "Accounts";
 var Account = [];
 var ChatRoom = [];
@@ -239,8 +240,8 @@ DatabaseClient.connect(DatabaseURL, { useUnifiedTopology: true, useNewUrlParser:
 			// Refreshes the server information to clients each 60 seconds
 			setInterval(AccountSendServerInfo, 60000);
 
-			// Updates the database appearance & skills every 150 seconds
-			setInterval(AccountDelayedUpdate, 150000);
+			// Updates the database appearance & skills every 300 seconds
+			setInterval(AccountDelayedUpdate, 300000);
 
 		});
 	});
@@ -279,12 +280,37 @@ function OnLogin(socket) {
 
 // Sends the server info to all players or one specific player (socket)
 function AccountSendServerInfo(socket) {
+
+	// Validates if the heap usage is too high and we should reboot, to prevent memory leaks
+	const MemoryData = process.memoryUsage();
+	if ((MemoryData != null) && (MemoryData.heapUsed > MaxHeapUsage)) {
+		var mailOptions = {
+			from: "donotreply@bondageprojects.com",
+			to: process.env.EMAIL_ADMIN || "",
+			subject: "Bondage Club Server Heap Usage Crash",
+			html: "Heap usage error occured:<br />heapTotal: " + MemoryData.heapTotal.toString() + "<br />heapUsed: " + MemoryData.heapUsed.toString()
+		};
+		MailTransporter.sendMail(mailOptions, function (err, info) {
+			if (err) console.log("Error while sending error email: " + err);
+			else console.log("Error email was sent");
+			try {
+				AccountDelayedUpdate();
+			} catch (error) {
+				console.log("Error while doing delayed updates");
+			}
+			process.exit(2);
+		});
+		return;
+	}
+
+	// Sends the info to all players
 	var SI = {
 		Time: CommonTime(),
 		OnlinePlayers: Account.length
 	};
 	if (socket != null) socket.emit("ServerInfo", SI);
 	else IO.sockets.volatile.emit("ServerInfo", SI);
+
 }
 
 // Return the current time
