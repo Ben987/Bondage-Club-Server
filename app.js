@@ -388,27 +388,29 @@ function AccountCreate(data, socket) {
 					// Creates a hashed password and saves it with the account info
 					BCrypt.hash(data.Password.toUpperCase(), 10, function( err, hash ) {
 						if (err) throw err;
-						data.Password = hash;
-						data.Money = 100;
-						data.Creation = CommonTime();
-						data.LastLogin = CommonTime();
-						data.MemberNumber = NextMemberNumber;
-						data.Lovership = [];
+						// @ts-expect-error This is MongoDB's primary key
 						delete data._id;
+
+						const account = /** @type {Account} */ (Object.assign({}, data));
+						account.Password = hash;
+						account.Money = 100;
+						account.Creation = CommonTime();
+						account.LastLogin = CommonTime();
+						account.MemberNumber = NextMemberNumber;
+						account.Lovership = [];
 						NextMemberNumber++;
-						Database.collection(AccountCollection).insertOne({...data}, function(err, res) { if (err) throw err; });
-						data.Environment = AccountGetEnvironment(socket);
-						console.log("Creating new account: " + data.AccountName + " ID: " + socket.id + " " + data.Environment);
-						data.ID = socket.id;
-						data.Socket = socket;
-						AccountValidData(data);
-						Account.push(data);
+						Database.collection(AccountCollection).insertOne(account, function(err, res) { if (err) throw err; });
+						account.Environment = AccountGetEnvironment(socket);
+						console.log("Creating new account: " + account.AccountName + " ID: " + socket.id + " " + account.Environment);
+						account.ID = socket.id;
+						account.Socket = socket;
+						AccountValidData(account);
+						Account.push(account);
 						OnLogin(socket);
-						socket.emit("CreationResponse", { ServerAnswer: "AccountCreated", OnlineID: data.ID, MemberNumber: data.MemberNumber } );
+						socket.emit("CreationResponse", { ServerAnswer: "AccountCreated", OnlineID: account.ID, MemberNumber: account.MemberNumber } );
 						AccountSendServerInfo(socket);
 						AccountPurgeInfo(data);
 					});
-
 				}
 
 			});
