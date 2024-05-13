@@ -1,0 +1,11 @@
+{
+  "compilerOptions": {
+    "module": "CommonJS",
+    "target": "ES2020",
+    "lib": ["ES2020"],
+    "checkJs": true,
+    "types": [],
+    "maxNodeModuleJsDepth": 0,
+  },
+  "include": ["typedef.d.ts", "Messages.d.ts", "app.js"],
+}
