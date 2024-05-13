@@ -10,6 +10,7 @@
   "private": true,
   "scripts": {
     "start": "node --unhandled-rejections=throw app.js",
+    "check": "tsc -p jsconfig.json",
     "docker:start": "docker-compose up -d --build",
     "docker:stop": "docker-compose down",
     "docker:restart": "npm run docker:stop && npm run docker:start",
@@ -22,5 +23,8 @@
     "newrelic": "^11.16.0",
     "nodemailer": "^6.9.13",
     "socket.io": "^4.7.5"
+  },
+  "devDependencies": {
+    "typescript": "^5.3.3"
   }
 }
