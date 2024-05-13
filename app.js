@@ -154,7 +154,7 @@ process.on('SIGTERM', function() {
 	process.exit(2);
 });*/
 
-const IPConnections = new Map(); 
+const IPConnections = new Map();
 
 // Connects to the Mongo Database
 DatabaseClient.connect(DatabaseURL, { useUnifiedTopology: true, useNewUrlParser: true, autoIndex: false }, function(err, db) {
