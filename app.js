@@ -50,7 +50,7 @@ var IO = new socketio.Server(App, Options);
 
 // Main game objects
 var BCrypt = require("bcrypt");
-var MaxHeapUsage = process.env.MAX_HEAP_USAGE || 16000000000; // 16 gigs allocated by default, can be altered server side
+var MaxHeapUsage = parseInt(process.env.MAX_HEAP_USAGE, 10) || 16_000_000_000; // 16 gigs allocated by default, can be altered server side
 var AccountCollection = process.env.ACCOUNT_COLLECTION || "Accounts";
 var Account = [];
 var ChatRoom = [];
@@ -76,7 +76,7 @@ const IP_CONNECTION_LIMIT = 64; // Limit of connections per IP address
 const IP_CONNECTION_PROXY_HEADER = "x-forwarded-for"; // Header with real IP, if set by trusted proxy (lowercase)
 const IP_CONNECTION_RATE_LIMIT = 2; // Limit of newly established connections per IP address within a second
 const CLIENT_MESSAGE_RATE_LIMIT = 20; // Limit the number of messages received from a client within a second
-const ROOM_LIMIT_DEFAULT = 10; // The default number of players in an online chat room 
+const ROOM_LIMIT_DEFAULT = 10; // The default number of players in an online chat room
 const ROOM_LIMIT_MINIMUM = 2; // The minimum number of players in an online chat room
 const ROOM_LIMIT_MAXIMUM = 20; // The maximum number of players in an online chat room
 
@@ -153,7 +153,7 @@ process.on('SIGTERM', function() {
 	process.exit(2);
 });*/
 
-const IPConnections = new Map(); 
+const IPConnections = new Map();
 
 // Connects to the Mongo Database
 DatabaseClient.connect(DatabaseURL, { useUnifiedTopology: true, useNewUrlParser: true, autoIndex: false }, function(err, db) {
