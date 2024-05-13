@@ -77,10 +77,11 @@ var NextPasswordReset = 0;
 var OwnershipDelay = 604800000; // 7 days delay for ownership events
 var LovershipDelay = 604800000; // 7 days delay for lovership events
 var DifficultyDelay = 604800000; // 7 days to activate the higher difficulty tiers
-const IP_CONNECTION_LIMIT = 64; // Limit of connections per IP address
+const IP_CONNECTION_LIMIT = parseInt(process.env.IP_CONNECTION_LIMIT, 10) || 64; // Limit of connections per IP address
+const IP_CONNECTION_RATE_LIMIT = parseInt(process.env.IP_CONNECTION_RATE_LIMIT, 10) || 2; // Limit of newly established connections per IP address within a second
+const CLIENT_MESSAGE_RATE_LIMIT = parseInt(process.env.CLIENT_MESSAGE_RATE_LIMIT, 10) || 20; // Limit the number of messages received from a client within a second
+
 const IP_CONNECTION_PROXY_HEADER = "x-forwarded-for"; // Header with real IP, if set by trusted proxy (lowercase)
-const IP_CONNECTION_RATE_LIMIT = 2; // Limit of newly established connections per IP address within a second
-const CLIENT_MESSAGE_RATE_LIMIT = 20; // Limit the number of messages received from a client within a second
 const ROOM_LIMIT_DEFAULT = 10; // The default number of players in an online chat room
 const ROOM_LIMIT_MINIMUM = 2; // The minimum number of players in an online chat room
 const ROOM_LIMIT_MAXIMUM = 20; // The maximum number of players in an online chat room
