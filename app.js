@@ -50,7 +50,7 @@ var IO = new socketio.Server(App, Options);
 
 // Main game objects
 var BCrypt = require("bcrypt");
-var MaxHeapUsage = process.env.MAX_HEAP_USAGE || 16000000000; // 16 gigs allocated by default, can be altered server side
+var MaxHeapUsage = parseInt(process.env.MAX_HEAP_USAGE, 10) || 16_000_000_000; // 16 gigs allocated by default, can be altered server side
 var AccountCollection = process.env.ACCOUNT_COLLECTION || "Accounts";
 var Account = [];
 var ChatRoom = [];
