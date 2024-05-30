@@ -606,7 +606,7 @@ function AccountUpdate(data, socket) {
 				delete data.DelayedGameUpdate;
 
 				// Some data is kept for future use
-				if (data.Inventory != null) Acc.Inventory = data.Inventory;
+				if (data.InventoryData != null) Acc.InventoryData = data.InventoryData;
 				if (data.ItemPermission != null) Acc.ItemPermission = data.ItemPermission;
 				if (data.ArousalSettings != null) Acc.ArousalSettings = data.ArousalSettings;
 				if (data.OnlineSharedSettings != null) Acc.OnlineSharedSettings = data.OnlineSharedSettings;
@@ -650,7 +650,7 @@ function AccountUpdate(data, socket) {
 				if ((data.Crafting != null)) Acc.Crafting = data.Crafting;
 
 				// Some changes should be synched to other players in chatroom
-				if ((Acc != null) && Acc.ChatRoom && ["MapData", "Title", "Nickname", "Crafting", "Reputation", "Description", "LabelColor", "ItemPermission", "Inventory", "BlockItems", "LimitedItems", "FavoriteItems", "OnlineSharedSettings", "WhiteList", "BlackList"].some(k => data[k] != null))
+				if ((Acc != null) && Acc.ChatRoom && ["MapData", "Title", "Nickname", "Crafting", "Reputation", "Description", "LabelColor", "ItemPermission", "InventoryData", "BlockItems", "LimitedItems", "FavoriteItems", "OnlineSharedSettings", "WhiteList", "BlackList"].some(k => data[k] != null))
 					ChatRoomSyncCharacter(Acc.ChatRoom, Acc.MemberNumber, Acc.MemberNumber);
 
 				// If only the appearance is updated, we keep the change in memory and do not update the database right away
@@ -1161,7 +1161,7 @@ function ChatRoomSyncGetCharSharedData(Acc) {
 		MemberNumber: Acc.MemberNumber,
 		LabelColor: Acc.LabelColor,
 		ItemPermission: Acc.ItemPermission,
-		Inventory: Acc.Inventory,
+		InventoryData: Acc.InventoryData,
 		Ownership: Acc.Ownership,
 		BlockItems: Acc.BlockItems,
 		LimitedItems: Acc.LimitedItems,
