@@ -347,6 +347,13 @@ function CommonTime() {
  */
 function CommonParseInt(thing, defaultValue = 0, base = 10) {
 	if (typeof thing !== "string" && typeof thing !== "number") return defaultValue;
+	if (typeof thing === "number") {
+		if (Number.isInteger(thing)) {
+			return thing;
+		} else {
+			return defaultValue;
+		}
+	}
 	let int = parseInt(thing, base);
 	if (!Number.isInteger(int)) int = defaultValue;
 	return int;
