@@ -153,7 +153,7 @@ interface ServerMapDataResponse {
 	MapData: ChatRoomMapPos;
 }
 
-type ServerAccountDataSynced = Omit<ServerAccountData, "Money" | "FriendList">;
+type ServerAccountDataSynced = Omit<ServerAccountData, "Money" | "FriendList" | "AccountName">;
 
 interface ServerOwnership {
 	MemberNumber?: number;
