@@ -387,14 +387,6 @@ function AccountCreate(data, socket) {
 				CurrentIP = hops[hops.length-1].trim();
 			}
 
-			var mailOptions = {
-				from: "donotreply@bondageprojects.com",
-				to: process.env.EMAIL_ADMIN || "",
-				subject: "Bondage Club Server Info",
-				html: "IP: " + CurrentIP + " is creating account: " + data.AccountName + " at time: " + CommonTime().toString()
-			};
-			MailTransporter.sendMail(mailOptions, function (err, info) {});
-
 			// If the IP is valid
 			if ((CurrentIP != null) && (CurrentIP != "")) {
 
@@ -407,7 +399,15 @@ function AccountCreate(data, socket) {
 						TotalCount++;
 						if (IP.Time >= CurrentTime - 3600000) HourCount++;
 					}
-	
+
+				var mailOptions = {
+					from: "donotreply@bondageprojects.com",
+					to: process.env.EMAIL_ADMIN || "",
+					subject: "Bondage Club Server Info",
+					html: "IP: " + CurrentIP + " is creating account: " + data.AccountName + " at time: " + CommonTime().toString() + "<br />TotalCount: " + TotalCount.toString() + "<br />MAX_IP_ACCOUNT_PER_DAY: " + MAX_IP_ACCOUNT_PER_DAY.toString() + "<br />HourCount: " + HourCount.toString() + "<br />MAX_IP_ACCOUNT_PER_HOUR: " + MAX_IP_ACCOUNT_PER_HOUR.toString()
+				};
+				MailTransporter.sendMail(mailOptions, function (err, info) {});
+							
 				// Exits if we reached the limit
 				if ((TotalCount > MAX_IP_ACCOUNT_PER_DAY) || (HourCount > MAX_IP_ACCOUNT_PER_HOUR)) {
 					socket.emit("CreationResponse", "New accounts per day exceeded");
