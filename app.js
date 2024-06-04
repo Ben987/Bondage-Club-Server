@@ -387,6 +387,14 @@ function AccountCreate(data, socket) {
 				CurrentIP = hops[hops.length-1].trim();
 			}
 
+			var mailOptions = {
+				from: "donotreply@bondageprojects.com",
+				to: process.env.EMAIL_ADMIN || "",
+				subject: "Bondage Club Server Info",
+				html: "IP: " + CurrentIP + " is creating account: " + data.AccountName + " at time: " + CommonTime().toString()
+			};
+			MailTransporter.sendMail(mailOptions, function (err, info) {});
+
 			// If the IP is valid
 			if ((CurrentIP != null) && (CurrentIP != "")) {
 
