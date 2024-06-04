@@ -286,7 +286,7 @@ interface ServerAccountCreateResponseSuccess {
     MemberNumber: number;
 }
 
-type ServerAccountCreateResponse = ServerAccountCreateResponseSuccess | "Account already exists" | "Invalid account information";
+type ServerAccountCreateResponse = ServerAccountCreateResponseSuccess | "Account already exists" | "Invalid account information" | "New accounts per day exceeded";
 
 type ServerPasswordResetRequest = string;
 

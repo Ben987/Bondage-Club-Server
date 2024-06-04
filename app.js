@@ -80,11 +80,15 @@ var DifficultyDelay = 604800000; // 7 days to activate the higher difficulty tie
 const IP_CONNECTION_LIMIT = parseInt(process.env.IP_CONNECTION_LIMIT, 10) || 64; // Limit of connections per IP address
 const IP_CONNECTION_RATE_LIMIT = parseInt(process.env.IP_CONNECTION_RATE_LIMIT, 10) || 2; // Limit of newly established connections per IP address within a second
 const CLIENT_MESSAGE_RATE_LIMIT = parseInt(process.env.CLIENT_MESSAGE_RATE_LIMIT, 10) || 20; // Limit the number of messages received from a client within a second
-
 const IP_CONNECTION_PROXY_HEADER = "x-forwarded-for"; // Header with real IP, if set by trusted proxy (lowercase)
 const ROOM_LIMIT_DEFAULT = 10; // The default number of players in an online chat room
 const ROOM_LIMIT_MINIMUM = 2; // The minimum number of players in an online chat room
 const ROOM_LIMIT_MAXIMUM = 20; // The maximum number of players in an online chat room
+
+// Limits the number of accounts created on each hour & day
+var AccountCreationIP = [];
+const MAX_IP_ACCOUNT_PER_DAY = parseInt(process.env.MAX_IP_ACCOUNT_PER_DAY, 10) || 12;
+const MAX_IP_ACCOUNT_PER_HOUR = parseInt(process.env.MAX_IP_ACCOUNT_PER_HOUR, 10) || 4;
 
 // DB Access
 /** @type { import("mongodb").Db } */
@@ -374,6 +378,38 @@ function AccountCreate(data, socket) {
 		var LS = /^[a-zA-Z ]+$/;
 		var E = /^[a-zA-Z0-9@.!#$%&'*+/=?^_`{|}~-]+$/;
 		if (data.Name.match(LS) && data.AccountName.match(LN) && data.Password.match(LN) && (data.Email.match(E) || data.Email == "") && (data.Name.length > 0) && (data.Name.length <= 20) && (data.AccountName.length > 0) && (data.AccountName.length <= 20) && (data.Password.length > 0) && (data.Password.length <= 20) && (data.Email.length <= 100)) {
+
+			// Gets the current IP Address that's creating the account
+			/** @type {string} */
+			let CurrentIP = socket.conn.remoteAddress;
+			if (IP_CONNECTION_PROXY_HEADER && typeof socket.handshake.headers[IP_CONNECTION_PROXY_HEADER] === "string") {
+				const hops = /** @type {string} */ (socket.handshake.headers[IP_CONNECTION_PROXY_HEADER]).split(",");
+				CurrentIP = hops[hops.length-1].trim();
+			}
+
+			// If the IP is valid
+			if ((CurrentIP != null) && (CurrentIP != "")) {
+
+				// Checks the number of account created in total and in the last hour by this IP
+				let CurrentTime = CommonTime();
+				let TotalCount = 0;
+				let HourCount = 0;
+				for (let IP of AccountCreationIP)
+					if (IP.Address === CurrentIP) {
+						TotalCount++;
+						if (IP.Time >= CurrentTime - 3600000) HourCount++;
+					}
+	
+				// Exits if we reached the limit
+				if ((TotalCount > MAX_IP_ACCOUNT_PER_DAY) || (HourCount > MAX_IP_ACCOUNT_PER_HOUR)) {
+					socket.emit("CreationResponse", "New accounts per day exceeded");
+					return;
+				}
+	
+				// Keeps the IP in memory for the next run
+				AccountCreationIP.push({ Address: CurrentIP, Time: CurrentTime });
+	
+			}
 
 			// Checks if the account already exists
 			data.AccountName = data.AccountName.toUpperCase();
