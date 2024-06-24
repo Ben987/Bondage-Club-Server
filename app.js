@@ -84,7 +84,7 @@ const IP_CONNECTION_PROXY_HEADER = "x-forwarded-for"; // Header with real IP, if
 const ROOM_LIMIT_DEFAULT = 10; // The default number of players in an online chat room
 const ROOM_LIMIT_MINIMUM = 2; // The minimum number of players in an online chat room
 const ROOM_LIMIT_MAXIMUM = 20; // The maximum number of players in an online chat room
-const ROOM_NAME_REGEX = /^[a-zA-Z0-9 ']+$/;
+const ROOM_NAME_REGEX = /^[\x20-\x7E]+$/;
 
 // Limits the number of accounts created on each hour & day
 var AccountCreationIP = [];
