@@ -1354,26 +1354,47 @@ function ChatRoomGetData(CR, SourceMemberNumber, IncludeCharacters)
 	if (CR == null) return;
 
 	// Builds the room data
-	const R = {
-		Name: CR.Name,
-		Language: CR.Language,
-		Description: CR.Description,
-		Admin: CR.Admin,
-		Ban: CR.Ban,
-		Background: CR.Background,
-		Custom: CR.Custom,
-		Limit: CR.Limit,
-		Game: CR.Game,
-		SourceMemberNumber,
-		Private: CR.Private,
-		Locked: CR.Locked,
-		MapData: CR.MapData,
-		BlockCategory: CR.BlockCategory,
-		Space: CR.Space,
-	};
-
+	let R;
 	if (IncludeCharacters) {
-		R.Character = CR.Account.map(ChatRoomSyncGetCharSharedData);
+		/** @type {ServerChatRoomSyncMessage} */
+		R = {
+			Name: CR.Name,
+			Language: CR.Language,
+			Description: CR.Description,
+			Admin: CR.Admin,
+			Ban: CR.Ban,
+			Background: CR.Background,
+			Custom: CR.Custom,
+			Limit: CR.Limit,
+			Game: CR.Game,
+			SourceMemberNumber,
+			Private: CR.Private,
+			Locked: CR.Locked,
+			MapData: CR.MapData,
+			BlockCategory: CR.BlockCategory,
+			Space: CR.Space,
+			Character: CR.Account.map(ChatRoomSyncGetCharSharedData),
+		};
+	} else {
+		/** @type {ServerChatRoomSyncPropertiesMessage} */
+		R = {
+			Name: CR.Name,
+			Language: CR.Language,
+			Description: CR.Description,
+			Admin: CR.Admin,
+			Ban: CR.Ban,
+			Background: CR.Background,
+			Custom: CR.Custom,
+			Limit: CR.Limit,
+			Game: CR.Game,
+			SourceMemberNumber,
+			Private: CR.Private,
+			Locked: CR.Locked,
+			MapData: CR.MapData,
+			BlockCategory: CR.BlockCategory,
+			Space: CR.Space,
+			Character: CR.Account.map(ChatRoomSyncGetCharSharedData),
+		};
 	}
 
 	return R;
