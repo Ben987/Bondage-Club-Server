@@ -84,6 +84,7 @@ const IP_CONNECTION_PROXY_HEADER = "x-forwarded-for"; // Header with real IP, if
 const ROOM_LIMIT_DEFAULT = 10; // The default number of players in an online chat room
 const ROOM_LIMIT_MINIMUM = 2; // The minimum number of players in an online chat room
 const ROOM_LIMIT_MAXIMUM = 20; // The maximum number of players in an online chat room
+const ROOM_NAME_REGEX = /^[\x20-\x7E]+$/;
 
 // Limits the number of accounts created on each hour & day
 var AccountCreationIP = [];
@@ -1062,7 +1063,7 @@ function ChatRoomCreate(data, socket) {
 
 		// Validates the room name
 		data.Name = data.Name.trim();
-		var LN = /^[a-zA-Z0-9 ]+$/;
+		var LN = ROOM_NAME_REGEX;
 		if (data.Name.match(LN) && (data.Name.length >= 1) && (data.Name.length <= 20) && (data.Description.length <= 100) && (data.Background.length <= 100)) {
 			// Finds the account and links it to the new room
 			var Acc = AccountGet(socket.id);
@@ -1669,7 +1670,7 @@ function ChatRoomAdmin(data, socket) {
 			if (data.Action == "Update")
 				if ((data.Room != null) && (typeof data.Room === "object") && (data.Room.Name != null) && (data.Room.Description != null) && (data.Room.Background != null) && (typeof data.Room.Name === "string") && (typeof data.Room.Description === "string") && (typeof data.Room.Background === "string") && (data.Room.Admin != null) && (Array.isArray(data.Room.Admin)) && (!data.Room.Admin.some(i => !Number.isInteger(i))) && (data.Room.Ban != null) && (Array.isArray(data.Room.Ban)) && (!data.Room.Ban.some(i => !Number.isInteger(i)))) {
 					data.Room.Name = data.Room.Name.trim();
-					var LN = /^[a-zA-Z0-9 ]+$/;
+					var LN = ROOM_NAME_REGEX;
 					if (data.Room.Name.match(LN) && (data.Room.Name.length >= 1) && (data.Room.Name.length <= 20) && (data.Room.Description.length <= 100) && (data.Room.Background.length <= 100)) {
 						for (const Room of ChatRoom)
 							if (Acc.ChatRoom && Acc.ChatRoom.Name != data.Room.Name && Room.Name.toUpperCase().trim() == data.Room.Name.toUpperCase().trim()) {
