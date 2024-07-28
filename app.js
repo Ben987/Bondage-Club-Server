@@ -96,7 +96,7 @@ const MAX_IP_ACCOUNT_PER_HOUR = parseInt(process.env.MAX_IP_ACCOUNT_PER_HOUR, 10
 var Database;
 var DatabaseClient = require('mongodb').MongoClient;
 var DatabaseURL = process.env.DATABASE_URL || "mongodb://localhost:27017/BondageClubDatabase";
-var DatabasePort = process.env.PORT || 4288;
+var ServerPort = process.env.BC_SERVER_PORT || 4288;
 var DatabaseName = process.env.DATABASE_NAME || "BondageClubDatabase";
 
 /**
@@ -188,10 +188,10 @@ DatabaseClient.connect(DatabaseURL, { useUnifiedTopology: true, useNewUrlParser:
 		console.log("Next Member Number: " + NextMemberNumber);
 
 		// Listens for clients on port 4288 if local or a random port if online
-		App.listen(DatabasePort, function () {
+		App.listen(ServerPort, function () {
 
 			// Sets up the Client/Server events
-			console.log("Bondage Club server is listening on " + (DatabasePort).toString());
+			console.log("Bondage Club server is listening on " + (ServerPort).toString());
 			console.log("****************************************");
 			IO.on("connection", function ( /** @type {ServerSocket} */ socket) {
 				/** @type {string} */
