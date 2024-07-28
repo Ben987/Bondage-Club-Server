@@ -408,16 +408,16 @@ function AccountCreate(data, socket) {
 					html: "IP: " + CurrentIP + " is creating account: " + data.AccountName + " at time: " + CommonTime().toString() + "<br />TotalCount: " + TotalCount.toString() + "<br />MAX_IP_ACCOUNT_PER_DAY: " + MAX_IP_ACCOUNT_PER_DAY.toString() + "<br />HourCount: " + HourCount.toString() + "<br />MAX_IP_ACCOUNT_PER_HOUR: " + MAX_IP_ACCOUNT_PER_HOUR.toString()
 				};
 				MailTransporter.sendMail(mailOptions, function (err, info) {});*/
-							
+
 				// Exits if we reached the limit
 				if ((TotalCount >= MAX_IP_ACCOUNT_PER_DAY) || (HourCount >= MAX_IP_ACCOUNT_PER_HOUR)) {
 					socket.emit("CreationResponse", "New accounts per day exceeded");
 					return;
 				}
-	
+
 				// Keeps the IP in memory for the next run
 				AccountCreationIP.push({ Address: CurrentIP, Time: CurrentTime });
-	
+
 			}
 
 			// Checks if the account already exists
@@ -1359,14 +1359,48 @@ function ChatRoomSyncGetCharSharedData(Acc) {
  * Returns a ChatRoom data that can be synced to clients
  * @param {Chatroom} CR
  * @param {number} SourceMemberNumber
- * @param {boolean} IncludeCharacters If the data should include full character info
  */
-function ChatRoomGetData(CR, SourceMemberNumber, IncludeCharacters)
+function ChatRoomGetData(CR, SourceMemberNumber)
 {
 	// Exits right away if the chat room was destroyed
 	if (CR == null) return;
 
 	// Builds the room data
+	/** @type {ServerChatRoomSyncMessage} */
+	const R = {
+		Name: CR.Name,
+		Language: CR.Language,
+		Description: CR.Description,
+		Admin: CR.Admin,
+		Ban: CR.Ban,
+		Background: CR.Background,
+		Custom: CR.Custom,
+		Limit: CR.Limit,
+		Game: CR.Game,
+		SourceMemberNumber,
+		Private: CR.Private,
+		Locked: CR.Locked,
+		MapData: CR.MapData,
+		BlockCategory: CR.BlockCategory,
+		Space: CR.Space,
+		Character: CR.Account.map(ChatRoomSyncGetCharSharedData),
+	};
+
+	return R;
+}
+
+/**
+ * Returns property data for a chatroom
+ * @param {Chatroom} CR
+ * @param {number} SourceMemberNumber
+ */
+function ChatRoomGetProperties(CR, SourceMemberNumber)
+{
+	// Exits right away if the chat room was destroyed
+	if (CR == null) return;
+
+	// Builds the room data
+	/** @type {ServerChatRoomSyncPropertiesMessage} */
 	const R = {
 		Name: CR.Name,
 		Language: CR.Language,
@@ -1385,10 +1419,6 @@ function ChatRoomGetData(CR, SourceMemberNumber, IncludeCharacters)
 		Space: CR.Space,
 	};
 
-	if (IncludeCharacters) {
-		R.Character = CR.Account.map(ChatRoomSyncGetCharSharedData);
-	}
-
 	return R;
 }
 
@@ -1403,7 +1433,7 @@ function ChatRoomSync(CR, SourceMemberNumber) {
 	if (CR == null) return;
 
 	// Sends the full packet to everyone in the room
-	IO.to("chatroom-" + CR.ID).emit("ChatRoomSync", ChatRoomGetData(CR, SourceMemberNumber, true));
+	IO.to("chatroom-" + CR.ID).emit("ChatRoomSync", ChatRoomGetData(CR, SourceMemberNumber));
 }
 
 /**
@@ -1422,7 +1452,7 @@ function ChatRoomSyncToMember(CR, SourceMemberNumber, TargetMemberNumber) {
 		if(RoomAcc.MemberNumber == TargetMemberNumber) // If the player is the one who gets synced...
 		{
 			// Send room data and break loop
-			RoomAcc.Socket.emit("ChatRoomSync", ChatRoomGetData(CR, SourceMemberNumber, true));
+			RoomAcc.Socket.emit("ChatRoomSync", ChatRoomGetData(CR, SourceMemberNumber));
 			break;
 		}
 	}
@@ -1502,7 +1532,7 @@ function ChatRoomSyncRoomProperties(CR, SourceMemberNumber) {
 
 	// Exits right away if the chat room was destroyed
 	if (CR == null) return;
-	IO.to("chatroom-" + CR.ID).emit("ChatRoomSyncRoomProperties", ChatRoomGetData(CR, SourceMemberNumber, false));
+	IO.to("chatroom-" + CR.ID).emit("ChatRoomSyncRoomProperties", ChatRoomGetProperties(CR, SourceMemberNumber));
 
 }
 
