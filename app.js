@@ -703,6 +703,8 @@ function AccountUpdate(data, socket) {
 				delete data.ActivePose;
 				delete data.ChatRoom;
 				delete data.ID;
+				delete data.Socket;
+				delete data.Inventory;
 				// @ts-expect-error This is MongoDB's primary key
 				delete data._id;
 				delete data.MemberNumber;
