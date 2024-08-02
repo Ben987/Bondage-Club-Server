@@ -28,10 +28,9 @@ interface Account extends ServerAccountData {
 	ChatRoom?: Chatroom;
 	Ownership?: ServerOwnership;
 	Lovership: Lovership[];
-	DelayedAppearanceUpdate: any;
-	DelayedSkillUpdate: any;
-	DelayedGameUpdate: ServerChatRoomGame;
-	MapData: any;
+	DelayedAppearanceUpdate?: ServerAccountData["Appearance"];
+	DelayedSkillUpdate?: ServerAccountData["Skill"];
+	DelayedGameUpdate?: ServerChatRoomGame;
 }
 
 interface Chatroom extends ServerChatRoomData {
