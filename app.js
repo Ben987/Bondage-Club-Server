@@ -433,25 +433,36 @@ function AccountCreate(data, socket) {
 					// Creates a hashed password and saves it with the account info
 					BCrypt.hash(data.Password.toUpperCase(), 10, function( err, hash ) {
 						if (err) throw err;
-						data.Password = hash;
-						data.Money = 100;
-						data.Creation = CommonTime();
-						data.LastLogin = CommonTime();
-						data.MemberNumber = NextMemberNumber;
-						data.Lovership = [];
-						delete data._id;
-						NextMemberNumber++;
-						Database.collection(AccountCollection).insertOne({...data}, function(err, res) { if (err) throw err; });
-						data.Environment = AccountGetEnvironment(socket);
-						console.log("Creating new account: " + data.AccountName + " ID: " + socket.id + " " + data.Environment);
-						data.ID = socket.id;
-						data.Socket = socket;
-						AccountValidData(data);
-						Account.push(data);
-						OnLogin(socket);
-						socket.emit("CreationResponse", { ServerAnswer: "AccountCreated", OnlineID: data.ID, MemberNumber: data.MemberNumber } );
-						AccountSendServerInfo(socket);
-						AccountPurgeInfo(data);
+						let account = /** @type {Account} */ ({
+							// ID and Socket are special; they're used at runtime but cannot be
+							// persisted to the database so they're set after that happens.
+							AccountName: data.AccountName,
+							Password: hash,
+							// Use the next member number and bump it
+							MemberNumber: NextMemberNumber++,
+							Name: data.Name,
+							Money: 100,
+							Creation: CommonTime(),
+							LastLogin: CommonTime(),
+							Environment: AccountGetEnvironment(socket),
+							Lovership: [],
+							ItemPermission: 2,
+							FriendList: [],
+							WhiteList: [],
+							BlackList: [],
+						});
+						Database.collection(AccountCollection).insertOne(account, function(err, res) {
+							if (err) throw err;
+							account.ID = socket.id;
+							account.Socket = socket;
+							console.log("Creating new account: " + account.AccountName + " ID: " + socket.id + " " + account.Environment);
+							AccountValidData(account);
+							Account.push(account);
+							OnLogin(socket);
+							socket.emit("CreationResponse", { ServerAnswer: "AccountCreated", OnlineID: account.ID, MemberNumber: account.MemberNumber } );
+							AccountSendServerInfo(socket);
+							AccountPurgeInfo(data);
+						});
 					});
 
 				}
