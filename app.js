@@ -1606,14 +1606,24 @@ function ChatRoomCharacterMapDataUpdate(data, socket) {
  * @param {ServerSocket} socket
  */
 function ChatRoomCharacterPoseUpdate(data, socket) {
-	if ((data != null) && (typeof data === "object")) {
-		if (typeof data.Pose !== "string" && !Array.isArray(data.Pose)) data.Pose = null;
-		if (Array.isArray(data.Pose)) data.Pose = data.Pose.filter(P => typeof P === "string");
-		var Acc = AccountGet(socket.id);
-		if (Acc != null) Acc.ActivePose = data.Pose;
-		if (Acc && Acc.ChatRoom) {
-			socket.to("chatroom-" + Acc.ChatRoom.ID).emit("ChatRoomSyncPose", { MemberNumber: Acc.MemberNumber, Pose: data.Pose });
-		}
+	if (!data || typeof data !== "object" || Array.isArray(data)) return;
+
+	const Acc = AccountGet(socket.id);
+	if (!Acc) return;
+
+	/** @type {readonly string[]} */
+	let Pose;
+	if (typeof data.Pose !== "string" && !Array.isArray(data.Pose)) {
+		Pose = [];
+	} else if (Array.isArray(data.Pose)) {
+		Pose = data.Pose.filter(P => typeof P === "string");
+	} else {
+		Pose = [data.Pose];
+	}
+
+	Acc.ActivePose = Pose;
+	if (Acc.ChatRoom) {
+		socket.to("chatroom-" + Acc.ChatRoom.ID).emit("ChatRoomSyncPose", { MemberNumber: Acc.MemberNumber, Pose: Pose });
 	}
 }
 
