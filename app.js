@@ -84,7 +84,6 @@ const IP_CONNECTION_PROXY_HEADER = "x-forwarded-for"; // Header with real IP, if
 const ROOM_LIMIT_DEFAULT = 10; // The default number of players in an online chat room
 const ROOM_LIMIT_MINIMUM = 2; // The minimum number of players in an online chat room
 const ROOM_LIMIT_MAXIMUM = 20; // The maximum number of players in an online chat room
-const ROOM_NAME_REGEX = /^[\x20-\x7E]+$/;
 
 // Limits the number of accounts created on each hour & day
 var AccountCreationIP = [];
@@ -170,6 +169,40 @@ process.on('SIGTERM', function() {
 
 /** @type {Map<string, number[]>} */
 const IPConnections = new Map();
+
+// These regex must be kept in sync with the client
+const ServerAccountEmailRegex = /^[a-zA-Z0-9@.!#$%&'*+/=?^_`{|}~-]{5,100}$/;
+const ServerAccountNameRegex = /^[a-zA-Z0-9]{1,20}$/;
+const ServerAccountPasswordRegex = /^[a-zA-Z0-9]{1,20}$/;
+const ServerAccountResetNumberRegex = /^[0-9]{1,20}$/;
+const ServerCharacterNameRegex = /^[a-zA-Z ]{1,20}$/;
+const ServerCharacterNicknameRegex = /^[\p{L}\p{Nd}\p{Z}'-]+$/u;
+const ServerChatRoomNameRegex = /^[\x20-\x7E]{1,20}$/;
+
+/**
+ * Type guard which checks that a value is a simple object (i.e. a non-null object which is not an array)
+ * @param {unknown} value - The value to test
+ * @returns {value is Record<string, unknown>}
+ */
+function CommonIsObject(value) {
+	return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
+/**
+ * Check that the passed string looks like an acceptable email address.
+ *
+ * @param {string} Email
+ * @returns {boolean}
+ */
+function CommonEmailIsValid(Email) {
+	if (!ServerAccountEmailRegex.test(Email)) return false;
+
+	const parts = Email.split("@");
+	if (parts.length !== 2) return false;
+	if (parts[1].indexOf(".") === -1) return false;
+
+	return true;
+}
 
 // Connects to the Mongo Database
 DatabaseClient.connect(DatabaseURL, { useUnifiedTopology: true, useNewUrlParser: true, autoIndex: false }, function(err, db) {
@@ -345,6 +378,15 @@ function CommonTime() {
 }
 
 /**
+ * Type guard which checks that a value is a simple object (i.e. a non-null object which is not an array)
+ * @param {unknown} value - The value to test
+ * @returns {value is Record<string, unknown>}
+ */
+function CommonIsObject(value) {
+	return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
+/**
  * Parses a integer out of something, with a default value
  * @param {unknown} thing
  * @param {number} defaultValue
@@ -375,10 +417,7 @@ function AccountCreate(data, socket) {
 	if ((data != null) && (typeof data === "object") && (data.Name != null) && (data.AccountName != null) && (data.Password != null) && (data.Email != null) && (typeof data.Name === "string") && (typeof data.AccountName === "string") && (typeof data.Password === "string") && (typeof data.Email === "string")) {
 
 		// Makes sure the data is valid
-		var LN = /^[a-zA-Z0-9]+$/;
-		var LS = /^[a-zA-Z ]+$/;
-		var E = /^[a-zA-Z0-9@.!#$%&'*+/=?^_`{|}~-]+$/;
-		if (data.Name.match(LS) && data.AccountName.match(LN) && data.Password.match(LN) && (data.Email.match(E) || data.Email == "") && (data.Name.length > 0) && (data.Name.length <= 20) && (data.AccountName.length > 0) && (data.AccountName.length <= 20) && (data.Password.length > 0) && (data.Password.length <= 20) && (data.Email.length <= 100)) {
+		if (data.Name.match(ServerCharacterNameRegex) && data.AccountName.match(ServerAccountNameRegex) && data.Password.match(ServerAccountPasswordRegex) && (CommonEmailIsValid(data.Email) || data.Email == "") && (data.Email.length <= 100)) {
 
 			// Gets the current IP Address that's creating the account
 			/** @type {string} */
@@ -810,9 +849,8 @@ function AccountUpdate(data, socket) {
  */
 function AccountUpdateEmail(data, socket) {
 	if ((data != null) && (typeof data === "object") && (data.EmailOld != null) && (data.EmailNew != null) && (typeof data.EmailOld === "string") && (typeof data.EmailNew === "string")) {
-		var Acc = AccountGet(socket.id);
-		var E = /^[a-zA-Z0-9@.!#$%&'*+/=?^_`{|}~-]+$/;
-		if ((Acc != null) && (data.EmailNew.match(E) || (data.EmailNew == "")) && (data.EmailNew.length <= 100) && (data.EmailNew.match(E) || (data.EmailNew == "")) && (data.EmailNew.length <= 100))
+		const Acc = AccountGet(socket.id);
+		if ((Acc != null) && (CommonEmailIsValid(data.EmailNew) || (data.EmailNew == "")) && (CommonEmailIsValid(data.EmailNew) || (data.EmailNew == "")))
 			Database.collection(AccountCollection).find({ AccountName : Acc.AccountName }).sort({MemberNumber: -1}).limit(1).toArray(function(err, result) {
 				if (err) throw err;
 				if ((result != null) && (typeof result === "object") && (result.length > 0) && data.EmailOld == result[0].Email) {
@@ -980,87 +1018,157 @@ function AccountGet(ID) {
 }
 
 /**
+ * The maximum number of search results to return at once
+ */
+const ChatRoomSearchMaxResults = 120;
+
+/**
  * When a user searches for a chat room
  * @param {ServerChatRoomSearchRequest} data
  * @param {ServerSocket} socket
  */
 function ChatRoomSearch(data, socket) {
-	if ((data != null) && (typeof data === "object") && (data.Query != null) && (typeof data.Query === "string") && (data.Query.length <= 20)) {
+	if (!CommonIsObject(data) || typeof data.Query !== "string" || data.Query.length > 20) {
+		return;
+	}
 
-		// Finds the current account
-		var Acc = AccountGet(socket.id);
-		if (Acc != null) {
+	// Finds the current account
+	const Acc = AccountGet(socket.id);
+	if (!Acc) return;
 
-			// Gets the chat room spaces to return (empty for public, asylum, etc.)
-			var Spaces = [];
-			if ((data.Space != null) && (typeof data.Space === "string") && (data.Space.length <= 100)) Spaces = [data.Space];
-			else if ((data.Space != null) && (Array.isArray(data.Space)))
-				data.Space.forEach(space => { if (typeof space === "string" && space.length <= 100) Spaces.push(space) });
+	// Our search query
+	const Query = data.Query.trim();
 
-			// Gets the game name currently being played in the chat room (empty for all games and non-games rooms)
-			var Game = "";
-			if ((data.Game != null) && (typeof data.Game === "string") && (data.Game.length <= 100)) Game = data.Game;
+	// Gets the chat room spaces to return (empty for public, asylum, etc.)
+	let Spaces = [];
+	if (typeof data.Space === "string" && data.Space.length <= 100) {
+		Spaces = [data.Space];
+	} else if (Array.isArray(data.Space)) {
+		Spaces = data.Space.filter(space => typeof space === "string" && space.length <= 100);
+	}
 
-			// Checks if the user requested full rooms
-			var FullRooms = false;
-			if ((data.FullRooms != null) && (typeof data.FullRooms === "boolean")) FullRooms = data.FullRooms;
+	// Gets the game name currently being played in the chat room (empty for all games and non-games rooms)
+	const Game = typeof data.Game === "string" && data.Game.length <= 100 ? data.Game : "";
 
-			// Checks if the user opted to ignore certain rooms
-			/** @type {string[]} */
-			var IgnoredRooms = [];
-			if ((data.Ignore != null) && (Array.isArray(data.Ignore))) IgnoredRooms = data.Ignore;
+	// Checks if the user allows full rooms to show up
+	const FullRooms = typeof data.FullRooms === "boolean" ? data.FullRooms : false;
 
-			// Validate array, only strings are valid.
-			var LN = /^[a-zA-Z0-9 ]+$/;
-			IgnoredRooms = IgnoredRooms.filter(R => typeof R === "string" && R.match(LN));
+	// Checks if the user opted to ignore certain rooms
+	let IgnoredRooms = [];
+	if (Array.isArray(data.Ignore)) {
+		// Validate array, only strings are valid.
+		IgnoredRooms = data.Ignore.filter(R => typeof R === "string" && R.match(ServerChatRoomNameRegex)).map(r => r.toUpperCase());
+	}
 
-			// Builds a list of all public rooms, the last rooms created are shown first
-			var CR = [];
-			var C = 0;
-			for (var C = ChatRoom.length - 1; ((C >= 0) && (CR.length <= 119)); C--)
-				if ((ChatRoom[C] != null) && ((FullRooms) || (ChatRoom[C].Account.length < ChatRoom[C].Limit)))
-					if ((Acc.Environment == ChatRoom[C].Environment) && (Spaces.includes(ChatRoom[C].Space))) // Must be in same environment (prod/dev) and same space (hall/asylum)
-						if ((Game == "") || (Game == ChatRoom[C].Game)) // If we must filter for a specific game in a chat room
-							if (ChatRoom[C].Ban.indexOf(Acc.MemberNumber) < 0) // The player cannot be banned
-								if ((data.Language == null) || (typeof data.Language !== "string") || (data.Language == "") || (data.Language === ChatRoom[C].Language)) // Filters by language
-									if ((data.Query == "") || (ChatRoom[C].Name.toUpperCase().indexOf(data.Query) >= 0)) // Room name must contain the searched name, if any
-										if (!ChatRoom[C].Locked || (ChatRoom[C].Admin.indexOf(Acc.MemberNumber) >= 0)) // Must be unlocked, unless the player is an administrator
-											if (!ChatRoom[C].Private || (ChatRoom[C].Name.toUpperCase() == data.Query)) // If it's private, must know the exact name
-												if (IgnoredRooms.indexOf(ChatRoom[C].Name.toUpperCase()) == -1) { // Room name cannot be ignored
+	// Grab the search language
+	const Language = typeof data.Language === "string" ? data.Language : "";
 
-													// Builds the searching account friend list in the current room
-													/** @type {ServerFriendInfo[]} */
-													var Friends = [];
-													for (const RoomAcc of ChatRoom[C].Account)
-														if (RoomAcc != null)
-															if ((RoomAcc.Ownership != null) && (RoomAcc.Ownership.MemberNumber != null) && (RoomAcc.Ownership.MemberNumber == Acc.MemberNumber))
-																Friends.push({ Type: "Submissive", MemberNumber: RoomAcc.MemberNumber, MemberName: RoomAcc.Name});
-															else if ((Acc.FriendList != null) && (RoomAcc.FriendList != null) && (Acc.FriendList.indexOf(RoomAcc.MemberNumber) >= 0) && (RoomAcc.FriendList.indexOf(Acc.MemberNumber) >= 0))
-																Friends.push({ Type: "Friend", MemberNumber: RoomAcc.MemberNumber, MemberName: RoomAcc.Name});
+	// Whether we also search the room descriptions
+	const SearchDescs = typeof data.SearchDescs === "boolean" ? data.SearchDescs : false;
 
-													// Builds a room object with all data
-													CR.push({
-														Name: ChatRoom[C].Name,
-														Language: ChatRoom[C].Language,
-														Creator: ChatRoom[C].Creator,
-														CreatorMemberNumber: ChatRoom[C].CreatorMemberNumber,
-														MemberCount: ChatRoom[C].Account.length,
-														MemberLimit: ChatRoom[C].Limit,
-														Description: ChatRoom[C].Description,
-														BlockCategory: ChatRoom[C].BlockCategory,
-														Game: ChatRoom[C].Game,
-														Friends: Friends,
-														Space: ChatRoom[C].Space,
-														MapType: ((ChatRoom[C].MapData != null) && (ChatRoom[C].MapData.Type != null)) ? ChatRoom[C].MapData.Type : "Never"
-													});
+	// Check if we have a map type filter
+	let MapTypes = [];
+	if (Array.isArray(data.MapTypes)) {
+		MapTypes = data.MapTypes.filter(t => typeof t === "string" && t.length < 20);
+	}
 
-												}
+	// Builds a list of all public rooms, the last rooms created are shown first
+	const CR = [];
+	for (const room of ChatRoom) {
+		if (!room) continue;
 
-			// Sends the list to the client
-			socket.emit("ChatRoomSearchResult", CR);
+		const roomName = room.Name.toUpperCase();
+
+		// Room is not in the correct environment, skip
+		if (Acc.Environment !== room.Environment) continue;
+
+		// We're looking for a specific game and the room's doesn't match, skip
+		if (Game !== "" && room.Game !== Game) continue;
+
+		// The room is full and we don't want those, skip
+		if (room.Account.length >= room.Limit && !FullRooms) continue;
+
+		// Room isn't in the correct space, skip
+		if (!Spaces.includes(room.Space)) continue;
+
+		// Player is banned from the room, skip
+		if (room.Ban.includes(Acc.MemberNumber)) continue;
+
+		// Room is for a different language than requested, skip
+		if (Language !== "" && room.Language !== Language) continue;
+
+		// We have a search query
+		if (Query !== "") {
+			// Query doesn't match the room, skip
+			const searchTerms = [roomName];
+			if (SearchDescs) {
+				searchTerms.push(room.Description.toUpperCase());
+			}
+			if (!searchTerms.some(term => term.includes(Query))) continue;
 
 		}
 
+		// Room is private, and query isn't an exact name match, skip
+		if (room.Private && roomName !== Query) continue;
+
+		// Room is locked and player isn't an admin, skip
+		if (room.Locked && !room.Admin.includes(Acc.MemberNumber)) continue;
+
+		// Room is in our ignore list, skip
+		if (IgnoredRooms.includes(roomName)) continue;
+
+		// Only allow requested map types
+		if (MapTypes.length > 0 && !MapTypes.includes(room.MapData?.Type)) continue;
+
+		const result = ChatRoomSearchAddResult(Acc, room);
+		if (!result) continue;
+
+		CR.push(result);
+
+		// We got enough results for one batch, return those
+		if (CR.length >= ChatRoomSearchMaxResults) break;
+	}
+
+	// Sends the list to the client
+	socket.emit("ChatRoomSearchResult", CR);
+}
+
+/**
+ * Transform a chatroom into its search result form
+ * @param {Account} Acc
+ * @param {Chatroom} room
+ * @returns {ServerChatRoomSearchData}
+ */
+function ChatRoomSearchAddResult(Acc, room) {
+
+	// Builds the searching account's list of known individuals in the current room
+	/** @type {ServerFriendInfo[]} */
+	const Friends = [];
+	for (const RoomAcc of room.Account) {
+		if (!RoomAcc) continue;
+		if (RoomAcc?.Ownership?.MemberNumber === Acc.MemberNumber) {
+			Friends.push({ Type: "Submissive", MemberNumber: RoomAcc.MemberNumber, MemberName: RoomAcc.Name });
+		} else if (Acc?.FriendList?.includes(RoomAcc.MemberNumber) && RoomAcc?.FriendList?.includes(Acc.MemberNumber)) {
+			Friends.push({ Type: "Friend", MemberNumber: RoomAcc.MemberNumber, MemberName: RoomAcc.Name });
+		}
+	}
+
+	const MapType = room?.MapData?.Type ? room.MapData.Type : "Never";
+
+	// Builds a search result object with the room data
+	return {
+		Name: room.Name,
+		Language: room.Language,
+		Creator: room.Creator,
+		CreatorMemberNumber: room.CreatorMemberNumber,
+		MemberCount: room.Account.length,
+		MemberLimit: room.Limit,
+		Description: room.Description,
+		BlockCategory: room.BlockCategory,
+		Game: room.Game,
+		Friends: Friends,
+		Space: room.Space,
+		MapType
 	}
 }
 
@@ -1076,8 +1184,7 @@ function ChatRoomCreate(data, socket) {
 
 		// Validates the room name
 		data.Name = data.Name.trim();
-		var LN = ROOM_NAME_REGEX;
-		if (data.Name.match(LN) && (data.Name.length >= 1) && (data.Name.length <= 20) && (data.Description.length <= 100) && (data.Background.length <= 100)) {
+		if (data.Name.match(ServerChatRoomNameRegex) && (data.Description.length <= 100) && (data.Background.length <= 100)) {
 			// Finds the account and links it to the new room
 			var Acc = AccountGet(socket.id);
 			if (Acc == null) {
@@ -1723,8 +1830,7 @@ function ChatRoomAdmin(data, socket) {
 			if (data.Action == "Update")
 				if ((data.Room != null) && (typeof data.Room === "object") && (data.Room.Name != null) && (data.Room.Description != null) && (data.Room.Background != null) && (typeof data.Room.Name === "string") && (typeof data.Room.Description === "string") && (typeof data.Room.Background === "string") && (data.Room.Admin != null) && (Array.isArray(data.Room.Admin)) && (!data.Room.Admin.some(i => !Number.isInteger(i))) && (data.Room.Ban != null) && (Array.isArray(data.Room.Ban)) && (!data.Room.Ban.some(i => !Number.isInteger(i)))) {
 					data.Room.Name = data.Room.Name.trim();
-					var LN = ROOM_NAME_REGEX;
-					if (data.Room.Name.match(LN) && (data.Room.Name.length >= 1) && (data.Room.Name.length <= 20) && (data.Room.Description.length <= 100) && (data.Room.Background.length <= 100)) {
+					if (data.Room.Name.match(ServerChatRoomNameRegex) && (data.Room.Description.length <= 100) && (data.Room.Background.length <= 100)) {
 						for (const Room of ChatRoom)
 							if (Acc.ChatRoom && Acc.ChatRoom.Name != data.Room.Name && Room.Name.toUpperCase().trim() == data.Room.Name.toUpperCase().trim()) {
 								socket.emit("ChatRoomUpdateResponse", "RoomAlreadyExist");
@@ -1961,7 +2067,7 @@ function PasswordResetSetNumber(AccountName, ResetNumber) {
  * @param {ServerSocket} socket
  */
 function PasswordReset(data, socket) {
-	if ((data != null) && (typeof data === "string") && (data != "") && data.match(/^[a-zA-Z0-9@.]+$/) && (data.length >= 5) && (data.length <= 100) && (data.indexOf("@") > 0) && (data.indexOf(".") > 0)) {
+	if ((data != null) && (typeof data === "string") && (data != "") && CommonEmailIsValid(data)) {
 
 		// One email reset password per 5 seconds to prevent flooding
 		if (NextPasswordReset > CommonTime()) return socket.emit("PasswordResetResponse", "RetryLater");
@@ -2019,8 +2125,7 @@ function PasswordResetProcess(data, socket) {
 	if ((data != null) && (typeof data === "object") && (data.AccountName != null) && (typeof data.AccountName === "string") && (data.ResetNumber != null) && (typeof data.ResetNumber === "string") && (data.NewPassword != null) && (typeof data.NewPassword === "string")) {
 
 		// Makes sure the data is valid
-		var LN = /^[a-zA-Z0-9 ]+$/;
-		if (data.AccountName.match(LN) && data.NewPassword.match(LN) && (data.AccountName.length > 0) && (data.AccountName.length <= 20) && (data.NewPassword.length > 0) && (data.NewPassword.length <= 20)) {
+		if (data.AccountName.match(ServerAccountNameRegex) && data.NewPassword.match(ServerAccountPasswordRegex)) {
 
 			// Checks if the reset number matches
 			for (const PasswordReset of PasswordResetProgress)
