@@ -488,7 +488,7 @@ interface ServerChatRoomSyncMessage extends ServerChatRoomData {
 	SourceMemberNumber: number;
 }
 
-interface ServerChatRoomSyncPropertiesMessage extends ServerChatRoomData {
+interface ServerChatRoomSyncPropertiesMessage extends Omit<ServerChatRoomData, "Character"> {
 	SourceMemberNumber: number;
 }
 
