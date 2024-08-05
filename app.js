@@ -843,21 +843,50 @@ function AccountUpdate(data, socket) {
  * @param {ServerSocket} socket
  */
 function AccountUpdateEmail(data, socket) {
-	if ((data != null) && (typeof data === "object") && (data.EmailOld != null) && (data.EmailNew != null) && (typeof data.EmailOld === "string") && (typeof data.EmailNew === "string")) {
-		const Acc = AccountGet(socket.id);
-		if ((Acc != null) && (CommonEmailIsValid(data.EmailNew) || (data.EmailNew == "")) && (CommonEmailIsValid(data.EmailNew) || (data.EmailNew == "")))
-			Database.collection(AccountCollection).find({ AccountName : Acc.AccountName }).sort({MemberNumber: -1}).limit(1).toArray(function(err, result) {
-				if (err) throw err;
-				if ((result != null) && (typeof result === "object") && (result.length > 0) && data.EmailOld == result[0].Email) {
-					socket.emit("AccountQueryResult", { Query: "EmailUpdate", Result: true });
-					Database.collection(AccountCollection).updateOne({ AccountName : Acc.AccountName }, { $set: { Email: data.EmailNew }}, function(err, res) { if (err) throw err; });
-					console.log("Account " + Acc.AccountName + " updated email from " + data.EmailOld + " to " + data.EmailNew);
-					return;
-				}
-			});
-
+	// Invalid data received
+	if (!data || typeof data !== "object" || Array.isArray(data)) {
 		socket.emit("AccountQueryResult", { Query: "EmailUpdate", Result: false });
+		return;
 	}
+
+	if (typeof data.EmailOld !== "string" || typeof data.EmailNew !== "string") {
+		socket.emit("AccountQueryResult", { Query: "EmailUpdate", Result: false });
+		return;
+	}
+
+	const Acc = AccountGet(socket.id);
+	if (!Acc) {
+		socket.emit("AccountQueryResult", { Query: "EmailUpdate", Result: false });
+		return;
+	}
+
+	// If we're given a new email, check that it is valid (removing the email from the account is allowed)
+	if (data.EmailNew !== "" && !CommonEmailIsValid(data.EmailNew)) {
+		socket.emit("AccountQueryResult", { Query: "EmailUpdate", Result: false });
+		return;
+	}
+
+	// At that point we need to load up the account from the database; email is part of the keys we don't keep around
+	/** @type {import("mongodb").Collection<Account>} */ (Database.collection(AccountCollection)).findOne(
+		{ AccountName : Acc.AccountName },
+		(err, result) => {
+			if (err) throw err;
+			if (data.EmailOld !== result.Email) {
+				socket.emit("AccountQueryResult", { Query: "EmailUpdate", Result: false });
+				return;
+			}
+
+			Database.collection(AccountCollection).updateOne(
+				{ AccountName : Acc.AccountName },
+				{ $set: { Email: data.EmailNew } },
+				function(err, res) {
+					if (err) throw err;
+					console.log("Account " + Acc.AccountName + " updated email from " + data.EmailOld + " to " + data.EmailNew);
+					socket.emit("AccountQueryResult", { Query: "EmailUpdate", Result: true });
+				}
+			);
+		}
+	);
 }
 
 /**
