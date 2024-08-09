@@ -442,7 +442,7 @@ interface ServerChatRoomSearchData {
     Game: ServerChatRoomGame;
     Friends: ServerFriendInfo[];
     Space: ServerChatRoomSpace;
-	MapType?: string;
+    MapType: string;
 }
 
 type ServerChatRoomSearchResultResponse = ServerChatRoomSearchData[];

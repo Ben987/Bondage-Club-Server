@@ -1156,8 +1156,6 @@ function ChatRoomSearchAddResult(Acc, room) {
 		}
 	}
 
-	const MapType = room?.MapData?.Type ? room.MapData.Type : "Never";
-
 	// Builds a search result object with the room data
 	return {
 		Name: room.Name,
@@ -1171,7 +1169,7 @@ function ChatRoomSearchAddResult(Acc, room) {
 		Game: room.Game,
 		Friends: Friends,
 		Space: room.Space,
-		MapType
+		MapType: room?.MapData?.Type ?? "Never",
 	}
 }
 
