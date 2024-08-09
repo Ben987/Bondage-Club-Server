@@ -1114,9 +1114,6 @@ function ChatRoomSearch(data, socket) {
 		// Room is private, and query isn't an exact name match, skip
 		if (room.Private && roomName !== Query) continue;
 
-		// Room is locked and player isn't an admin, skip
-		if (room.Locked && !room.Admin.includes(Acc.MemberNumber)) continue;
-
 		// Room is in our ignore list, skip
 		if (IgnoredRooms.includes(roomName)) continue;
 
@@ -1169,6 +1166,7 @@ function ChatRoomSearchAddResult(Acc, room) {
 		Game: room.Game,
 		Friends: Friends,
 		Space: room.Space,
+		Locked: room.Locked,
 		MapType: room?.MapData?.Type ?? "Never",
 	}
 }

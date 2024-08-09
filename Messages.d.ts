@@ -442,6 +442,7 @@ interface ServerChatRoomSearchData {
     Game: ServerChatRoomGame;
     Friends: ServerFriendInfo[];
     Space: ServerChatRoomSpace;
+    Locked: boolean;
     MapType: string;
 }
 
