@@ -1103,6 +1103,9 @@ function ChatRoomSearch(data, socket) {
 	// Grab the search language
 	const Language = typeof data.Language === "string" ? data.Language : "";
 
+	// Whether we also search the room descriptions
+	const SearchDescs = typeof data.SearchDescs === "boolean" ? data.SearchDescs : false;
+
 	// Builds a list of all public rooms, the last rooms created are shown first
 	const CR = [];
 	for (const room of ChatRoom) {
@@ -1131,7 +1134,12 @@ function ChatRoomSearch(data, socket) {
 		// We have a search query
 		if (Query !== "") {
 			// Query doesn't match the room, skip
-			if (!roomName.includes(Query)) continue;
+			const searchTerms = [roomName];
+			if (SearchDescs) {
+				searchTerms.push(room.Description.toUpperCase());
+			}
+			if (!searchTerms.some(term => term.includes(Query))) continue;
+
 		}
 
 		// Room is private, and query isn't an exact name match or player isn't in the whitelist, skip

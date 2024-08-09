@@ -427,6 +427,7 @@ interface ServerChatRoomSearchRequest {
     FullRooms?: boolean;
     Ignore?: string[];
     Language: string;
+    SearchDescs?: boolean;
 }
 
 interface ServerChatRoomSearchData {
