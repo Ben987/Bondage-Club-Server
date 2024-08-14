@@ -425,7 +425,7 @@ interface ServerChatRoomSearchRequest {
     Game?: ServerChatRoomGame;
     FullRooms?: boolean;
     Ignore?: string[];
-    Language: string;
+	Language: "" | ServerChatRoomLanguage | ServerChatRoomLanguage[];
     SearchDescs?: boolean;
     MapTypes?: string[];
 }
