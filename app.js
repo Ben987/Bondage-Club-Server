@@ -1101,7 +1101,12 @@ function ChatRoomSearch(data, socket) {
 	}
 
 	// Grab the search language
-	const Language = typeof data.Language === "string" ? data.Language : "";
+	let Languages = []
+	if (typeof data.Language === "string" && data.Language !== "") {
+		Languages.push(data.Language);
+	} else if (Array.isArray(data.Language)) {
+		Languages = Languages.concat(data.Language);
+	}
 
 	// Whether we also search the room descriptions
 	const SearchDescs = typeof data.SearchDescs === "boolean" ? data.SearchDescs : false;
@@ -1135,7 +1140,7 @@ function ChatRoomSearch(data, socket) {
 		if (room.Ban.includes(Acc.MemberNumber)) continue;
 
 		// Room is for a different language than requested, skip
-		if (Language !== "" && room.Language !== Language) continue;
+		if (Languages.length !== 0 && !Languages.includes(room.Language)) continue;
 
 		// We have a search query
 		if (Query !== "") {
