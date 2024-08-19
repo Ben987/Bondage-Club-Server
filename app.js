@@ -84,7 +84,6 @@ const IP_CONNECTION_PROXY_HEADER = "x-forwarded-for"; // Header with real IP, if
 const ROOM_LIMIT_DEFAULT = 10; // The default number of players in an online chat room
 const ROOM_LIMIT_MINIMUM = 2; // The minimum number of players in an online chat room
 const ROOM_LIMIT_MAXIMUM = 20; // The maximum number of players in an online chat room
-const ROOM_NAME_REGEX = /^[\x20-\x7E]+$/;
 
 // Limits the number of accounts created on each hour & day
 var AccountCreationIP = [];
@@ -170,6 +169,40 @@ process.on('SIGTERM', function() {
 
 /** @type {Map<string, number[]>} */
 const IPConnections = new Map();
+
+// These regex must be kept in sync with the client
+const ServerAccountEmailRegex = /^[a-zA-Z0-9@.!#$%&'*+/=?^_`{|}~-]{5,100}$/;
+const ServerAccountNameRegex = /^[a-zA-Z0-9]{1,20}$/;
+const ServerAccountPasswordRegex = /^[a-zA-Z0-9]{1,20}$/;
+const ServerAccountResetNumberRegex = /^[0-9]{1,20}$/;
+const ServerCharacterNameRegex = /^[a-zA-Z ]{1,20}$/;
+const ServerCharacterNicknameRegex = /^[\p{L}\p{Nd}\p{Z}'-]+$/u;
+const ServerChatRoomNameRegex = /^[\x20-\x7E]{1,20}$/;
+
+/**
+ * Type guard which checks that a value is a simple object (i.e. a non-null object which is not an array)
+ * @param {unknown} value - The value to test
+ * @returns {value is Record<string, unknown>}
+ */
+function CommonIsObject(value) {
+	return !!value && typeof value === "object" && !Array.isArray(value);
+}
+
+/**
+ * Check that the passed string looks like an acceptable email address.
+ *
+ * @param {string} Email
+ * @returns {boolean}
+ */
+function CommonEmailIsValid(Email) {
+	if (!ServerAccountEmailRegex.test(Email)) return false;
+
+	const parts = Email.split("@");
+	if (parts.length !== 2) return false;
+	if (parts[1].indexOf(".") === -1) return false;
+
+	return true;
+}
 
 // Connects to the Mongo Database
 DatabaseClient.connect(DatabaseURL, { useUnifiedTopology: true, useNewUrlParser: true, autoIndex: false }, function(err, db) {
@@ -375,10 +408,7 @@ function AccountCreate(data, socket) {
 	if ((data != null) && (typeof data === "object") && (data.Name != null) && (data.AccountName != null) && (data.Password != null) && (data.Email != null) && (typeof data.Name === "string") && (typeof data.AccountName === "string") && (typeof data.Password === "string") && (typeof data.Email === "string")) {
 
 		// Makes sure the data is valid
-		var LN = /^[a-zA-Z0-9]+$/;
-		var LS = /^[a-zA-Z ]+$/;
-		var E = /^[a-zA-Z0-9@.!#$%&'*+/=?^_`{|}~-]+$/;
-		if (data.Name.match(LS) && data.AccountName.match(LN) && data.Password.match(LN) && (data.Email.match(E) || data.Email == "") && (data.Name.length > 0) && (data.Name.length <= 20) && (data.AccountName.length > 0) && (data.AccountName.length <= 20) && (data.Password.length > 0) && (data.Password.length <= 20) && (data.Email.length <= 100)) {
+		if (data.Name.match(ServerCharacterNameRegex) && data.AccountName.match(ServerAccountNameRegex) && data.Password.match(ServerAccountPasswordRegex) && (CommonEmailIsValid(data.Email) || data.Email == "") && (data.Email.length <= 100)) {
 
 			// Gets the current IP Address that's creating the account
 			/** @type {string} */
@@ -810,9 +840,8 @@ function AccountUpdate(data, socket) {
  */
 function AccountUpdateEmail(data, socket) {
 	if ((data != null) && (typeof data === "object") && (data.EmailOld != null) && (data.EmailNew != null) && (typeof data.EmailOld === "string") && (typeof data.EmailNew === "string")) {
-		var Acc = AccountGet(socket.id);
-		var E = /^[a-zA-Z0-9@.!#$%&'*+/=?^_`{|}~-]+$/;
-		if ((Acc != null) && (data.EmailNew.match(E) || (data.EmailNew == "")) && (data.EmailNew.length <= 100) && (data.EmailNew.match(E) || (data.EmailNew == "")) && (data.EmailNew.length <= 100))
+		const Acc = AccountGet(socket.id);
+		if ((Acc != null) && (CommonEmailIsValid(data.EmailNew) || (data.EmailNew == "")) && (CommonEmailIsValid(data.EmailNew) || (data.EmailNew == "")))
 			Database.collection(AccountCollection).find({ AccountName : Acc.AccountName }).sort({MemberNumber: -1}).limit(1).toArray(function(err, result) {
 				if (err) throw err;
 				if ((result != null) && (typeof result === "object") && (result.length > 0) && data.EmailOld == result[0].Email) {
@@ -1011,8 +1040,7 @@ function ChatRoomSearch(data, socket) {
 			if ((data.Ignore != null) && (Array.isArray(data.Ignore))) IgnoredRooms = data.Ignore;
 
 			// Validate array, only strings are valid.
-			var LN = /^[a-zA-Z0-9 ]+$/;
-			IgnoredRooms = IgnoredRooms.filter(R => typeof R === "string" && R.match(LN));
+			IgnoredRooms = IgnoredRooms.filter(R => typeof R === "string" && R.match(ServerChatRoomNameRegex));
 
 			// Builds a list of all public rooms, the last rooms created are shown first
 			var CR = [];
@@ -1076,8 +1104,7 @@ function ChatRoomCreate(data, socket) {
 
 		// Validates the room name
 		data.Name = data.Name.trim();
-		var LN = ROOM_NAME_REGEX;
-		if (data.Name.match(LN) && (data.Name.length >= 1) && (data.Name.length <= 20) && (data.Description.length <= 100) && (data.Background.length <= 100)) {
+		if (data.Name.match(ServerChatRoomNameRegex) && (data.Description.length <= 100) && (data.Background.length <= 100)) {
 			// Finds the account and links it to the new room
 			var Acc = AccountGet(socket.id);
 			if (Acc == null) {
@@ -1723,8 +1750,7 @@ function ChatRoomAdmin(data, socket) {
 			if (data.Action == "Update")
 				if ((data.Room != null) && (typeof data.Room === "object") && (data.Room.Name != null) && (data.Room.Description != null) && (data.Room.Background != null) && (typeof data.Room.Name === "string") && (typeof data.Room.Description === "string") && (typeof data.Room.Background === "string") && (data.Room.Admin != null) && (Array.isArray(data.Room.Admin)) && (!data.Room.Admin.some(i => !Number.isInteger(i))) && (data.Room.Ban != null) && (Array.isArray(data.Room.Ban)) && (!data.Room.Ban.some(i => !Number.isInteger(i)))) {
 					data.Room.Name = data.Room.Name.trim();
-					var LN = ROOM_NAME_REGEX;
-					if (data.Room.Name.match(LN) && (data.Room.Name.length >= 1) && (data.Room.Name.length <= 20) && (data.Room.Description.length <= 100) && (data.Room.Background.length <= 100)) {
+					if (data.Room.Name.match(ServerChatRoomNameRegex) && (data.Room.Description.length <= 100) && (data.Room.Background.length <= 100)) {
 						for (const Room of ChatRoom)
 							if (Acc.ChatRoom && Acc.ChatRoom.Name != data.Room.Name && Room.Name.toUpperCase().trim() == data.Room.Name.toUpperCase().trim()) {
 								socket.emit("ChatRoomUpdateResponse", "RoomAlreadyExist");
@@ -1961,7 +1987,7 @@ function PasswordResetSetNumber(AccountName, ResetNumber) {
  * @param {ServerSocket} socket
  */
 function PasswordReset(data, socket) {
-	if ((data != null) && (typeof data === "string") && (data != "") && data.match(/^[a-zA-Z0-9@.]+$/) && (data.length >= 5) && (data.length <= 100) && (data.indexOf("@") > 0) && (data.indexOf(".") > 0)) {
+	if ((data != null) && (typeof data === "string") && (data != "") && CommonEmailIsValid(data)) {
 
 		// One email reset password per 5 seconds to prevent flooding
 		if (NextPasswordReset > CommonTime()) return socket.emit("PasswordResetResponse", "RetryLater");
@@ -2019,8 +2045,7 @@ function PasswordResetProcess(data, socket) {
 	if ((data != null) && (typeof data === "object") && (data.AccountName != null) && (typeof data.AccountName === "string") && (data.ResetNumber != null) && (typeof data.ResetNumber === "string") && (data.NewPassword != null) && (typeof data.NewPassword === "string")) {
 
 		// Makes sure the data is valid
-		var LN = /^[a-zA-Z0-9 ]+$/;
-		if (data.AccountName.match(LN) && data.NewPassword.match(LN) && (data.AccountName.length > 0) && (data.AccountName.length <= 20) && (data.NewPassword.length > 0) && (data.NewPassword.length <= 20)) {
+		if (data.AccountName.match(ServerAccountNameRegex) && data.NewPassword.match(ServerAccountPasswordRegex)) {
 
 			// Checks if the reset number matches
 			for (const PasswordReset of PasswordResetProgress)
