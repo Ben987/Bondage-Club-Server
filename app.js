@@ -95,7 +95,7 @@ const MAX_IP_ACCOUNT_PER_HOUR = parseInt(process.env.MAX_IP_ACCOUNT_PER_HOUR, 10
 var Database;
 var DatabaseClient = require('mongodb').MongoClient;
 var DatabaseURL = process.env.DATABASE_URL || "mongodb://localhost:27017/BondageClubDatabase";
-var ServerPort = process.env.BC_SERVER_PORT || 4288;
+var ServerPort = process.env.PORT || 4288;
 var DatabaseName = process.env.DATABASE_NAME || "BondageClubDatabase";
 
 /**
