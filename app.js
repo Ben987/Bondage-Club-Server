@@ -70,7 +70,10 @@ var ChatRoomProduction = [
 	process.env.PRODUCTION6 || "",
 	process.env.PRODUCTION7 || "",
 	process.env.PRODUCTION8 || "",
-	process.env.PRODUCTION9 || ""
+	process.env.PRODUCTION9 || "",
+	process.env.PRODUCTION10 || "",
+	process.env.PRODUCTION11 || "",
+	process.env.PRODUCTION12 || ""
 ];
 var NextMemberNumber = 1;
 var NextPasswordReset = 0;
