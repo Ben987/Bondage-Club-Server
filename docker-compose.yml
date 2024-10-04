@@ -26,6 +26,8 @@ services:
         depends_on:
             - db
         image: mongo-express
+        environment:
+            - PORT=8081
         ports:
             - 8081:8081
 volumes:
