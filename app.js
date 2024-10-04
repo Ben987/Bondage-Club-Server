@@ -871,7 +871,8 @@ function AccountUpdateEmail(data, socket) {
 		{ AccountName : Acc.AccountName },
 		(err, result) => {
 			if (err) throw err;
-			if (data.EmailOld !== result.Email) {
+			// If the account had no email, we allow a new one to be set
+			if (result.Email && data.EmailOld !== result.Email) {
 				socket.emit("AccountQueryResult", { Query: "EmailUpdate", Result: false });
 				return;
 			}
