@@ -843,17 +843,20 @@ function AccountUpdate(data, socket) {
  * @param {ServerSocket} socket
  */
 function AccountUpdateEmail(data, socket) {
-	// Invalid data received
+
+	// If invalid data is received, we return an error to the client
 	if (!data || typeof data !== "object" || Array.isArray(data)) {
 		socket.emit("AccountQueryResult", { Query: "EmailUpdate", Result: false });
 		return;
 	}
 
+	// Make sure the emails are strings
 	if (typeof data.EmailOld !== "string" || typeof data.EmailNew !== "string") {
 		socket.emit("AccountQueryResult", { Query: "EmailUpdate", Result: false });
 		return;
 	}
 
+	// Finds the linked account
 	const Acc = AccountGet(socket.id);
 	if (!Acc) {
 		socket.emit("AccountQueryResult", { Query: "EmailUpdate", Result: false });
@@ -867,16 +870,19 @@ function AccountUpdateEmail(data, socket) {
 	}
 
 	// At that point we need to load up the account from the database; email is part of the keys we don't keep around
-	/** @type {import("mongodb").Collection<Account>} */ (Database.collection(AccountCollection)).findOne(
+	Database.collection(AccountCollection).findOne(
 		{ AccountName : Acc.AccountName },
-		(err, result) => {
+		{ projection: { Email: 1, _id: 0 }},
+		( err, result ) => {
+
+			// If the account already had an email, we validate the old email supplied vs the current in the database
 			if (err) throw err;
-			// If the account had no email, we allow a new one to be set
-			if (result.Email && data.EmailOld !== result.Email) {
+			if (result.Email && data.EmailOld.trim().toLowerCase() !== result.Email.trim().toLowerCase()) {
 				socket.emit("AccountQueryResult", { Query: "EmailUpdate", Result: false });
 				return;
 			}
 
+			// Updates the email in the database
 			Database.collection(AccountCollection).updateOne(
 				{ AccountName : Acc.AccountName },
 				{ $set: { Email: data.EmailNew } },
