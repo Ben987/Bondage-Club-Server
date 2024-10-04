@@ -470,6 +470,7 @@ function AccountCreate(data, socket) {
 							// ID and Socket are special; they're used at runtime but cannot be
 							// persisted to the database so they're set after that happens.
 							AccountName: data.AccountName,
+							Email: data.Email,
 							Password: hash,
 							// Use the next member number and bump it
 							MemberNumber: NextMemberNumber++,
