@@ -458,7 +458,7 @@ interface ServerChatRoomAdminUpdateRequest {
 
 interface ServerChatRoomAdminMoveRequest {
 	MemberNumber: number;
-	Action: "Move" | "MoveLeft" | "MoveRight" | "Kick" | "Ban" | "Unban" | "Promote" | "Demote" | "Shuffle";
+	Action: "Move" | "MoveLeft" | "MoveRight" | "Kick" | "Ban" | "Unban" | "Promote" | "Demote" | "Whitelist" | "Unwhitelist" | "Shuffle";
 	Publish?: boolean;
 }
 
