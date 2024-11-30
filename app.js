@@ -1092,7 +1092,7 @@ function ChatRoomSearch(data, socket) {
 							if (ChatRoom[C].Ban.indexOf(Acc.MemberNumber) < 0) // The player cannot be banned
 								if ((data.Language == null) || (typeof data.Language !== "string") || (data.Language == "") || (data.Language === ChatRoom[C].Language)) // Filters by language
 									if ((data.Query == "") || (ChatRoom[C].Name.toUpperCase().indexOf(data.Query) >= 0)) // Room name must contain the searched name, if any
-										if (!ChatRoom[C].Locked || (ChatRoom[C].Admin.indexOf(Acc.MemberNumber) >= 0)) // Must be unlocked, unless the player is an administrator
+										if (!ChatRoom[C].Locked || (ChatRoom[C].Admin.indexOf(Acc.MemberNumber) >= 0) || (ChatRoom[C].Whitelist.indexOf(Acc.MemberNumber) >= 0)) // Must be unlocked, unless the player is an administrator or on the whitelist
 											if (!ChatRoom[C].Private || (ChatRoom[C].Name.toUpperCase() == data.Query)) // If it's private, must know the exact name
 												if (IgnoredRooms.indexOf(ChatRoom[C].Name.toUpperCase()) == -1) { // Room name cannot be ignored
 
@@ -1236,8 +1236,8 @@ function ChatRoomJoin(data, socket) {
 						if (Room.Account.length < Room.Limit) {
 							if (Room.Ban.indexOf(Acc.MemberNumber) < 0) {
 
-								// If the room is unlocked or the player is an admin, we allow her inside
-								if (!Room.Locked || (Room.Admin.indexOf(Acc.MemberNumber) >= 0)) {
+								// If the room is unlocked, the player is an admin, or the player is on the whitelist, we allow them inside
+								if (!Room.Locked || (Room.Admin.indexOf(Acc.MemberNumber) >= 0) || (Room.Whitelist.indexOf(Acc.MemberNumber) >= 0)) {
 									if (Acc.ChatRoom == null || Acc.ChatRoom.ID !== Room.ID) {
 										ChatRoomRemove(Acc, "ServerLeave", []);
 										Acc.ChatRoom = Room;
