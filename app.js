@@ -1168,6 +1168,7 @@ function ChatRoomCreate(data, socket) {
 			if ((data.Game != null) && (typeof data.Game === "string") && (data.Game.length <= 100)) Game = data.Game;
 			if ((data.BlockCategory == null) || !Array.isArray(data.BlockCategory)) data.BlockCategory = [];
 			if (!Array.isArray(data.Ban) || data.Ban.some(i => !Number.isInteger(i))) data.Ban = [];
+			if (!Array.isArray(data.Whitelist) || data.Whitelist.some(i => !Number.isInteger(i))) data.Whitelist = [];
 			if (!Array.isArray(data.Admin) || data.Admin.some(i => !Number.isInteger(i))) data.Admin = [Acc.MemberNumber];
 
 			// Makes sure the limit is valid
@@ -1197,6 +1198,7 @@ function ChatRoomCreate(data, socket) {
 				Account: [],
 				Ban: data.Ban,
 				BlockCategory: data.BlockCategory,
+				Whitelist: data.Whitelist,
 				Admin: data.Admin
 			};
 			ChatRoom.push(NewRoom);
@@ -1439,6 +1441,7 @@ function ChatRoomGetData(CR, SourceMemberNumber)
 		Language: CR.Language,
 		Description: CR.Description,
 		Admin: CR.Admin,
+		Whitelist: CR.Whitelist,
 		Ban: CR.Ban,
 		Background: CR.Background,
 		Custom: CR.Custom,
@@ -1473,6 +1476,7 @@ function ChatRoomGetProperties(CR, SourceMemberNumber)
 		Language: CR.Language,
 		Description: CR.Description,
 		Admin: CR.Admin,
+		Whitelist: CR.Whitelist,
 		Ban: CR.Ban,
 		Background: CR.Background,
 		Custom: CR.Custom,
@@ -1804,6 +1808,7 @@ function ChatRoomAdmin(data, socket) {
 						if ((data.Room.BlockCategory == null) || !Array.isArray(data.Room.BlockCategory)) data.Room.BlockCategory = [];
 						Acc.ChatRoom.BlockCategory = data.Room.BlockCategory;
 						Acc.ChatRoom.Ban = data.Room.Ban;
+						Acc.ChatRoom.Whitelist = data.Room.Whitelist;
 						Acc.ChatRoom.Admin = data.Room.Admin;
 						Acc.ChatRoom.Game = ((data.Room.Game == null) || (typeof data.Room.Game !== "string") || (data.Room.Game.length > 100)) ? "" : data.Room.Game;
 						let Limit = CommonParseInt(data.Room.Limit, ROOM_LIMIT_DEFAULT);
