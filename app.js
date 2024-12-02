@@ -1092,8 +1092,8 @@ function ChatRoomSearch(data, socket) {
 							if (ChatRoom[C].Ban.indexOf(Acc.MemberNumber) < 0) // The player cannot be banned
 								if ((data.Language == null) || (typeof data.Language !== "string") || (data.Language == "") || (data.Language === ChatRoom[C].Language)) // Filters by language
 									if ((data.Query == "") || (ChatRoom[C].Name.toUpperCase().indexOf(data.Query) >= 0)) // Room name must contain the searched name, if any
-										if (!ChatRoom[C].Locked || (ChatRoom[C].Admin.indexOf(Acc.MemberNumber) >= 0)) // Must be unlocked, unless the player is an administrator
-											if (!ChatRoom[C].Private || (ChatRoom[C].Name.toUpperCase() == data.Query)) // If it's private, must know the exact name
+										if (!ChatRoom[C].Locked || (ChatRoom[C].Admin.indexOf(Acc.MemberNumber) >= 0) || (ChatRoom[C].Whitelist.indexOf(Acc.MemberNumber) >= 0)) // Must be unlocked, unless the player is an administrator or on the whitelist
+											if (!ChatRoom[C].Private || (ChatRoom[C].Name.toUpperCase() == data.Query) || (ChatRoom[C].Whitelist.indexOf(Acc.MemberNumber) >= 0)) // If it's private, must know the exact name or be whitelisted
 												if (IgnoredRooms.indexOf(ChatRoom[C].Name.toUpperCase()) == -1) { // Room name cannot be ignored
 
 													// Builds the searching account friend list in the current room
@@ -1168,6 +1168,7 @@ function ChatRoomCreate(data, socket) {
 			if ((data.Game != null) && (typeof data.Game === "string") && (data.Game.length <= 100)) Game = data.Game;
 			if ((data.BlockCategory == null) || !Array.isArray(data.BlockCategory)) data.BlockCategory = [];
 			if (!Array.isArray(data.Ban) || data.Ban.some(i => !Number.isInteger(i))) data.Ban = [];
+			if (!Array.isArray(data.Whitelist) || data.Whitelist.some(i => !Number.isInteger(i))) data.Whitelist = [];
 			if (!Array.isArray(data.Admin) || data.Admin.some(i => !Number.isInteger(i))) data.Admin = [Acc.MemberNumber];
 
 			// Makes sure the limit is valid
@@ -1197,6 +1198,7 @@ function ChatRoomCreate(data, socket) {
 				Account: [],
 				Ban: data.Ban,
 				BlockCategory: data.BlockCategory,
+				Whitelist: data.Whitelist,
 				Admin: data.Admin
 			};
 			ChatRoom.push(NewRoom);
@@ -1234,8 +1236,8 @@ function ChatRoomJoin(data, socket) {
 						if (Room.Account.length < Room.Limit) {
 							if (Room.Ban.indexOf(Acc.MemberNumber) < 0) {
 
-								// If the room is unlocked or the player is an admin, we allow her inside
-								if (!Room.Locked || (Room.Admin.indexOf(Acc.MemberNumber) >= 0)) {
+								// If the room is unlocked, the player is an admin, or the player is on the whitelist, we allow them inside
+								if (!Room.Locked || (Room.Admin.indexOf(Acc.MemberNumber) >= 0) || (Room.Whitelist.indexOf(Acc.MemberNumber) >= 0)) {
 									if (Acc.ChatRoom == null || Acc.ChatRoom.ID !== Room.ID) {
 										ChatRoomRemove(Acc, "ServerLeave", []);
 										Acc.ChatRoom = Room;
@@ -1439,6 +1441,7 @@ function ChatRoomGetData(CR, SourceMemberNumber)
 		Language: CR.Language,
 		Description: CR.Description,
 		Admin: CR.Admin,
+		Whitelist: CR.Whitelist,
 		Ban: CR.Ban,
 		Background: CR.Background,
 		Custom: CR.Custom,
@@ -1473,6 +1476,7 @@ function ChatRoomGetProperties(CR, SourceMemberNumber)
 		Language: CR.Language,
 		Description: CR.Description,
 		Admin: CR.Admin,
+		Whitelist: CR.Whitelist,
 		Ban: CR.Ban,
 		Background: CR.Background,
 		Custom: CR.Custom,
@@ -1804,6 +1808,7 @@ function ChatRoomAdmin(data, socket) {
 						if ((data.Room.BlockCategory == null) || !Array.isArray(data.Room.BlockCategory)) data.Room.BlockCategory = [];
 						Acc.ChatRoom.BlockCategory = data.Room.BlockCategory;
 						Acc.ChatRoom.Ban = data.Room.Ban;
+						Acc.ChatRoom.Whitelist = data.Room.Whitelist;
 						Acc.ChatRoom.Admin = data.Room.Admin;
 						Acc.ChatRoom.Game = ((data.Room.Game == null) || (typeof data.Room.Game !== "string") || (data.Room.Game.length > 100)) ? "" : data.Room.Game;
 						let Limit = CommonParseInt(data.Room.Limit, ROOM_LIMIT_DEFAULT);
@@ -1908,10 +1913,25 @@ function ChatRoomAdmin(data, socket) {
 						ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "ServerDemoteAdmin", "Action", null, Dictionary);
 						ChatRoomSyncRoomProperties(Acc.ChatRoom, Acc.MemberNumber);
 					}
+					else if ((data.Action == "Whitelist") && (Acc.ChatRoom.Whitelist.indexOf(data.MemberNumber) < 0))
+					{
+						Acc.ChatRoom.Whitelist.push(data.MemberNumber);
+						Dictionary.push({Tag: "TargetCharacterName", Text: Acc.ChatRoom.Account[A].Name, MemberNumber: Acc.ChatRoom.Account[A].MemberNumber});
+						Dictionary.push({Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber});
+						ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "ServerRoomWhitelist", "Action", null, Dictionary);
+						ChatRoomSyncRoomProperties(Acc.ChatRoom, Acc.MemberNumber);
+					}
+					else if ((data.Action == "Unwhitelist") && (Acc.ChatRoom.Whitelist.indexOf(Acc.ChatRoom.Account[A].MemberNumber) >= 0)) {
+						Acc.ChatRoom.Whitelist.splice(Acc.ChatRoom.Whitelist.indexOf(Acc.ChatRoom.Account[A].MemberNumber), 1);
+						Dictionary.push({Tag: "TargetCharacterName", Text: Acc.ChatRoom.Account[A].Name, MemberNumber: Acc.ChatRoom.Account[A].MemberNumber});
+						Dictionary.push({Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber});
+						ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "ServerRoomUnwhitelist", "Action", null, Dictionary);
+						ChatRoomSyncRoomProperties(Acc.ChatRoom, Acc.MemberNumber);
+					}
 					return;
 				}
 
-			// Can also ban or unban without having the player in the room, there's no visible output
+			// Can also ban, unban, whitelist, and unwhitelist without having the player in the room, there's no visible output
 			if ((data.Action == "Ban") && (Acc.ChatRoom != null) && (Acc.ChatRoom.Ban.indexOf(data.MemberNumber) < 0))
 			{
 				Acc.ChatRoom.Ban.push(data.MemberNumber);
@@ -1920,6 +1940,16 @@ function ChatRoomAdmin(data, socket) {
 			if ((data.Action == "Unban") && (Acc.ChatRoom != null) && (Acc.ChatRoom.Ban.indexOf(data.MemberNumber) >= 0))
 			{
 				Acc.ChatRoom.Ban.splice(Acc.ChatRoom.Ban.indexOf(data.MemberNumber), 1);
+				ChatRoomSyncRoomProperties(Acc.ChatRoom, Acc.MemberNumber);
+			}
+			if ((data.Action == "Whitelist") && (Acc.ChatRoom != null) && (Acc.ChatRoom.Whitelist.indexOf(data.MemberNumber) < 0))
+			{
+				Acc.ChatRoom.Whitelist.push(data.MemberNumber);
+				ChatRoomSyncRoomProperties(Acc.ChatRoom, Acc.MemberNumber);
+			}
+			if ((data.Action == "Unwhitelist") && (Acc.ChatRoom != null) && (Acc.ChatRoom.Whitelist.indexOf(data.MemberNumber) >= 0))
+			{
+				Acc.ChatRoom.Whitelist.splice(Acc.ChatRoom.Whitelist.indexOf(data.MemberNumber), 1);
 				ChatRoomSyncRoomProperties(Acc.ChatRoom, Acc.MemberNumber);
 			}
 		}

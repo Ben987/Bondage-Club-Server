@@ -221,6 +221,7 @@ type ServerChatRoomData = {
 	Name: string;
 	Description: string;
 	Admin: number[];
+	Whitelist: number[];
 	Ban: number[];
 	Background: string;
 	/* FIXME: server actually expects a string there, but we cheat to make the typing simpler */
@@ -457,7 +458,7 @@ interface ServerChatRoomAdminUpdateRequest {
 
 interface ServerChatRoomAdminMoveRequest {
 	MemberNumber: number;
-	Action: "Move" | "MoveLeft" | "MoveRight" | "Kick" | "Ban" | "Unban" | "Promote" | "Demote" | "Shuffle";
+	Action: "Move" | "MoveLeft" | "MoveRight" | "Kick" | "Ban" | "Unban" | "Promote" | "Demote" | "Whitelist" | "Unwhitelist" | "Shuffle";
 	Publish?: boolean;
 }
 
