@@ -443,6 +443,8 @@ interface ServerChatRoomSearchData {
     Game: ServerChatRoomGame;
     Friends: ServerFriendInfo[];
     Space: ServerChatRoomSpace;
+    Locked: boolean;
+	Private: boolean;
     MapType: string;
 }
 

@@ -1209,6 +1209,8 @@ function ChatRoomSearchAddResult(Acc, room) {
 		Game: room.Game,
 		Friends: Friends,
 		Space: room.Space,
+		Locked: room.Locked,
+		Private: room.Private,
 		MapType: room?.MapData?.Type ?? "Never",
 	}
 }
