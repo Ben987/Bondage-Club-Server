@@ -22,7 +22,7 @@
     "mongodb": "^3.7.4",
     "newrelic": "^11.16.0",
     "nodemailer": "^6.9.13",
-    "socket.io": "^4.7.5"
+    "socket.io": "^4.8.0"
   },
   "devDependencies": {
     "typescript": "^5.3.3"
