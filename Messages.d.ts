@@ -426,7 +426,9 @@ interface ServerChatRoomSearchRequest {
     Game?: ServerChatRoomGame;
     FullRooms?: boolean;
     Ignore?: string[];
-    Language: string;
+	Language: "" | ServerChatRoomLanguage | ServerChatRoomLanguage[];
+    SearchDescs?: boolean;
+    MapTypes?: string[];
 }
 
 interface ServerChatRoomSearchData {
@@ -441,7 +443,9 @@ interface ServerChatRoomSearchData {
     Game: ServerChatRoomGame;
     Friends: ServerFriendInfo[];
     Space: ServerChatRoomSpace;
-	MapType?: string;
+    Locked: boolean;
+	Private: boolean;
+    MapType: string;
 }
 
 type ServerChatRoomSearchResultResponse = ServerChatRoomSearchData[];
