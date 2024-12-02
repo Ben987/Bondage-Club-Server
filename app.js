@@ -2352,27 +2352,30 @@ function AccountLovership(data, socket) {
 							for (const Lover of P)
 								TargetLoversNumbers.push(Lover.MemberNumber ? Lover.MemberNumber : -1);
 
-						if (Array.isArray(P)) P.splice(TargetLoversNumbers.indexOf(Acc.MemberNumber), 1);
-						else P = [];
+						var TL = TargetLoversNumbers.indexOf(Acc.MemberNumber);
+						// Don't try to remove an already removed lover
+						if (TL >= 0) {
+							if (Array.isArray(P)) P.splice(TL, 1);
+							else P = [];
 
-						for (const OtherAcc of Account)
-							if (OtherAcc.MemberNumber == data.MemberNumber) {
-								OtherAcc.Lovership = P;
-								OtherAcc.Socket.emit("AccountLovership", { Lovership: OtherAcc.Lovership });
-								if (OtherAcc.ChatRoom != null)
-									ChatRoomSyncCharacter(OtherAcc.ChatRoom, OtherAcc.MemberNumber, OtherAcc.MemberNumber);
-							}
+							for (const OtherAcc of Account)
+								if (OtherAcc.MemberNumber == data.MemberNumber) {
+									OtherAcc.Lovership = P;
+									OtherAcc.Socket.emit("AccountLovership", { Lovership: OtherAcc.Lovership });
+									if (OtherAcc.ChatRoom != null)
+										ChatRoomSyncCharacter(OtherAcc.ChatRoom, OtherAcc.MemberNumber, OtherAcc.MemberNumber);
+								}
 
-						AccountUpdateLovership(P, data.MemberNumber, null, false);
-
+							AccountUpdateLovership(P, data.MemberNumber, null, false);
+						}
 					}
 
 					// Make sure we don't do a double-delete in the odd case where we're breaking up with ourselves
 					if (data.MemberNumber === Acc.MemberNumber) return;
 
 					// Updates the account that triggered the break up
-					if (Array.isArray(Acc.Lovership)) Acc.Lovership.splice(AL, 1);
-					else Acc.Lovership = [];
+					if (!Array.isArray(Acc.Lovership)) Acc.Lovership = [];
+					else if (Acc.Lovership[AL].MemberNumber === data.MemberNumber) Acc.Lovership.splice(AL, 1);
 					AccountUpdateLovership(Acc.Lovership, Acc.MemberNumber);
 				});
 				return;
