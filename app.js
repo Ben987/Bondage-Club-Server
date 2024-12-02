@@ -1148,11 +1148,14 @@ function ChatRoomSearch(data, socket) {
 
 		}
 
-		// Room is private, and query isn't an exact name match or player isn't in the whitelist, skip
-		if (room.Private && !(roomName === Query || room.Whitelist.includes(Acc.MemberNumber))) continue;
+		// Keep track of whether the player is admin or whitelisted in the room
+		const isVIP = room.Admin.includes(Acc.MemberNumber) || room.Whitelist.includes(Acc.MemberNumber);
 
-		// Room is locked and player isn't an admin or in the whitelist, skip
-		if (room.Locked && !(room.Admin.includes(Acc.MemberNumber) || room.Whitelist.includes(Acc.MemberNumber))) continue;
+		// Room is private, and query isn't an exact name match or player isn't a VIP, skip
+		if (room.Private && !(roomName === Query || isVIP)) continue;
+
+		// Room is locked and player isn't a VIP, skip
+		if (room.Locked && !isVIP) continue;
 
 		// Room is in our ignore list, skip
 		if (IgnoredRooms.includes(roomName)) continue;
