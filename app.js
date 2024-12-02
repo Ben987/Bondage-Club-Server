@@ -1893,7 +1893,10 @@ function ChatRoomAdmin(data, socket) {
 						if ((data.Room.BlockCategory == null) || !Array.isArray(data.Room.BlockCategory)) data.Room.BlockCategory = [];
 						Acc.ChatRoom.BlockCategory = data.Room.BlockCategory;
 						Acc.ChatRoom.Ban = data.Room.Ban;
-						Acc.ChatRoom.Whitelist = data.Room.Whitelist;
+						if (Array.isArray(data.Room.Whitelist)) {
+							// Backward-compatibility with pre-whitelist client
+							Acc.ChatRoom.Whitelist = data.Room.Whitelist;
+						}
 						Acc.ChatRoom.Admin = data.Room.Admin;
 						Acc.ChatRoom.Game = ((data.Room.Game == null) || (typeof data.Room.Game !== "string") || (data.Room.Game.length > 100)) ? "" : data.Room.Game;
 						let Limit = CommonParseInt(data.Room.Limit, ROOM_LIMIT_DEFAULT);
