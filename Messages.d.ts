@@ -428,6 +428,7 @@ interface ServerChatRoomSearchRequest {
     Ignore?: string[];
 	Language: "" | ServerChatRoomLanguage | ServerChatRoomLanguage[];
     SearchDescs?: boolean;
+	ShowLocked?: boolean;
     MapTypes?: string[];
 }
 

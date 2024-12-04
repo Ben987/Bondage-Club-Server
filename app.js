@@ -1159,6 +1159,9 @@ function ChatRoomSearch(data, socket) {
 		// Room is private, and query isn't an exact name match or player isn't a VIP, skip
 		if (room.Private && !(roomName === Query || isVIP)) continue;
 
+		// Room is locked and player isn't a VIP, skip
+		if (!data.ShowLocked && room.Locked && !isVIP) continue;
+
 		// Room is in our ignore list, skip
 		if (IgnoredRooms.includes(roomName)) continue;
 
