@@ -1118,8 +1118,10 @@ function ChatRoomSearch(data, socket) {
 	}
 
 	// Builds a list of all public rooms, the last rooms created are shown first
+	const rooms = [...ChatRoom].reverse();
+
 	const CR = [];
-	for (const room of ChatRoom) {
+	for (const room of rooms) {
 		if (!room) continue;
 
 		const roomName = room.Name.toUpperCase();
