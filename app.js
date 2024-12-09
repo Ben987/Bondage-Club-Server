@@ -1209,6 +1209,7 @@ function ChatRoomSearchAddResult(Acc, room) {
 		Language: room.Language,
 		Creator: room.Creator,
 		CreatorMemberNumber: room.CreatorMemberNumber,
+		Creation: room.Creation,
 		MemberCount: room.Account.length,
 		MemberLimit: room.Limit,
 		Description: room.Description,
