@@ -437,6 +437,7 @@ interface ServerChatRoomSearchData {
     Language: string;
     Creator: string;
     CreatorMemberNumber: number;
+	Creation: number;
     MemberCount: number;
     MemberLimit: number;
     Description: string;
