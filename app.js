@@ -2469,7 +2469,7 @@ function AccountLovership(data, socket) {
 
 					// Updates the account that triggered the break up
 					if ((Acc.Lovership == null) || !Array.isArray(Acc.Lovership)) Acc.Lovership = [];
-					else if ((AL <= Acc.Lovership.length) && (Acc.Lovership[AL].MemberNumber === data.MemberNumber)) Acc.Lovership.splice(AL, 1);
+					else if ((AL < Acc.Lovership.length) && (Acc.Lovership[AL].MemberNumber === data.MemberNumber)) Acc.Lovership.splice(AL, 1);
 					AccountUpdateLovership(Acc.Lovership, Acc.MemberNumber);
 
 				});
