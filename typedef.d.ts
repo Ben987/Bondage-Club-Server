@@ -1,6 +1,10 @@
 
 /** The type of our sockets */
-type ServerSocket = import("socket.io").Socket<ClientToServerEvents, ServerToClientEvents, import("socket.io/dist/typed-events").DefaultEventsMap, never>;
+type ServerSocket = import("socket.io").Socket<ClientToServerEvents, ServerToClientEvents, import("socket.io/dist/typed-events").DefaultEventsMap, SocketData>;
+
+interface SocketData {
+	Account?: Account;
+}
 
 /* Things that are missing from Messages.d.ts */
 type AssetGroupName = string;
