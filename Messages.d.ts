@@ -205,6 +205,7 @@ type ServerAppearanceBundle = ServerItemBundle[];
 
 type ServerChatRoomSpace = "X" | "" | "M" | "Asylum";
 type ServerChatRoomLanguage = "EN" | "DE" | "FR" | "ES" | "CN" | "RU" | "UA";
+type ServerChatRoomRole = "All" | "Admin" | "Whitelist";
 type ServerChatRoomGame = "" | "ClubCard" | "LARP" | "MagicBattle" | "GGTS";
 type ServerChatRoomBlockCategory =
 	/** Those are known as AssetCategory to the client */
@@ -227,8 +228,16 @@ type ServerChatRoomData = {
 	/* FIXME: server actually expects a string there, but we cheat to make the typing simpler */
 	Limit: number;
 	Game: ServerChatRoomGame;
-	Locked: boolean;
-	Private: boolean;
+	Visibility: ServerChatRoomRole[];
+	Access: ServerChatRoomRole[];
+	/**
+	 * @deprecated Use {@link ServerChatRoomData.Visibility} instead, this is temporarily maintained for backwards compatibility
+	 */
+	Private: boolean; // TODO: Remove following completion of migration
+	/**
+	 * @deprecated Use {@link ServerChatRoomData.Access} instead, this is temporarily maintained for backwards compatibility
+	 */
+	Locked: boolean; // TODO: Remove following completion of migration
 	BlockCategory: ServerChatRoomBlockCategory[];
 	Language: ServerChatRoomLanguage;
 	Space: ServerChatRoomSpace;
@@ -445,8 +454,16 @@ interface ServerChatRoomSearchData {
     Game: ServerChatRoomGame;
     Friends: ServerFriendInfo[];
     Space: ServerChatRoomSpace;
-    Locked: boolean;
-	Private: boolean;
+    Visibility: ServerChatRoomRole[];
+	Access: ServerChatRoomRole[];
+	/**
+	 * @deprecated Use {@link ServerChatRoomData.Visibility} instead, this is maintained for backwards compatibility
+	 */
+	Private?: boolean;
+	/**
+	 * @deprecated Use {@link ServerChatRoomData.Access} instead, this is maintained for backwards compatibility
+	 */
+	Locked?: boolean;
     MapType: string;
 }
 
