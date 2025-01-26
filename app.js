@@ -933,7 +933,7 @@ function AccountQuery(data, socket) {
 						var IsOwned = (OtherAcc.Ownership != null) && (OtherAcc.Ownership.MemberNumber != null) && (OtherAcc.Ownership.MemberNumber == Acc.MemberNumber);
 						var IsLover = LoversNumbers.indexOf(Acc.MemberNumber) >= 0;
 						if (IsOwned || IsLover) {
-							Friends.push({ Type: IsOwned ? "Submissive" : "Lover", MemberNumber: OtherAcc.MemberNumber, MemberName: OtherAcc.Name, ChatRoomSpace: (OtherAcc.ChatRoom == null) ? null : OtherAcc.ChatRoom.Space, ChatRoomName: (OtherAcc.ChatRoom == null) ? null : OtherAcc.ChatRoom.Name, Private: (OtherAcc.ChatRoom && OtherAcc.ChatRoom.Private) ? true : undefined });
+							Friends.push({ Type: IsOwned ? "Submissive" : "Lover", MemberNumber: OtherAcc.MemberNumber, MemberName: OtherAcc.Name, ChatRoomSpace: (OtherAcc.ChatRoom == null) ? null : OtherAcc.ChatRoom.Space, ChatRoomName: (OtherAcc.ChatRoom == null) ? null : OtherAcc.ChatRoom.Name, Private: (OtherAcc.ChatRoom && ChatRoomRoleListIsRestrictive(OtherAcc.ChatRoom.Visibility)) ? true : undefined });
 							Index.push(OtherAcc.MemberNumber);
 						}
 					}
@@ -946,7 +946,7 @@ function AccountQuery(data, socket) {
 							for (const OtherAcc of Account)
 								if (OtherAcc.MemberNumber == Acc.FriendList[F]) {
 									if ((OtherAcc.Environment == Acc.Environment) && (OtherAcc.FriendList != null) && (OtherAcc.FriendList.indexOf(Acc.MemberNumber) >= 0))
-										Friends.push({ Type: "Friend", MemberNumber: OtherAcc.MemberNumber, MemberName: OtherAcc.Name, ChatRoomSpace: ((OtherAcc.ChatRoom != null) && !OtherAcc.ChatRoom.Private) ? OtherAcc.ChatRoom.Space : null, ChatRoomName: (OtherAcc.ChatRoom == null) ? null : (OtherAcc.ChatRoom.Private) ? null : OtherAcc.ChatRoom.Name, Private: (OtherAcc.ChatRoom && OtherAcc.ChatRoom.Private) ? true : undefined });
+										Friends.push({ Type: "Friend", MemberNumber: OtherAcc.MemberNumber, MemberName: OtherAcc.Name, ChatRoomSpace: ((OtherAcc.ChatRoom != null) && ChatRoomRoleListIsRestrictive(OtherAcc.ChatRoom.Visibility)) ? OtherAcc.ChatRoom.Space : null, ChatRoomName: (OtherAcc.ChatRoom == null) ? null : (ChatRoomRoleListIsRestrictive(OtherAcc.ChatRoom.Visibility)) ? null : OtherAcc.ChatRoom.Name, Private: (OtherAcc.ChatRoom && ChatRoomRoleListIsRestrictive(OtherAcc.ChatRoom.Visibility)) ? true : undefined });
 									break;
 								}
 
@@ -988,7 +988,7 @@ function AccountBeep(data, socket) {
 							MemberName: Acc.Name,
 							ChatRoomSpace: (Acc.ChatRoom == null || data.IsSecret) ? null : Acc.ChatRoom.Space,
 							ChatRoomName: (Acc.ChatRoom == null || data.IsSecret) ? null : Acc.ChatRoom.Name,
-							Private: (Acc.ChatRoom == null || data.IsSecret) ? null : Acc.ChatRoom.Private,
+							Private: (Acc.ChatRoom == null || data.IsSecret) ? null : ChatRoomRoleListIsRestrictive(Acc.ChatRoom.Visibility),
 							BeepType: (data.BeepType) ? data.BeepType : null,
 							Message: data.Message
 						});
@@ -1155,14 +1155,11 @@ function ChatRoomSearch(data, socket) {
 
 		}
 
-		const isAdmin = room.Admin.includes(Acc.MemberNumber);
-		const isWhitelisted = room.Whitelist.includes(Acc.MemberNumber);
+		// If query isn't the exact name and player isn't in visibility list, skip
+		if (roomName !== Query && !ChatRoomAccountHasAnyRole(Acc, room, room.Visibility)) continue;
 
-		// Room is private, and query isn't an exact name match or player isn't an admin, skip
-		if (room.Private && !(roomName === Query || isAdmin)) continue;
-
-		// Room is locked and player isn't an admin or whitelisted, skip
-		if (!data.ShowLocked && room.Locked && !(isAdmin || isWhitelisted)) continue;
+		// If player doesn't want locked room results and isn't in access list, skip
+		if (!data.ShowLocked && !ChatRoomAccountHasAnyRole(Acc, room, room.Access)) continue;
 
 		// Room is in our ignore list, skip
 		if (IgnoredRooms.includes(roomName)) continue;
@@ -1217,6 +1214,8 @@ function ChatRoomSearchAddResult(Acc, room) {
 		Game: room.Game,
 		Friends: Friends,
 		Space: room.Space,
+		Visibility: room.Visibility,
+		Access: room.Access,
 		Locked: room.Locked,
 		Private: room.Private,
 		MapType: room?.MapData?.Type ?? "Never",
@@ -1231,7 +1230,34 @@ function ChatRoomSearchAddResult(Acc, room) {
 function ChatRoomCreate(data, socket) {
 
 	// Make sure we have everything to create it
-	if ((data != null) && (typeof data === "object") && (data.Name != null) && (data.Description != null) && (data.Background != null) && (data.Private != null) && (typeof data.Name === "string") && (typeof data.Description === "string") && (typeof data.Background === "string") && (typeof data.Private === "boolean")) {
+	if ((data != null) && (typeof data === "object") && (data.Name != null) && (data.Description != null) && (data.Background != null) && (typeof data.Name === "string") && (typeof data.Description === "string") && (typeof data.Background === "string")) {
+		{ // BACKWARD-COMPATIBILITY BLOCK for Private/Locked Transition
+			// ! TODO: Remember to add the visibility & access validity checks to the above if statement when removing this block
+			const hasVisibility = data.Visibility != null && Array.isArray(data.Visibility);
+			const hasPrivate = data.Private != null && typeof data.Private === "boolean";
+			if (hasVisibility == hasPrivate) { // new client: visibility, old client: private; both is unexpected; neither is missing data
+				socket.emit("ChatRoomCreateResponse", "InvalidRoomData");
+				return;
+			} else if (hasVisibility) { // Help new clients add Private for older clients | any visibility setting = private
+				data.Private = !data.Visibility.includes("All");
+			} else if (data.Private != null) { // Help old clients add Visibility for new clients | private = admin only
+				data.Visibility = data.Private ? ["Admin"] : ["All"];
+			}
+
+			const hasAccess = data.Access != null && Array.isArray(data.Access);
+			const hasLocked = data.Locked != null && typeof data.Locked === "boolean";
+			if (hasAccess && hasLocked) { // missing data
+				socket.emit("ChatRoomCreateResponse", "InvalidRoomData");
+				return;
+			} else if (hasAccess) { // Help new clients add Locked for older clients | any access setting = locked
+				data.Locked = !data.Access.includes("All");
+			} else if (hasLocked) { // Help old clients add Access if Locked is set | locked = admin + whitelist only
+				data.Access = data.Locked ? ["Admin", "Whitelist"] : ["All"];
+			} else { // Maintaining older backward-compatibility behaviour
+				data.Locked = false;
+				data.Access = ["All"];
+			}
+		}
 
 		// Validates the room name
 		data.Name = data.Name.trim();
@@ -1277,6 +1303,8 @@ function ChatRoomCreate(data, socket) {
 				Background: data.Background,
 				Custom: data.Custom,
 				Limit: Limit,
+				Visibility: data.Visibility,
+				Access: data.Access,
 				Private: data.Private || false,
 				Locked : data.Locked || false,
 				MapData : data.MapData,
@@ -1327,8 +1355,8 @@ function ChatRoomJoin(data, socket) {
 						if (Room.Account.length < Room.Limit) {
 							if (Room.Ban.indexOf(Acc.MemberNumber) < 0) {
 
-								// If the room is unlocked, the player is an admin, or the player is on the whitelist, we allow them inside
-								if (!Room.Locked || (Room.Admin.indexOf(Acc.MemberNumber) >= 0) || (Room.Whitelist.indexOf(Acc.MemberNumber) >= 0)) {
+								// If the player is on the access list, we allow them inside
+								if (ChatRoomAccountHasAnyRole(Acc, Room, Room.Access)) {
 									if (Acc.ChatRoom == null || Acc.ChatRoom.ID !== Room.ID) {
 										ChatRoomRemove(Acc, "ServerLeave", []);
 										Acc.ChatRoom = Room;
@@ -1539,6 +1567,8 @@ function ChatRoomGetData(CR, SourceMemberNumber)
 		Limit: CR.Limit,
 		Game: CR.Game,
 		SourceMemberNumber,
+		Visibility: CR.Visibility,
+		Access: CR.Access,
 		Private: CR.Private,
 		Locked: CR.Locked,
 		MapData: CR.MapData,
@@ -1574,6 +1604,8 @@ function ChatRoomGetProperties(CR, SourceMemberNumber)
 		Limit: CR.Limit,
 		Game: CR.Game,
 		SourceMemberNumber,
+		Visibility: CR.Visibility,
+		Access: CR.Access,
 		Private: CR.Private,
 		Locked: CR.Locked,
 		MapData: CR.MapData,
@@ -1891,6 +1923,21 @@ function ChatRoomAdmin(data, socket) {
 								socket.emit("ChatRoomUpdateResponse", "RoomAlreadyExist");
 								return;
 							}
+						
+						{ // BACKWARD-COMPATIBILITY BLOCK for Private/Locked Transition
+							if (data.Room.Visibility != null && Array.isArray(data.Room.Visibility)) {
+								data.Room.Private = !data.Room.Visibility.includes("All"); // Help new clients add Private for older clients | any visibility setting = private
+							} else if (data.Room.Private != null && typeof data.Room.Private === "boolean") {
+								data.Room.Visibility = data.Room.Private ? ["Admin"] : ["All"]; // Help old clients add Visibility for new clients | private = admin only
+							}
+
+							if (data.Room.Access != null && Array.isArray(data.Room.Access)) { // Help new clients add Locked for older clients | any access setting = locked
+								data.Room.Locked = !data.Room.Access.includes("All");
+							} else if (data.Room.Locked != null && typeof data.Room.Locked === "boolean") { // Help old clients add Access for new clients | locked = admin + whitelist only
+								data.Room.Access = data.Room.Locked ? ["Admin", "Whitelist"] : ["All"];
+							}
+						}
+						
 						Acc.ChatRoom.Name = data.Room.Name;
 						Acc.ChatRoom.Language = data.Room.Language;
 						Acc.ChatRoom.Background = data.Room.Background;
@@ -1908,6 +1955,8 @@ function ChatRoomAdmin(data, socket) {
 						let Limit = CommonParseInt(data.Room.Limit, ROOM_LIMIT_DEFAULT);
 						if (Limit < ROOM_LIMIT_MINIMUM || Limit > ROOM_LIMIT_MAXIMUM) Limit = ROOM_LIMIT_DEFAULT;
 						Acc.ChatRoom.Limit = Limit;
+						if ((data.Room.Visibility != null) && (Array.isArray(data.Room.Visibility))) Acc.ChatRoom.Visibility = data.Room.Visibility;
+						if ((data.Room.Access != null) && (Array.isArray(data.Room.Access))) Acc.ChatRoom.Access = data.Room.Access;
 						if ((data.Room.Private != null) && (typeof data.Room.Private === "boolean")) Acc.ChatRoom.Private = data.Room.Private;
 						if ((data.Room.Locked != null) && (typeof data.Room.Locked === "boolean")) Acc.ChatRoom.Locked = data.Room.Locked;
 						Acc.ChatRoom.MapData = data.Room.MapData;
@@ -1917,8 +1966,8 @@ function ChatRoomAdmin(data, socket) {
 							Dictionary.push({Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber});
 							Dictionary.push({Tag: "ChatRoomName", Text: Acc.ChatRoom.Name});
 							Dictionary.push({Tag: "ChatRoomLimit", Text: Acc.ChatRoom.Limit.toString()});
-							Dictionary.push({Tag: "ChatRoomPrivacy", TextToLookUp: (Acc.ChatRoom.Private ? "Private" : "Public")});
-							Dictionary.push({Tag: "ChatRoomLocked", TextToLookUp: (Acc.ChatRoom.Locked ? "Locked" : "Unlocked")});
+							Dictionary.push({Tag: "ChatRoomPrivacy", TextToLookUp: (ChatRoomRoleListIsRestrictive(Acc.ChatRoom.Visibility) ? "Private" : "Public")});
+							Dictionary.push({Tag: "ChatRoomLocked", TextToLookUp: (ChatRoomRoleListIsRestrictive(Acc.ChatRoom.Access) ? "Locked" : "Unlocked")});
 							ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "ServerUpdateRoom", "Action", null, Dictionary);
 						}
 						if ((Acc != null) && (Acc.ChatRoom != null)) ChatRoomSyncRoomProperties(Acc.ChatRoom, Acc.MemberNumber);
@@ -2049,6 +2098,29 @@ function ChatRoomAdmin(data, socket) {
 		}
 
 	}
+}
+
+/**
+ * Checks if the given role list is restrictive (does not allow "All" role)
+ * @param {ServerChatRoomRole[]} roles - The roles to check
+ */
+function ChatRoomRoleListIsRestrictive(roles) {
+	return !roles.includes("All");
+}
+
+/**
+ * Checks if a given account matches any role given an array of roles and the room to check for
+ * @param {Account} Acc - The account to check
+ * @param {ServerChatRoomRole[]} roles - The roles to check
+ * @param {Chatroom} room - The room to check for (sourcing admin and whitelist)
+ * @returns {boolean} - Returns TRUE if the account matches any role. FALSE otherwise.
+ */
+function ChatRoomAccountHasAnyRole(Acc, room, roles) {
+	if (Acc == null || roles == null) return false;
+	if (roles.includes("All")) return true;
+	if (roles.includes("Admin") && room.Admin.includes(Acc.MemberNumber)) return true;
+	if (roles.includes("Whitelist") && room.Whitelist.includes(Acc.MemberNumber)) return true;
+	return false;
 }
 
 /**
