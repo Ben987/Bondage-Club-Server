@@ -72,6 +72,8 @@ interface ServerAccountData extends ServerAccountImmutableData {
 	/** @deprecated superseded by the {@link ServerAccountData.LastChatRoom} object */
 	LastChatRoomAdmin?: string;
 	/** @deprecated superseded by the {@link ServerAccountData.LastChatRoom} object */
+	LastChatRoomWhitelist?: string;
+	/** @deprecated superseded by the {@link ServerAccountData.LastChatRoom} object */
 	LastChatRoomBan?: string;
 	/** @deprecated superseded by the {@link ServerAccountData.LastChatRoom} object */
 	LastChatRoomBG?: string;
@@ -196,7 +198,7 @@ interface ServerPrivateCharacterData {
 	Appearance: ServerAppearanceBundle;
 	AppearanceFull: ServerAppearanceBundle;
 	ArousalSettings: ArousalSettingsType;
-	Event: NPCTrait[];
+	Event: NPCEvent[];
 	FromPandora?: boolean;
 }
 
@@ -206,7 +208,7 @@ type ServerAppearanceBundle = ServerItemBundle[];
 type ServerChatRoomSpace = "X" | "" | "M" | "Asylum";
 type ServerChatRoomLanguage = "EN" | "DE" | "FR" | "ES" | "CN" | "RU" | "UA";
 type ServerChatRoomRole = "All" | "Admin" | "Whitelist";
-type ServerChatRoomGame = "" | "ClubCard" | "LARP" | "MagicBattle" | "GGTS";
+type ServerChatRoomGame = "" | "ClubCard" | "LARP" | "MagicBattle" | "GGTS" | "Prison";
 type ServerChatRoomBlockCategory =
 	/** Those are known as AssetCategory to the client */
 	"Medical" | "Extreme" | "Pony" | "SciFi" | "ABDL" | "Fantasy" |
@@ -247,10 +249,10 @@ type ServerChatRoomData = {
 }
 
 interface ServerChatRoomMapData {
-	Type: string;
+	Type: ChatRoomMapType;
 	Fog?: boolean;
-	Tiles: string;
-	Objects: string;
+	Tiles?: string;
+	Objects?: string;
 }
 
 interface ServerChatRoomCustomData {
@@ -839,7 +841,7 @@ interface ServerChatRoomGameCardGameStartRequest {
 	Player2: number;
 }
 
-type ServerChatRoomGameCardGameActionRequest = { GameProgress: "Action" } & ({ CCLog: string } | { CCData: any });
+type ServerChatRoomGameCardGameActionRequest = { GameProgress: "Action" } & ({ CCLog: any } | { CCData: any });
 
 type ServerChatRoomGameCardGameUpdateRequest = ServerChatRoomGameCardGameStartRequest | ServerChatRoomGameCardGameQueryRequest | ServerChatRoomGameCardGameActionRequest;
 
@@ -868,8 +870,8 @@ interface ServerChatRoomGameResponse extends ServerChatRoomMessageBase {
 		/* Club Card */
 		Player1?: number;
 		Player2?: number;
-		CCData: [any];
-		CCLog: string;
+		CCData: any[];
+		CCLog: any[];
 	};
     RNG: number;
 }
