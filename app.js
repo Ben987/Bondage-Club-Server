@@ -946,7 +946,7 @@ function AccountQuery(data, socket) {
 							for (const OtherAcc of Account)
 								if (OtherAcc.MemberNumber == Acc.FriendList[F]) {
 									if ((OtherAcc.Environment == Acc.Environment) && (OtherAcc.FriendList != null) && (OtherAcc.FriendList.indexOf(Acc.MemberNumber) >= 0))
-										Friends.push({ Type: "Friend", MemberNumber: OtherAcc.MemberNumber, MemberName: OtherAcc.Name, ChatRoomSpace: ((OtherAcc.ChatRoom != null) && ChatRoomRoleListIsRestrictive(OtherAcc.ChatRoom.Visibility)) ? OtherAcc.ChatRoom.Space : null, ChatRoomName: (OtherAcc.ChatRoom == null) ? null : (ChatRoomRoleListIsRestrictive(OtherAcc.ChatRoom.Visibility)) ? null : OtherAcc.ChatRoom.Name, Private: (OtherAcc.ChatRoom && ChatRoomRoleListIsRestrictive(OtherAcc.ChatRoom.Visibility)) ? true : undefined });
+										Friends.push({ Type: "Friend", MemberNumber: OtherAcc.MemberNumber, MemberName: OtherAcc.Name, ChatRoomSpace: ((OtherAcc.ChatRoom != null) && !ChatRoomRoleListIsRestrictive(OtherAcc.ChatRoom.Visibility)) ? OtherAcc.ChatRoom.Space : null, ChatRoomName: (OtherAcc.ChatRoom == null) ? null : (ChatRoomRoleListIsRestrictive(OtherAcc.ChatRoom.Visibility)) ? null : OtherAcc.ChatRoom.Name, Private: (OtherAcc.ChatRoom && ChatRoomRoleListIsRestrictive(OtherAcc.ChatRoom.Visibility)) ? true : undefined });
 									break;
 								}
 
