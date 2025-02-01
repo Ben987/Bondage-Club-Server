@@ -2,32 +2,7 @@
 require('newrelic');
 const base64id = require("base64id");
 
-// Reads the SSL key and certificate, if there's no file available, we switch to regular http
-/*var SyncRequest = require("sync-request");
-var ServerKey = null;
-if ((process.env.SERVER_KEY0 != null) && (process.env.SERVER_KEY0 != "")) { try { ServerKey = SyncRequest("GET", process.env.SERVER_KEY0).getBody(); } catch(err) {} }
-if ((ServerKey == null) && (process.env.SERVER_KEY1 != null) && (process.env.SERVER_KEY1 != "")) { try { ServerKey = SyncRequest("GET", process.env.SERVER_KEY1).getBody(); } catch(err) {} }
-if ((ServerKey == null) && (process.env.SERVER_KEY2 != null) && (process.env.SERVER_KEY2 != "")) { try { ServerKey = SyncRequest("GET", process.env.SERVER_KEY2).getBody(); } catch(err) {} }
-var ServerCert = null;
-if ((process.env.SERVER_CERT0 != null) && (process.env.SERVER_CERT0 != "")) { try { ServerCert = SyncRequest("GET", process.env.SERVER_CERT0).getBody(); } catch(err) {} }
-if ((ServerCert == null) && (process.env.SERVER_CERT1 != null) && (process.env.SERVER_CERT1 != "")) { try { ServerCert = SyncRequest("GET", process.env.SERVER_CERT1).getBody(); } catch(err) {} }
-if ((ServerCert == null) && (process.env.SERVER_CERT2 != null) && (process.env.SERVER_CERT2 != "")) { try { ServerCert = SyncRequest("GET", process.env.SERVER_CERT2).getBody(); } catch(err) {} }
-console.log("Using Server Key: " + ServerKey);
-console.log("Using Server Certificate: " + ServerCert);*/
-
-// Enforce https with a certificate
-var App;
-var UseSecure;
-UseSecure = false;
-App = require("http").createServer();
-
-/*if ((ServerKey == null) || (ServerCert == null)) {
-	console.log("No key or certificate found, starting http server with origin " + process.env.CORS_ORIGIN0);
-} else {
-	console.log("Starting https server for certificate with origin " + process.env.CORS_ORIGIN0);
-	UseSecure = true;
-	App = require("https").createServer({ key: ServerKey, cert: ServerCert, requestCert: false, rejectUnauthorized: false });
-}*/
+const App = require("http").createServer();
 
 // Starts socket.io to accept incoming connections on specified origins
 const socketio = require("socket.io");
@@ -41,7 +16,6 @@ var Options = {
 	httpCompression: true,
 	perMessageDeflate: true,
 	allowEIO3: false,
-	secure: UseSecure
 };
 if ((process.env.CORS_ORIGIN0 != null) && (process.env.CORS_ORIGIN0 != ""))
 	Options.cors = { origin: [process.env.CORS_ORIGIN0 || "", process.env.CORS_ORIGIN1 || "", process.env.CORS_ORIGIN2 || "", process.env.CORS_ORIGIN3 || "", process.env.CORS_ORIGIN4 || "", process.env.CORS_ORIGIN5 || ""] };
