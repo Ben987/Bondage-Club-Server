@@ -230,14 +230,6 @@ type ServerChatRoomData = {
 	Game: ServerChatRoomGame;
 	Visibility: ServerChatRoomRole[];
 	Access: ServerChatRoomRole[];
-	/**
-	 * @deprecated Use {@link ServerChatRoomData.Visibility} instead, this is temporarily maintained for backwards compatibility
-	 */
-	Private: boolean; // TODO: Remove following completion of migration
-	/**
-	 * @deprecated Use {@link ServerChatRoomData.Access} instead, this is temporarily maintained for backwards compatibility
-	 */
-	Locked: boolean; // TODO: Remove following completion of migration
 	BlockCategory: ServerChatRoomBlockCategory[];
 	Language: ServerChatRoomLanguage;
 	Space: ServerChatRoomSpace;
@@ -456,14 +448,6 @@ interface ServerChatRoomSearchData {
     Space: ServerChatRoomSpace;
     Visibility: ServerChatRoomRole[];
 	Access: ServerChatRoomRole[];
-	/**
-	 * @deprecated Use {@link ServerChatRoomData.Visibility} instead, this is maintained for backwards compatibility
-	 */
-	Private?: boolean;
-	/**
-	 * @deprecated Use {@link ServerChatRoomData.Access} instead, this is maintained for backwards compatibility
-	 */
-	Locked?: boolean;
     MapType: string;
 }
 
