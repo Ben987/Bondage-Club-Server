@@ -1219,6 +1219,7 @@ function ChatRoomSearchAddResult(Acc, room) {
 		Locked: room.Locked,
 		Private: room.Private,
 		MapType: room?.MapData?.Type ?? "Never",
+		CanJoin: ChatRoomAccountHasAnyRole(Acc, room, room.Access),
 	}
 }
 
