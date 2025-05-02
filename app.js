@@ -1216,8 +1216,6 @@ function ChatRoomSearchAddResult(Acc, room) {
 		Space: room.Space,
 		Visibility: room.Visibility,
 		Access: room.Access,
-		Locked: room.Locked,
-		Private: room.Private,
 		MapType: room?.MapData?.Type ?? "Never",
 		CanJoin: ChatRoomAccountHasAnyRole(Acc, room, room.Access),
 	}
@@ -1231,35 +1229,7 @@ function ChatRoomSearchAddResult(Acc, room) {
 function ChatRoomCreate(data, socket) {
 
 	// Make sure we have everything to create it
-	if ((data != null) && (typeof data === "object") && (data.Name != null) && (data.Description != null) && (data.Background != null) && (typeof data.Name === "string") && (typeof data.Description === "string") && (typeof data.Background === "string")) {
-		{ // BACKWARD-COMPATIBILITY BLOCK for Private/Locked Transition
-			// ! TODO: Remember to add the visibility & access validity checks to the above if statement when removing this block
-			const hasVisibility = data.Visibility != null && Array.isArray(data.Visibility);
-			const hasPrivate = data.Private != null && typeof data.Private === "boolean";
-			if (hasVisibility == hasPrivate) { // new client: visibility, old client: private; both is unexpected; neither is missing data
-				socket.emit("ChatRoomCreateResponse", "InvalidRoomData");
-				return;
-			} else if (hasVisibility) { // Help new clients add Private for older clients | any visibility setting = private
-				data.Private = !data.Visibility.includes("All");
-			} else if (data.Private != null) { // Help old clients add Visibility for new clients | private = admin only
-				data.Visibility = data.Private ? ["Admin"] : ["All"];
-			}
-
-			const hasAccess = data.Access != null && Array.isArray(data.Access);
-			const hasLocked = data.Locked != null && typeof data.Locked === "boolean";
-			if (hasAccess && hasLocked) { // missing data
-				socket.emit("ChatRoomCreateResponse", "InvalidRoomData");
-				return;
-			} else if (hasAccess) { // Help new clients add Locked for older clients | any access setting = locked
-				data.Locked = !data.Access.includes("All");
-			} else if (hasLocked) { // Help old clients add Access if Locked is set | locked = admin + whitelist only
-				data.Access = data.Locked ? ["Admin", "Whitelist"] : ["All"];
-			} else { // Maintaining older backward-compatibility behaviour
-				data.Locked = false;
-				data.Access = ["All"];
-			}
-		}
-
+	if ((data != null) && (typeof data === "object") && (data.Name != null) && (data.Description != null) && (data.Background != null) && (typeof data.Name === "string") && (typeof data.Description === "string") && (typeof data.Background === "string") && (Array.isArray(data.Visibility)) && (Array.isArray(data.Access))) {
 		// Validates the room name
 		data.Name = data.Name.trim();
 		if (data.Name.match(ServerChatRoomNameRegex) && (data.Description.length <= 100) && (data.Background.length <= 100)) {
@@ -1306,8 +1276,6 @@ function ChatRoomCreate(data, socket) {
 				Limit: Limit,
 				Visibility: data.Visibility,
 				Access: data.Access,
-				Private: data.Private || false,
-				Locked : data.Locked || false,
 				MapData : data.MapData,
 				Environment: Acc.Environment,
 				Space: Space,
@@ -1570,8 +1538,6 @@ function ChatRoomGetData(CR, SourceMemberNumber)
 		SourceMemberNumber,
 		Visibility: CR.Visibility,
 		Access: CR.Access,
-		Private: CR.Private,
-		Locked: CR.Locked,
 		MapData: CR.MapData,
 		BlockCategory: CR.BlockCategory,
 		Space: CR.Space,
@@ -1607,8 +1573,6 @@ function ChatRoomGetProperties(CR, SourceMemberNumber)
 		SourceMemberNumber,
 		Visibility: CR.Visibility,
 		Access: CR.Access,
-		Private: CR.Private,
-		Locked: CR.Locked,
 		MapData: CR.MapData,
 		BlockCategory: CR.BlockCategory,
 		Space: CR.Space,
@@ -1925,20 +1889,6 @@ function ChatRoomAdmin(data, socket) {
 								return;
 							}
 						
-						{ // BACKWARD-COMPATIBILITY BLOCK for Private/Locked Transition
-							if (data.Room.Visibility != null && Array.isArray(data.Room.Visibility)) {
-								data.Room.Private = !data.Room.Visibility.includes("All"); // Help new clients add Private for older clients | any visibility setting = private
-							} else if (data.Room.Private != null && typeof data.Room.Private === "boolean") {
-								data.Room.Visibility = data.Room.Private ? ["Admin"] : ["All"]; // Help old clients add Visibility for new clients | private = admin only
-							}
-
-							if (data.Room.Access != null && Array.isArray(data.Room.Access)) { // Help new clients add Locked for older clients | any access setting = locked
-								data.Room.Locked = !data.Room.Access.includes("All");
-							} else if (data.Room.Locked != null && typeof data.Room.Locked === "boolean") { // Help old clients add Access for new clients | locked = admin + whitelist only
-								data.Room.Access = data.Room.Locked ? ["Admin", "Whitelist"] : ["All"];
-							}
-						}
-						
 						Acc.ChatRoom.Name = data.Room.Name;
 						Acc.ChatRoom.Language = data.Room.Language;
 						Acc.ChatRoom.Background = data.Room.Background;
@@ -1958,8 +1908,6 @@ function ChatRoomAdmin(data, socket) {
 						Acc.ChatRoom.Limit = Limit;
 						if ((data.Room.Visibility != null) && (Array.isArray(data.Room.Visibility))) Acc.ChatRoom.Visibility = data.Room.Visibility;
 						if ((data.Room.Access != null) && (Array.isArray(data.Room.Access))) Acc.ChatRoom.Access = data.Room.Access;
-						if ((data.Room.Private != null) && (typeof data.Room.Private === "boolean")) Acc.ChatRoom.Private = data.Room.Private;
-						if ((data.Room.Locked != null) && (typeof data.Room.Locked === "boolean")) Acc.ChatRoom.Locked = data.Room.Locked;
 						Acc.ChatRoom.MapData = data.Room.MapData;
 						socket.emit("ChatRoomUpdateResponse", "Updated");
 						if ((Acc != null) && (Acc.ChatRoom != null)) {
