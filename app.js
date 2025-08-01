@@ -181,6 +181,7 @@ const ServerAccountResetNumberRegex = /^[0-9]{1,20}$/;
 const ServerCharacterNameRegex = /^[a-zA-Z ]{1,20}$/;
 const ServerCharacterNicknameRegex = /^[\p{L}\p{Nd}\p{Z}'-]+$/u;
 const ServerChatRoomNameRegex = /^[\x20-\x7E]{1,20}$/;
+const ServerChatRoomDescriptionMaxLength = 300;
 
 /**
  * Type guard which checks that a value is a simple object (i.e. a non-null object which is not an array)
@@ -1262,7 +1263,7 @@ function ChatRoomCreate(data, socket) {
 
 		// Validates the room name
 		data.Name = data.Name.trim();
-		if (data.Name.match(ServerChatRoomNameRegex) && (data.Description.length <= 100) && (data.Background.length <= 100)) {
+		if (data.Name.match(ServerChatRoomNameRegex) && (data.Description.length <= ServerChatRoomDescriptionMaxLength) && (data.Background.length <= 100)) {
 			// Finds the account and links it to the new room
 			var Acc = AccountGet(socket.id);
 			if (Acc == null) {
@@ -1918,7 +1919,7 @@ function ChatRoomAdmin(data, socket) {
 			if (data.Action == "Update")
 				if ((data.Room != null) && (typeof data.Room === "object") && (data.Room.Name != null) && (data.Room.Description != null) && (data.Room.Background != null) && (typeof data.Room.Name === "string") && (typeof data.Room.Description === "string") && (typeof data.Room.Background === "string") && (data.Room.Admin != null) && (Array.isArray(data.Room.Admin)) && (!data.Room.Admin.some(i => !Number.isInteger(i))) && (data.Room.Ban != null) && (Array.isArray(data.Room.Ban)) && (!data.Room.Ban.some(i => !Number.isInteger(i)))) {
 					data.Room.Name = data.Room.Name.trim();
-					if (data.Room.Name.match(ServerChatRoomNameRegex) && (data.Room.Description.length <= 100) && (data.Room.Background.length <= 100)) {
+					if (data.Room.Name.match(ServerChatRoomNameRegex) && (data.Room.Description.length <= ServerChatRoomDescriptionMaxLength) && (data.Room.Background.length <= 100)) {
 						for (const Room of ChatRoom)
 							if (Acc.ChatRoom && Acc.ChatRoom.Name != data.Room.Name && Room.Name.toUpperCase().trim() == data.Room.Name.toUpperCase().trim()) {
 								socket.emit("ChatRoomUpdateResponse", "RoomAlreadyExist");
