@@ -181,6 +181,7 @@ const ServerAccountResetNumberRegex = /^[0-9]{1,20}$/;
 const ServerCharacterNameRegex = /^[a-zA-Z ]{1,20}$/;
 const ServerCharacterNicknameRegex = /^[\p{L}\p{Nd}\p{Z}'-]+$/u;
 const ServerChatRoomNameRegex = /^[\x20-\x7E]{1,20}$/;
+const ServerChatMessageMaxLength = 2000;
 const ServerChatRoomDescriptionMaxLength = 300;
 
 /**
@@ -1471,7 +1472,7 @@ function ChatRoomMessage(CR, Sender, Content, Type, Target, Dictionary) {
  * @param {ServerSocket} socket
  */
 function ChatRoomChat(data, socket) {
-	if ((data != null) && (typeof data === "object") && (data.Content != null) && (data.Type != null) && (typeof data.Content === "string") && (typeof data.Type === "string") && (ChatRoomMessageType.indexOf(data.Type) >= 0) && (data.Content.length <= 1000)) {
+	if ((data != null) && (typeof data === "object") && (data.Content != null) && (data.Type != null) && (typeof data.Content === "string") && (typeof data.Type === "string") && (ChatRoomMessageType.indexOf(data.Type) >= 0) && (data.Content.length <= ServerChatMessageMaxLength)) {
 		var Acc = AccountGet(socket.id);
 		if (Acc != null) ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, data.Content.trim(), data.Type, data.Target, data.Dictionary);
 	}
