@@ -2,6 +2,16 @@
 
 type MemberNumber = number;
 
+type ChatRoomMapPos = {
+	X: number;
+	Y: number;
+}
+
+type ChatRoomMapData = {
+	Pos: ChatRoomMapPos
+	PrivateState: Record<string, Object>
+}
+
 interface ServerAccountImmutableData {
 	/** Socket ID */
 	ID: string;
@@ -52,11 +62,12 @@ interface ServerAccountData extends ServerAccountImmutableData {
 	/** String-based values have been deprecated as of BondageProjects/Bondage-College#2138 */
 	Inventory?: string | Partial<Record<AssetGroupName, string[]>>;
 	InventoryData?: string;
-	AssetFamily?: "Female3DCG";
+	/** Initialized by {@link CharacterCreate} */
+	AssetFamily: "Female3DCG";
 	Infiltration?: InfiltrationType;
 	SavedColors?: HSVColor[];
 	ChatSearchFilterTerms?: string;
-	Difficulty?: { Level: number; LastChange: number };
+	Difficulty?: { Level: DifficultyLevel; LastChange: number };
 	MapData?: ChatRoomMapData;
 	PrivateCharacter?: ServerPrivateCharacterData[];
 	SavedExpressions?: ({ Group: ExpressionGroupName, CurrentExpression?: ExpressionName }[] | null)[];
@@ -71,6 +82,8 @@ interface ServerAccountData extends ServerAccountImmutableData {
 	LastChatRoomDesc?: string;
 	/** @deprecated superseded by the {@link ServerAccountData.LastChatRoom} object */
 	LastChatRoomAdmin?: string;
+	/** @deprecated superseded by the {@link ServerAccountData.LastChatRoom} object */
+	LastChatRoomWhitelist?: string;
 	/** @deprecated superseded by the {@link ServerAccountData.LastChatRoom} object */
 	LastChatRoomBan?: string;
 	/** @deprecated superseded by the {@link ServerAccountData.LastChatRoom} object */
@@ -150,7 +163,7 @@ type ServerItemPermissionsPacked = Partial<Record<AssetGroupName, Record<string,
 
 interface ServerMapDataResponse {
 	MemberNumber: number;
-	MapData: ChatRoomMapPos;
+	MapData: ChatRoomMapData;
 }
 
 type ServerAccountDataSynced = Omit<ServerAccountData, "Money" | "FriendList" | "AccountName">;
@@ -196,7 +209,7 @@ interface ServerPrivateCharacterData {
 	Appearance: ServerAppearanceBundle;
 	AppearanceFull: ServerAppearanceBundle;
 	ArousalSettings: ArousalSettingsType;
-	Event: NPCTrait[];
+	Event: NPCEvent[];
 	FromPandora?: boolean;
 }
 
@@ -206,7 +219,7 @@ type ServerAppearanceBundle = ServerItemBundle[];
 type ServerChatRoomSpace = "X" | "" | "M" | "Asylum";
 type ServerChatRoomLanguage = "EN" | "DE" | "FR" | "ES" | "CN" | "RU" | "UA";
 type ServerChatRoomRole = "All" | "Admin" | "Whitelist";
-type ServerChatRoomGame = "" | "ClubCard" | "LARP" | "MagicBattle" | "GGTS";
+type ServerChatRoomGame = "" | "ClubCard" | "LARP" | "MagicBattle" | "GGTS" | "Prison";
 type ServerChatRoomBlockCategory =
 	/** Those are known as AssetCategory to the client */
 	"Medical" | "Extreme" | "Pony" | "SciFi" | "ABDL" | "Fantasy" |
@@ -247,10 +260,10 @@ type ServerChatRoomData = {
 }
 
 interface ServerChatRoomMapData {
-	Type: string;
+	Type: ChatRoomMapType;
 	Fog?: boolean;
-	Tiles: string;
-	Objects: string;
+	Tiles?: string;
+	Objects?: string;
 }
 
 interface ServerChatRoomCustomData {
@@ -274,7 +287,7 @@ type ServerChatRoomSettings = Partial<ServerChatRoomData> & {
 
 //#region Requests & Responses
 
-type ServerLoginResponse = "InvalidNamePassword" | Partial<ServerAccountData>;
+type ServerLoginResponse = "InvalidNamePassword" | ServerAccountData;
 
 type ServerLoginQueueResponse = number;
 
@@ -450,7 +463,7 @@ interface ServerChatRoomSearchData {
     MemberCount: number;
     MemberLimit: number;
     Description: string;
-    BlockCategory: string[];
+    BlockCategory: AssetCategory[];
     Game: ServerChatRoomGame;
     Friends: ServerFriendInfo[];
     Space: ServerChatRoomSpace;
@@ -464,6 +477,7 @@ interface ServerChatRoomSearchData {
 	 * @deprecated Use {@link ServerChatRoomData.Access} instead, this is maintained for backwards compatibility
 	 */
 	Locked?: boolean;
+	CanJoin: boolean;
     MapType: string;
 }
 
@@ -748,6 +762,29 @@ interface ActivityNameDictionaryEntry {
 }
 
 /**
+ * A dictionary entry indicating the ID of a message being replied to.
+ */
+interface ReplyIdDictionaryEntry {
+	ReplyId: string;
+	Tag: "ReplyId";
+}
+/**
+ * A dictionary entry indicating the ID of a message.
+ */
+interface MsgIdDictionaryEntry {
+	MsgId: string;
+	Tag: "MsgId";
+}
+
+/**
+ * A dictionary entry for teleport events
+ */
+interface MapViewTeleportEventDictionaryEntry {
+	Tag: "MapViewTeleport";
+	Position: ChatRoomMapPos;
+}
+
+/**
  * A dictionary entry with metadata about the chat message transmitted.
  *
  * Send with Chat and Whisper-type messages to inform the other side about the
@@ -774,7 +811,11 @@ type ChatMessageDictionaryEntry =
 	| ActivityCounterDictionaryEntry
 	| AssetGroupNameDictionaryEntry
 	| ActivityNameDictionaryEntry
-	| MessageEffectEntry;
+	| MessageEffectEntry
+	| MsgIdDictionaryEntry
+	| ReplyIdDictionaryEntry
+	| MapViewTeleportEventDictionaryEntry;
+
 
 type ChatMessageDictionary = ChatMessageDictionaryEntry[];
 
@@ -826,9 +867,28 @@ interface ServerChatRoomGameKDUpdateRequest {
 	KinkyDungeon: any;
 }
 
+interface ServerChatRoomGameCardGameData {
+    MemberNumber: number;
+    Playing: boolean;
+    Level: number;
+    Fame: number;
+    Money: number;
+    LastFamePerTurn: number;
+    LastMoneyPerTurn: number;
+    FullDeck: string;
+    Deck: string;
+    Hand: string;
+    Board: string;
+    Event: string;
+    DiscardPile: string;
+    CardsPlayedThisTurn: Record<number, ClubCard[]>;
+	ClubCardTurnCounter: number;
+	Sleeve: number;
+}
+
 interface ServerChatRoomGameCardGameQueryRequest {
 	GameProgress: "Query";
-	CCData?: any;
+	CCData?: ServerChatRoomGameCardGameData[];
 	Player1?: number;
 	Player2?: number;
 }
@@ -839,7 +899,7 @@ interface ServerChatRoomGameCardGameStartRequest {
 	Player2: number;
 }
 
-type ServerChatRoomGameCardGameActionRequest = { GameProgress: "Action" } & ({ CCLog: string } | { CCData: any });
+type ServerChatRoomGameCardGameActionRequest = { GameProgress: "Action" } & ({ CCLog: any } | { CCData: any });
 
 type ServerChatRoomGameCardGameUpdateRequest = ServerChatRoomGameCardGameStartRequest | ServerChatRoomGameCardGameQueryRequest | ServerChatRoomGameCardGameActionRequest;
 
@@ -868,8 +928,8 @@ interface ServerChatRoomGameResponse extends ServerChatRoomMessageBase {
 		/* Club Card */
 		Player1?: number;
 		Player2?: number;
-		CCData: [any];
-		CCLog: string;
+		CCData: ServerChatRoomGameCardGameData[];
+		CCLog: ClubCardMessage;
 	};
     RNG: number;
 }
@@ -938,17 +998,17 @@ interface ServerCharacterArousalResponse {
 
 interface ServerCharacterItemUpdate {
 	Target: number;
-	Group: string;
+	Group: AssetGroupName;
 	Name?: string;
 	Color: string | string[];
 	Difficulty: number;
-	Property: any;
-	Craft: any;
+	Property?: ItemProperties;
+	Craft?: CraftingItem;
 }
 
 interface ServerChatRoomSyncItemResponse {
     Source: number;
-    Item: any;
+    Item: ServerCharacterItemUpdate;
 }
 
 type ServerChatRoomUpdateResponse = "RoomAlreadyExist" | "Updated" | "InvalidRoomData";
@@ -1035,7 +1095,7 @@ interface ClientToServerEvents {
 	ChatRoomCharacterPoseUpdate: (data: ServerCharacterPoseUpdate) => void;
 	ChatRoomCharacterArousalUpdate: (data: ServerCharacterArousalUpdate) => void;
 	ChatRoomCharacterItemUpdate: (data: ServerCharacterItemUpdate) => void;
-	ChatRoomCharacterMapDataUpdate: (data: ChatRoomMapPos) => void;
+	ChatRoomCharacterMapDataUpdate: (data: ChatRoomMapData) => void;
 
 	ChatRoomAdmin: (data: ServerChatRoomAdminRequest) => void;
 	ChatRoomAllowItem: (data: ServerChatRoomAllowItemRequest) => void;

@@ -8,7 +8,12 @@ type ItemColor = string;
 type ItemProperties = any;
 type CraftingItem = any;
 type ActivityName = string;
-
+type DifficultyLevel =
+ 	| 0 // Roleplay
+	| 1 // Regular
+	| 2 // Hardcore
+	| 3 // Extreme
+	;
 type Lovership = ServerLovership;
 
 interface Account extends ServerAccountData {

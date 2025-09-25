@@ -1812,7 +1812,7 @@ function ChatRoomCharacterExpressionUpdate(data, socket) {
  * Updates a character MapData for a chat room
  *
  * This does not update the database
- * @param {ServerChatRoomMapData} data
+ * @param {ChatRoomMapData} data
  * @param {ServerSocket} socket
  */
 function ChatRoomCharacterMapDataUpdate(data, socket) {
@@ -1926,7 +1926,7 @@ function ChatRoomAdmin(data, socket) {
 								socket.emit("ChatRoomUpdateResponse", "RoomAlreadyExist");
 								return;
 							}
-						
+
 						{ // BACKWARD-COMPATIBILITY BLOCK for Private/Locked Transition
 							if (data.Room.Visibility != null && Array.isArray(data.Room.Visibility)) {
 								data.Room.Private = !data.Room.Visibility.includes("All"); // Help new clients add Private for older clients | any visibility setting = private
@@ -1940,7 +1940,7 @@ function ChatRoomAdmin(data, socket) {
 								data.Room.Access = data.Room.Locked ? ["Admin", "Whitelist"] : ["All"];
 							}
 						}
-						
+
 						Acc.ChatRoom.Name = data.Room.Name;
 						Acc.ChatRoom.Language = data.Room.Language;
 						Acc.ChatRoom.Background = data.Room.Background;
@@ -2713,7 +2713,7 @@ function AccountDifficulty(data, socket) {
 			if ((data <= 1) || (LastChange + DifficultyDelay < CommonTime())) {
 
 				// Updates the account and the database
-				var NewDifficulty = { Difficulty: { Level: data, LastChange: CommonTime() } };
+				var NewDifficulty = { Difficulty: { Level: /** @type {DifficultyLevel} */ (data), LastChange: CommonTime() } };
 				Acc.Difficulty = NewDifficulty.Difficulty;
 				//console.log("Updating account " + Acc.AccountName + " difficulty to " + NewDifficulty.Difficulty.Level);
 				Database.collection(AccountCollection).updateOne({ AccountName : Acc.AccountName }, { $set: NewDifficulty }, function(err, res) { if (err) throw err; });
