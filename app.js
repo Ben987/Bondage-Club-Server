@@ -1062,7 +1062,7 @@ function AccountGet(ID) {
 /**
  * The maximum number of search results to return at once
  */
-const ChatRoomSearchMaxResults = 120;
+const ChatRoomSearchMaxResults = 240;
 
 /**
  * When a user searches for a chat room
