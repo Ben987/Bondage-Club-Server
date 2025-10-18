@@ -25,6 +25,8 @@ interface ServerAccountImmutableData {
 	Pose?: readonly AssetPoseName[];
 }
 
+type AllowedInteractions = 0 | 1 | 2 | 3 | 4 | 5;
+
 interface ServerAccountData extends ServerAccountImmutableData {
 	Owner?: string;
 	/**
@@ -37,7 +39,9 @@ interface ServerAccountData extends ServerAccountImmutableData {
 	BlackList: MemberNumber[];
 	FriendList: MemberNumber[];
 	WhiteList: MemberNumber[];
-	ItemPermission: 0 | 1 | 2 | 3 | 4 | 5;
+	AllowedInteractions: AllowedInteractions;
+	/** @deprecated */
+	ItemPermission: AllowedInteractions;
 	Skill?: Skill[];
 	Reputation?: { Type: ReputationType, Value: number }[];
 	Wardrobe?: string;
@@ -73,7 +77,9 @@ interface ServerAccountData extends ServerAccountImmutableData {
 	SavedExpressions?: ({ Group: ExpressionGroupName, CurrentExpression?: ExpressionName }[] | null)[];
 	ConfiscatedItems?: { Group: AssetGroupName, Name: string }[];
 	RoomCreateLanguage?: ServerChatRoomLanguage;
+	/** @deprecated */
 	RoomSearchLanguage?: "" | ServerChatRoomLanguage;
+	ChatSearchSettings?: ChatRoomSearchSettings;
 	LastMapData?: null | ChatRoomMapData;
 	// Unfortunately can't @deprecated individual union members
 	/** String-based values have been deprecated and are superseded by {@link ServerChatRoomSettings} objects */
@@ -223,7 +229,7 @@ type ServerChatRoomRole = "All" | "Admin" | "Whitelist";
 type ServerChatRoomGame = "" | "ClubCard" | "LARP" | "MagicBattle" | "GGTS" | "Prison";
 type ServerChatRoomBlockCategory =
 	/** Those are known as AssetCategory to the client */
-	"Medical" | "Extreme" | "Pony" | "SciFi" | "ABDL" | "Fantasy" |
+	"Medical" | "Extreme" | "Pony" | "SciFi" | "ABDL" | "Fantasy" | "Smoking" |
 	/** Those are room features */
 	"Leashing" | "Photos" | "Arousal";
 
@@ -462,6 +468,17 @@ interface ServerChatRoomSearchRequest {
 	ShowLocked?: boolean;
     MapTypes?: string[];
 }
+type ChatRoomSearchSettings = {
+	Language: "" | ServerChatRoomLanguage;
+	Space: ServerChatRoomSpace;
+	Game: ServerChatRoomGame;
+	FullRooms: boolean;
+	ShowLocked: boolean;
+	SearchDescriptions: boolean;
+	MapTypes: string;
+	RoomMinSize: number;
+	RoomMaxSize: number;
+}
 
 interface ServerChatRoomSearchData {
     Name: string;
@@ -593,6 +610,7 @@ interface CharacterReferenceDictionaryEntry extends TaggedDictionaryEntry {
  */
 interface SourceCharacterDictionaryEntry {
 	SourceCharacter: number;
+	HasSuperPowers?: true;
 }
 
 /**
@@ -794,6 +812,17 @@ interface MapViewTeleportEventDictionaryEntry {
 }
 
 /**
+ * A dictionary entry for change key events
+ */
+interface MapViewChangeKeyEventDictionaryEntry {
+	Tag: "MapViewChangeKey";
+	/** The key to give or take. */
+	Key: "gold" | "silver" | "bronze";
+	/** Whether to give (true) or take the key (false) */
+	Bool: boolean;
+}
+
+/**
  * A dictionary entry with metadata about the chat message transmitted.
  *
  * Send with Chat and Whisper-type messages to inform the other side about the
@@ -823,7 +852,8 @@ type ChatMessageDictionaryEntry =
 	| MessageEffectEntry
 	| MsgIdDictionaryEntry
 	| ReplyIdDictionaryEntry
-	| MapViewTeleportEventDictionaryEntry;
+	| MapViewTeleportEventDictionaryEntry
+	| MapViewChangeKeyEventDictionaryEntry;
 
 
 type ChatMessageDictionary = ChatMessageDictionaryEntry[];
