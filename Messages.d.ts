@@ -40,8 +40,6 @@ interface ServerAccountData extends ServerAccountImmutableData {
 	FriendList: MemberNumber[];
 	WhiteList: MemberNumber[];
 	AllowedInteractions: AllowedInteractions;
-	/** @deprecated */
-	ItemPermission: AllowedInteractions;
 	Skill?: Skill[];
 	Reputation?: { Type: ReputationType, Value: number }[];
 	Wardrobe?: string;

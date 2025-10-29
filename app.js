@@ -491,7 +491,7 @@ function AccountCreate(data, socket) {
 							LastLogin: CommonTime(),
 							Environment: AccountGetEnvironment(socket),
 							Lovership: [],
-							ItemPermission: 2,
+							AllowedInteractions: 2,
 							FriendList: [],
 							WhiteList: [],
 							BlackList: [],
@@ -538,7 +538,7 @@ function AccountGetEnvironment(socket) {
  */
 function AccountValidData(Account) {
 	if (Account != null) {
-		if ((Account.ItemPermission == null) || (typeof Account.ItemPermission !== "number")) Account.ItemPermission = 2;
+		if ((Account.AllowedInteractions == null) || (typeof Account.AllowedInteractions !== "number")) Account.AllowedInteractions = 2;
 		if ((Account.WhiteList == null) || !Array.isArray(Account.WhiteList)) Account.WhiteList = [];
 		if ((Account.BlackList == null) || !Array.isArray(Account.BlackList)) Account.BlackList = [];
 		if ((Account.FriendList == null) || !Array.isArray(Account.FriendList)) Account.FriendList = [];
@@ -764,7 +764,7 @@ function AccountUpdate(data, socket) {
 
 				// Some data is kept for future use
 				if (data.InventoryData != null) Acc.InventoryData = data.InventoryData;
-				if (data.ItemPermission != null) Acc.ItemPermission = data.ItemPermission;
+				if (data.AllowedInteractions != null) Acc.AllowedInteractions = data.AllowedInteractions;
 				if (data.ArousalSettings != null) Acc.ArousalSettings = data.ArousalSettings;
 				if (data.OnlineSharedSettings != null) Acc.OnlineSharedSettings = data.OnlineSharedSettings;
 				if (data.Game != null) Acc.Game = data.Game;
@@ -1529,7 +1529,7 @@ function ChatRoomSyncGetCharSharedData(Acc) {
 		Owner: Acc.Owner,
 		MemberNumber: Acc.MemberNumber,
 		LabelColor: Acc.LabelColor,
-		ItemPermission: Acc.ItemPermission,
+		AllowedInteractions: Acc.AllowedInteractions,
 		InventoryData: Acc.InventoryData,
 		Ownership: Acc.Ownership,
 		BlockItems: Acc.BlockItems,
@@ -2147,7 +2147,7 @@ function ChatRoomDominantValue(Account) {
  * @returns {boolean}
  */
 function AccountShouldSendBlackList(Acc) {
-	return Acc.ItemPermission === 1 || Acc.ItemPermission === 2;
+	return Acc.AllowedInteractions === 1 || Acc.AllowedInteractions === 2;
 }
 
 /**
@@ -2163,23 +2163,23 @@ function ChatRoomGetAllowItem(Source, Target) {
 	AccountValidData(Target);
 
 	// At zero permission level or if target is source or if owner, we allow it
-	if ((Target.ItemPermission <= 0) || (Source.MemberNumber == Target.MemberNumber) || ((Target.Ownership != null) && (Target.Ownership.MemberNumber != null) && (Target.Ownership.MemberNumber == Source.MemberNumber))) return true;
+	if ((Target.AllowedInteractions <= 0) || (Source.MemberNumber == Target.MemberNumber) || ((Target.Ownership != null) && (Target.Ownership.MemberNumber != null) && (Target.Ownership.MemberNumber == Source.MemberNumber))) return true;
 
 	// At one, we allow if the source isn't on the blacklist
-	if ((Target.ItemPermission == 1) && (Target.BlackList.indexOf(Source.MemberNumber) < 0)) return true;
+	if ((Target.AllowedInteractions == 1) && (Target.BlackList.indexOf(Source.MemberNumber) < 0)) return true;
 
 	var LoversNumbers = [];
 	for (const Lover of Target.Lovership) {
 		if (Lover.MemberNumber != null) { LoversNumbers.push(Lover.MemberNumber); }
 	}
 	// At two, we allow if the source is Dominant compared to the Target (25 points allowed) or on whitelist or a lover
-	if ((Target.ItemPermission == 2) && (Target.BlackList.indexOf(Source.MemberNumber) < 0) && ((ChatRoomDominantValue(Source) + 25 >= ChatRoomDominantValue(Target)) || (Target.WhiteList.indexOf(Source.MemberNumber) >= 0) || (LoversNumbers.indexOf(Source.MemberNumber) >= 0))) return true;
+	if ((Target.AllowedInteractions == 2) && (Target.BlackList.indexOf(Source.MemberNumber) < 0) && ((ChatRoomDominantValue(Source) + 25 >= ChatRoomDominantValue(Target)) || (Target.WhiteList.indexOf(Source.MemberNumber) >= 0) || (LoversNumbers.indexOf(Source.MemberNumber) >= 0))) return true;
 
 	// At three, we allow if the source is on the whitelist of the Target or a lover
-	if ((Target.ItemPermission == 3) && ((Target.WhiteList.indexOf(Source.MemberNumber) >= 0) || (LoversNumbers.indexOf(Source.MemberNumber) >= 0))) return true;
+	if ((Target.AllowedInteractions == 3) && ((Target.WhiteList.indexOf(Source.MemberNumber) >= 0) || (LoversNumbers.indexOf(Source.MemberNumber) >= 0))) return true;
 
 	// At four, we allow if the source is a lover
-	if ((Target.ItemPermission == 4) && (LoversNumbers.indexOf(Source.MemberNumber) >= 0)) return true;
+	if ((Target.AllowedInteractions == 4) && (LoversNumbers.indexOf(Source.MemberNumber) >= 0)) return true;
 
 	// No valid combo, we don't allow the item
 	return false;
