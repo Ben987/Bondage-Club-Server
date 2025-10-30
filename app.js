@@ -53,6 +53,7 @@ var IO = new socketio.Server(App, Options);
 
 // Main game objects
 var BCrypt = require("bcrypt");
+const argon2 = require("argon2");
 var MaxHeapUsage = parseInt(process.env.MAX_HEAP_USAGE, 10) || 16_000_000_000; // 16 gigs allocated by default, can be altered server side
 var AccountCollection = process.env.ACCOUNT_COLLECTION || "Accounts";
 /** @type {Account[]} */
@@ -483,7 +484,7 @@ function AccountCreate(data, socket) {
 		}
 
 		// Creates a hashed password and saves it with the account info
-		const hash = await BCrypt.hash(data.Password, 10);
+		const hash = await argon2.hash(data.Password);
 		let account = /** @type {Account} */ ({
 			// ID and Socket are special; they're used at runtime but cannot be
 			// persisted to the database so they're set after that happens.
@@ -665,14 +666,14 @@ async function AccountLoginProcess(socket, AccountName, Password) {
 	}
 
 	// All of the password checking
-	if (await BCrypt.compare(Password, result.Password)) {
-		// All good
-	} else if (await BCrypt.compare(Password.toUpperCase(), result.Password)) {
-		if (Password !== result.Password) {
-			// casing is different, upgrade stored version **assuming** this is the casing people use generally
-			result.Password = await BCrypt.hash(Password, 10);
+	if (result.Password.startsWith('$argon2id$') && await argon2.verify(Password, result.Password)) {
+		if (argon2.needsRehash(result.Password, { })) {
+			result.Password = await argon2.hash(Password);
 			await Database.collection(AccountCollection).update({ AccountName }, { $set: { Password: result.Password } });
 		}
+	} else if (result.Password.startsWith('$2') && (await BCrypt.compare(Password, result.Password) || await BCrypt.compare(Password.toUpperCase(), result.Password))) {
+		result.Password = await argon2.hash(Password);
+		await Database.collection(AccountCollection).update({ AccountName }, { $set: { Password: result.Password } });
 	} else {
 		if (!socket.connected) return;
 		socket.emit("LoginResponse", "InvalidNamePassword");
@@ -2293,7 +2294,7 @@ function PasswordReset(data, socket) {
  * @param {ServerPasswordResetProcessRequest} data
  * @param {ServerSocket} socket
  */
-function PasswordResetProcess(data, socket) {
+async function PasswordResetProcess(data, socket) {
 	if (!CommonIsObject(data) || typeof data.AccountName !== "string" || typeof data.ResetNumber !== "string" || typeof data.NewPassword !== "string") {
 		socket.emit("PasswordResetResponse", "InvalidPasswordResetInfo");
 		return;
@@ -2314,12 +2315,12 @@ function PasswordResetProcess(data, socket) {
 	}
 
 	// Creates a hashed password and updates the account with it
-	BCrypt.hash(data.NewPassword, 10, function(err, hash) {
-		if (err) throw err;
-		console.log("Updating password for account: " + data.AccountName);
-		Database.collection(AccountCollection).updateOne({ AccountName: data.AccountName }, { $set: { Password: hash } }, function(err, res) { if (err) throw err; });
-		socket.emit("PasswordResetResponse", "PasswordResetSuccessful");
-	});
+	console.log("Updating password for account: " + data.AccountName);
+	const hash = await argon2.hash(data.NewPassword);
+
+	await Database.collection(AccountCollection).updateOne({ AccountName: data.AccountName }, { $set: { Password: hash } });
+	socket.emit("PasswordResetResponse", "PasswordResetSuccessful");
+
 }
 
 /**
