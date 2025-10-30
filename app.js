@@ -2226,53 +2226,58 @@ function PasswordResetSetNumber(AccountName, ResetNumber) {
  * @param {ServerSocket} socket
  */
 function PasswordReset(data, socket) {
-	if ((data != null) && (typeof data === "string") && (data != "") && CommonEmailIsValid(data)) {
-
-		// One email reset password per 5 seconds to prevent flooding
-		if (NextPasswordReset > CommonTime()) return socket.emit("PasswordResetResponse", "RetryLater");
-		NextPasswordReset = CommonTime() + 5000;
-
-		// Gets all accounts that matches the email
-		Database.collection(AccountCollection).find({ Email : data }).toArray(function(err, result) {
-
-			// If we found accounts with that email
-			if (err) throw err;
-			if ((result != null) && (typeof result === "object") && (result.length > 0)) {
-
-				// Builds a reset number for each account found and creates the email body
-				var EmailBody = "To reset your account password, enter your account name and the reset number included in this email.  You need to put these in the Bondage Club password reset screen, with your new password.<br /><br />";
-				for (const res of result) {
-					var ResetNumber = (Math.round(Math.random() * 1000000000000)).toString();
-					PasswordResetSetNumber(res.AccountName, ResetNumber);
-					EmailBody = EmailBody + "Account Name: " + res.AccountName + "<br />";
-					EmailBody = EmailBody + "Reset Number: " + ResetNumber + "<br /><br />";
-				}
-
-				// Prepares the email to be sent
-				var mailOptions = {
-					from: "donotreply@bondageprojects.com",
-					to: result[0].Email,
-					subject: "Bondage Club Password Reset",
-					html: EmailBody
-				};
-
-				// Sends the email and logs the result
-				MailTransporter.sendMail(mailOptions, function (err, info) {
-					if (err) {
-						console.log("Error while sending password reset email: " + err);
-						socket.emit("PasswordResetResponse", "EmailSentError");
-					}
-					else {
-						console.log("Password reset email send to: " + result[0].Email);
-						socket.emit("PasswordResetResponse", "EmailSent");
-					}
-				});
-
-			} else socket.emit("PasswordResetResponse", "NoAccountOnEmail");
-
-		});
-
+	if (typeof data !== "string" || !CommonEmailIsValid(data)) {
+		// socket.emit("PasswordResetResponse", "InvalidEmail");
+		return;
 	}
+
+	// One email reset password per 5 seconds to prevent flooding
+	if (NextPasswordReset > CommonTime()) {
+		socket.emit("PasswordResetResponse", "RetryLater");
+		return;
+	}
+	NextPasswordReset = CommonTime() + 5000;
+
+	// Gets all accounts that matches the email
+	Database.collection(AccountCollection).find({ Email : data }).toArray(function(err, result) {
+		if (err) {
+			throw err;
+		}
+
+		if (!Array.isArray(result) || result.length === 0) {
+			socket.emit("PasswordResetResponse", "NoAccountOnEmail");
+			return;
+		}
+
+		// If we found accounts with that email
+		// Builds a reset number for each account found and creates the email body
+		let EmailBody = "To reset your account password, enter your account name and the reset number included in this email.  You need to put these in the Bondage Club password reset screen, with your new password.<br /><br />";
+		for (const res of result) {
+			const ResetNumber = (Math.round(Math.random() * 1000000000000)).toString();
+			PasswordResetSetNumber(res.AccountName, ResetNumber);
+			EmailBody = EmailBody + "Account Name: " + res.AccountName + "<br />";
+			EmailBody = EmailBody + "Reset Number: " + ResetNumber + "<br /><br />";
+		}
+
+		// Prepares the email to be sent
+		const mailOptions = {
+			from: "donotreply@bondageprojects.com",
+			to: result[0].Email,
+			subject: "Bondage Club Password Reset",
+			html: EmailBody
+		};
+
+		// Sends the email and logs the result
+		MailTransporter.sendMail(mailOptions, function (err, info) {
+			if (err) {
+				console.log("Error while sending password reset email: " + err);
+				socket.emit("PasswordResetResponse", "EmailSentError");
+			} else {
+				console.log("Password reset email send to: " + result[0].Email);
+				socket.emit("PasswordResetResponse", "EmailSent");
+			}
+		});
+	});
 }
 
 /**
@@ -2281,31 +2286,32 @@ function PasswordReset(data, socket) {
  * @param {ServerSocket} socket
  */
 function PasswordResetProcess(data, socket) {
-	if ((data != null) && (typeof data === "object") && (data.AccountName != null) && (typeof data.AccountName === "string") && (data.ResetNumber != null) && (typeof data.ResetNumber === "string") && (data.NewPassword != null) && (typeof data.NewPassword === "string")) {
+	if (!CommonIsObject(data) || typeof data.AccountName !== "string" || typeof data.ResetNumber !== "string" || typeof data.NewPassword !== "string") {
+		socket.emit("PasswordResetResponse", "InvalidPasswordResetInfo");
+		return;
+	}
 
-		// Makes sure the data is valid
-		if (data.AccountName.match(ServerAccountNameRegex) && data.NewPassword.match(ServerAccountPasswordRegex)) {
+	// Makes sure the data is valid
+	if (!data.AccountName.match(ServerAccountNameRegex) || !data.NewPassword.match(ServerAccountPasswordRegex)) {
+		socket.emit("PasswordResetResponse", "InvalidPasswordResetInfo");
+		return;
+	}
 
-			// Checks if the reset number matches
-			for (const PasswordReset of PasswordResetProgress)
-				if ((PasswordReset.AccountName == data.AccountName) && (PasswordReset.ResetNumber == data.ResetNumber)) {
+	// Find the request for that account and number
+	const resetRequest = PasswordResetProgress.find(req => req.AccountName === data.AccountName && req.ResetNumber === data.ResetNumber);
+	if (!resetRequest) {
+		// Sends a fail message to the client
+		socket.emit("PasswordResetResponse", "InvalidPasswordResetInfo");
+		return;
+	}
 
-					// Creates a hashed password and updates the account with it
-					BCrypt.hash(data.NewPassword.toUpperCase(), 10, function( err, hash ) {
-						if (err) throw err;
-						console.log("Updating password for account: " + data.AccountName);
-						Database.collection(AccountCollection).updateOne({ AccountName : data.AccountName }, { $set: { Password: hash } }, function(err, res) { if (err) throw err; });
-						socket.emit("PasswordResetResponse", "PasswordResetSuccessful");
-					});
-					return;
-				}
-
-			// Sends a fail message to the client
-			socket.emit("PasswordResetResponse", "InvalidPasswordResetInfo");
-
-		} else socket.emit("PasswordResetResponse", "InvalidPasswordResetInfo");
-
-	} else socket.emit("PasswordResetResponse", "InvalidPasswordResetInfo");
+	// Creates a hashed password and updates the account with it
+	BCrypt.hash(data.NewPassword.toUpperCase(), 10, function(err, hash) {
+		if (err) throw err;
+		console.log("Updating password for account: " + data.AccountName);
+		Database.collection(AccountCollection).updateOne({ AccountName: data.AccountName }, { $set: { Password: hash } }, function(err, res) { if (err) throw err; });
+		socket.emit("PasswordResetResponse", "PasswordResetSuccessful");
+	});
 }
 
 /**
