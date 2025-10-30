@@ -89,7 +89,8 @@ const ROOM_LIMIT_MINIMUM = 2; // The minimum number of players in an online chat
 const ROOM_LIMIT_MAXIMUM = 20; // The maximum number of players in an online chat room
 
 // Limits the number of accounts created on each hour & day
-var AccountCreationIP = [];
+/** @type {{ Address: string, Time: number }[]} */
+const AccountCreationIP = [];
 const MAX_IP_ACCOUNT_PER_DAY = parseInt(process.env.MAX_IP_ACCOUNT_PER_DAY, 10) || 12;
 const MAX_IP_ACCOUNT_PER_HOUR = parseInt(process.env.MAX_IP_ACCOUNT_PER_HOUR, 10) || 4;
 
@@ -417,107 +418,104 @@ function CommonParseInt(thing, defaultValue = 0, base = 10) {
  * @param {ServerSocket} socket
  */
 function AccountCreate(data, socket) {
-
 	// Makes sure the account comes with a name and a password
-	if ((data != null) && (typeof data === "object") && (data.Name != null) && (data.AccountName != null) && (data.Password != null) && (data.Email != null) && (typeof data.Name === "string") && (typeof data.AccountName === "string") && (typeof data.Password === "string") && (typeof data.Email === "string")) {
+	if (!CommonIsObject(data) || typeof data.Name !== "string" || typeof data.AccountName !== "string" || typeof data.Email !== "string" || typeof data.Password !== "string") {
+		socket.emit("CreationResponse", "Invalid account information");
+		return;
+	}
 
-		// Makes sure the data is valid
-		if (data.Name.match(ServerCharacterNameRegex) && data.AccountName.match(ServerAccountNameRegex) && data.Password.match(ServerAccountPasswordRegex) && (CommonEmailIsValid(data.Email) || data.Email == "") && (data.Email.length <= 100)) {
+	// Makes sure the data is valid
+	if (!data.Name.match(ServerCharacterNameRegex)
+		|| !data.AccountName.match(ServerAccountNameRegex)
+		|| !data.Password.match(ServerAccountPasswordRegex)
+		|| data.Email !== "" && !CommonEmailIsValid(data.Email)) {
+			socket.emit("CreationResponse", "Invalid account information");
+			return;
+	}
 
-			// Gets the current IP Address that's creating the account
-			/** @type {string} */
-			let CurrentIP = socket.conn.remoteAddress;
-			if (IP_CONNECTION_PROXY_HEADER && typeof socket.handshake.headers[IP_CONNECTION_PROXY_HEADER] === "string") {
-				const hops = /** @type {string} */ (socket.handshake.headers[IP_CONNECTION_PROXY_HEADER]).split(",");
-				CurrentIP = hops[hops.length-1].trim();
+	// Gets the current IP Address that's creating the account
+	/** @type {string} */
+	let CurrentIP = socket.conn.remoteAddress;
+	if (IP_CONNECTION_PROXY_HEADER && typeof socket.handshake.headers[IP_CONNECTION_PROXY_HEADER] === "string") {
+		const hops = /** @type {string} */ (socket.handshake.headers[IP_CONNECTION_PROXY_HEADER]).split(",");
+		CurrentIP = hops[hops.length-1].trim();
+	}
+
+	// If the IP is valid
+	if ((CurrentIP != null) && (CurrentIP != "")) {
+		// Checks the number of account created in total and in the last hour by this IP
+		let CurrentTime = CommonTime();
+		let TotalCount = 0;
+		let HourCount = 0;
+		for (let IP of AccountCreationIP)
+			if (IP.Address === CurrentIP) {
+				TotalCount++;
+				if (IP.Time >= CurrentTime - 3600000) HourCount++;
 			}
 
-			// If the IP is valid
-			if ((CurrentIP != null) && (CurrentIP != "")) {
+		/*var mailOptions = {
+			from: "donotreply@bondageprojects.com",
+			to: process.env.EMAIL_ADMIN || "",
+			subject: "Bondage Club Server Info",
+			html: "IP: " + CurrentIP + " is creating account: " + data.AccountName + " at time: " + CommonTime().toString() + "<br />TotalCount: " + TotalCount.toString() + "<br />MAX_IP_ACCOUNT_PER_DAY: " + MAX_IP_ACCOUNT_PER_DAY.toString() + "<br />HourCount: " + HourCount.toString() + "<br />MAX_IP_ACCOUNT_PER_HOUR: " + MAX_IP_ACCOUNT_PER_HOUR.toString()
+		};
+		MailTransporter.sendMail(mailOptions, function (err, info) {});*/
 
-				// Checks the number of account created in total and in the last hour by this IP
-				let CurrentTime = CommonTime();
-				let TotalCount = 0;
-				let HourCount = 0;
-				for (let IP of AccountCreationIP)
-					if (IP.Address === CurrentIP) {
-						TotalCount++;
-						if (IP.Time >= CurrentTime - 3600000) HourCount++;
-					}
-
-				/*var mailOptions = {
-					from: "donotreply@bondageprojects.com",
-					to: process.env.EMAIL_ADMIN || "",
-					subject: "Bondage Club Server Info",
-					html: "IP: " + CurrentIP + " is creating account: " + data.AccountName + " at time: " + CommonTime().toString() + "<br />TotalCount: " + TotalCount.toString() + "<br />MAX_IP_ACCOUNT_PER_DAY: " + MAX_IP_ACCOUNT_PER_DAY.toString() + "<br />HourCount: " + HourCount.toString() + "<br />MAX_IP_ACCOUNT_PER_HOUR: " + MAX_IP_ACCOUNT_PER_HOUR.toString()
-				};
-				MailTransporter.sendMail(mailOptions, function (err, info) {});*/
-
-				// Exits if we reached the limit
-				if ((TotalCount >= MAX_IP_ACCOUNT_PER_DAY) || (HourCount >= MAX_IP_ACCOUNT_PER_HOUR)) {
-					socket.emit("CreationResponse", "New accounts per day exceeded");
-					return;
-				}
-
-				// Keeps the IP in memory for the next run
-				AccountCreationIP.push({ Address: CurrentIP, Time: CurrentTime });
-
-			}
-
-			// Checks if the account already exists
-			data.AccountName = data.AccountName.toUpperCase();
-			Database.collection(AccountCollection).findOne({ AccountName : data.AccountName }, function(err, result) {
-
-				// Makes sure the result is null so the account doesn't already exists
-				if (err) throw err;
-				if (result != null) {
-					socket.emit("CreationResponse", "Account already exists");
-				} else {
-
-					// Creates a hashed password and saves it with the account info
-					BCrypt.hash(data.Password.toUpperCase(), 10, function( err, hash ) {
-						if (err) throw err;
-						let account = /** @type {Account} */ ({
-							// ID and Socket are special; they're used at runtime but cannot be
-							// persisted to the database so they're set after that happens.
-							AccountName: data.AccountName,
-							Email: data.Email,
-							Password: hash,
-							// Use the next member number and bump it
-							MemberNumber: NextMemberNumber++,
-							Name: data.Name,
-							Money: 100,
-							Creation: CommonTime(),
-							LastLogin: CommonTime(),
-							Environment: AccountGetEnvironment(socket),
-							Lovership: [],
-							ItemPermission: 2,
-							FriendList: [],
-							WhiteList: [],
-							BlackList: [],
-						});
-						Database.collection(AccountCollection).insertOne(account, function(err, res) {
-							if (err) throw err;
-							account.ID = socket.id;
-							account.Socket = socket;
-							console.log("Creating new account: " + account.AccountName + " ID: " + socket.id + " " + account.Environment);
-							AccountValidData(account);
-							Account.push(account);
-							OnLogin(socket);
-							socket.emit("CreationResponse", { ServerAnswer: "AccountCreated", OnlineID: account.ID, MemberNumber: account.MemberNumber } );
-							AccountSendServerInfo(socket);
-							AccountPurgeInfo(data);
-						});
-					});
-
-				}
-
-			});
-
+		// Exits if we reached the limit
+		if ((TotalCount >= MAX_IP_ACCOUNT_PER_DAY) || (HourCount >= MAX_IP_ACCOUNT_PER_HOUR)) {
+			socket.emit("CreationResponse", "New accounts per day exceeded");
+			return;
 		}
 
-	} else socket.emit("CreationResponse", "Invalid account information");
+		// Keeps the IP in memory for the next run
+		AccountCreationIP.push({ Address: CurrentIP, Time: CurrentTime });
+	}
 
+	// Checks if the account already exists
+	data.AccountName = data.AccountName.toUpperCase();
+	Database.collection(AccountCollection).findOne({ AccountName: data.AccountName }, async function(err, result) {
+
+		// Makes sure the result is null so the account doesn't already exists
+		if (err) throw err;
+		if (result != null) {
+			socket.emit("CreationResponse", "Account already exists");
+			return;
+		}
+
+		// Creates a hashed password and saves it with the account info
+		const hash = await BCrypt.hash(data.Password.toUpperCase(), 10);
+		let account = /** @type {Account} */ ({
+			// ID and Socket are special; they're used at runtime but cannot be
+			// persisted to the database so they're set after that happens.
+			AccountName: data.AccountName,
+			Email: data.Email,
+			Password: hash,
+			// Use the next member number and bump it
+			MemberNumber: NextMemberNumber++,
+			Name: data.Name,
+			Money: 100,
+			Creation: CommonTime(),
+			LastLogin: CommonTime(),
+			Environment: AccountGetEnvironment(socket),
+			Lovership: [],
+			ItemPermission: 2,
+			FriendList: [],
+			WhiteList: [],
+			BlackList: [],
+		});
+		Database.collection(AccountCollection).insertOne(account, function(err, res) {
+			if (err) throw err;
+			account.ID = socket.id;
+			account.Socket = socket;
+			console.log("Creating new account: " + account.AccountName + " ID: " + socket.id + " " + account.Environment);
+			AccountValidData(account);
+			Account.push(account);
+			OnLogin(socket);
+			socket.emit("CreationResponse", { ServerAnswer: "AccountCreated", OnlineID: account.ID, MemberNumber: account.MemberNumber } );
+			AccountSendServerInfo(socket);
+			AccountPurgeInfo(data);
+		});
+	});
 }
 
 /**
