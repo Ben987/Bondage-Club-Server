@@ -483,7 +483,7 @@ function AccountCreate(data, socket) {
 		}
 
 		// Creates a hashed password and saves it with the account info
-		const hash = await BCrypt.hash(data.Password.toUpperCase(), 10);
+		const hash = await BCrypt.hash(data.Password, 10);
 		let account = /** @type {Account} */ ({
 			// ID and Socket are special; they're used at runtime but cannot be
 			// persisted to the database so they're set after that happens.
@@ -652,6 +652,8 @@ function AccountRemoveFromChatRoom(MemberNumber) {
  * @param {string} Password
  */
 async function AccountLoginProcess(socket, AccountName, Password) {
+	if (!socket.connected) return;
+
 	// Checks if there's an account that matches the name
 	/** @type {Account|null} */
 	const result = await Database.collection(AccountCollection).findOne({ AccountName });
@@ -662,14 +664,22 @@ async function AccountLoginProcess(socket, AccountName, Password) {
 		return;
 	}
 
-	// Compare the password to its hashed version
-	const res = await BCrypt.compare(Password.toUpperCase(), result.Password);
-
-	if (!socket.connected) return;
-	if (!res) {
+	// All of the password checking
+	if (await BCrypt.compare(Password, result.Password)) {
+		// All good
+	} else if (await BCrypt.compare(Password.toUpperCase(), result.Password)) {
+		if (Password !== result.Password) {
+			// casing is different, upgrade stored version **assuming** this is the casing people use generally
+			result.Password = await BCrypt.hash(Password, 10);
+			await Database.collection(AccountCollection).update({ AccountName }, { $set: { Password: result.Password } });
+		}
+	} else {
+		if (!socket.connected) return;
 		socket.emit("LoginResponse", "InvalidNamePassword");
 		return;
 	}
+
+	if (!socket.connected) return;
 
 	// Disconnect duplicated logged accounts
 	for (const Acc of Account) {
@@ -2304,7 +2314,7 @@ function PasswordResetProcess(data, socket) {
 	}
 
 	// Creates a hashed password and updates the account with it
-	BCrypt.hash(data.NewPassword.toUpperCase(), 10, function(err, hash) {
+	BCrypt.hash(data.NewPassword, 10, function(err, hash) {
 		if (err) throw err;
 		console.log("Updating password for account: " + data.AccountName);
 		Database.collection(AccountCollection).updateOne({ AccountName: data.AccountName }, { $set: { Password: hash } }, function(err, res) { if (err) throw err; });
