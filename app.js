@@ -177,7 +177,7 @@ const IPConnections = new Map();
 // These regex must be kept in sync with the client
 const ServerAccountEmailRegex = /^[a-zA-Z0-9@.!#$%&'*+/=?^_`{|}~-]{5,100}$/;
 const ServerAccountNameRegex = /^[a-zA-Z0-9]{1,20}$/;
-const ServerAccountPasswordRegex = /^[a-zA-Z0-9]{1,20}$/;
+const ServerAccountPasswordRegex = /^[a-zA-Z0-9`~!@#$%^&*()_\-+={}|[\]:";'<>?,.]{1,100}$/;
 const ServerAccountResetNumberRegex = /^[0-9]{1,20}$/;
 const ServerCharacterNameRegex = /^[a-zA-Z ]{1,20}$/;
 const ServerCharacterNicknameRegex = /^[\p{L}\p{Nd}\p{Z}'-]+$/u;
