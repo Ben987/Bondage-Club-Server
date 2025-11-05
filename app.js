@@ -2233,7 +2233,7 @@ function PasswordResetSetNumber(AccountName, ResetNumber) {
  * @param {ServerPasswordResetRequest} data
  * @param {ServerSocket} socket
  */
-function PasswordReset(data, socket) {
+async function PasswordReset(data, socket) {
 	if (typeof data !== "string" || !CommonEmailIsValid(data)) {
 		// socket.emit("PasswordResetResponse", "InvalidEmail");
 		return;
@@ -2246,46 +2246,49 @@ function PasswordReset(data, socket) {
 	}
 	NextPasswordReset = CommonTime() + 5000;
 
+	function escapeRegex(string) {
+		return string.replace(/[/\-\\^$*+?.()|[\]{}]/g, '\\$&');
+	}
+
+	let count = 0;
+	let didError = false;
 	// Gets all accounts that matches the email
-	Database.collection(AccountCollection).find({ Email : data }).toArray(function(err, result) {
-		if (err) {
-			throw err;
+	let emailRegex = new RegExp(`^${escapeRegex(data)}$`, "i");
+	const cursor = await Database.collection(AccountCollection).find({ Email: emailRegex }, { projection: { AccountName: 1, Email: 1 } });
+	for (const account of await cursor.toArray()) {
+		try {
+			count++;
+
+			// Generate a reset number for each account found and creates the email body
+			const resetNumber = base64id.generateId();
+
+			// Sends the email and logs the result
+			await MailTransporter.sendMail({
+				from: "donotreply@bondageprojects.com",
+				to: account.Email,
+				subject: "Bondage Club Password Reset",
+				html: `To reset your account password, enter your account name and the reset number included in this email. `
+				+ `You need to put these in the Bondage Club password reset screen, with your new password.<br /><br />`
+				+ `Account Name: ${account.AccountName}<br />`
+				+ `Reset Number: ${resetNumber}<br /><br />`,
+			});
+			console.log(`Password reset email send to: ${account.Email}`);
+			PasswordResetSetNumber(account.AccountName, resetNumber);
+		} catch (err) {
+			console.log("Error while sending password reset email: ", err);
+			didError = true;
 		}
+	}
 
-		if (!Array.isArray(result) || result.length === 0) {
-			socket.emit("PasswordResetResponse", "NoAccountOnEmail");
-			return;
-		}
-
-		// If we found accounts with that email
-		// Builds a reset number for each account found and creates the email body
-		let EmailBody = "To reset your account password, enter your account name and the reset number included in this email.  You need to put these in the Bondage Club password reset screen, with your new password.<br /><br />";
-		for (const res of result) {
-			const ResetNumber = (Math.round(Math.random() * 1000000000000)).toString();
-			PasswordResetSetNumber(res.AccountName, ResetNumber);
-			EmailBody = EmailBody + "Account Name: " + res.AccountName + "<br />";
-			EmailBody = EmailBody + "Reset Number: " + ResetNumber + "<br /><br />";
-		}
-
-		// Prepares the email to be sent
-		const mailOptions = {
-			from: "donotreply@bondageprojects.com",
-			to: result[0].Email,
-			subject: "Bondage Club Password Reset",
-			html: EmailBody
-		};
-
-		// Sends the email and logs the result
-		MailTransporter.sendMail(mailOptions, function (err, info) {
-			if (err) {
-				console.log("Error while sending password reset email: " + err);
-				socket.emit("PasswordResetResponse", "EmailSentError");
-			} else {
-				console.log("Password reset email send to: " + result[0].Email);
-				socket.emit("PasswordResetResponse", "EmailSent");
-			}
-		});
-	});
+	if (count === 0) {
+		socket.emit("PasswordResetResponse", "NoAccountOnEmail");
+		return;
+	}
+	if (didError) {
+		socket.emit("PasswordResetResponse", "EmailSentError");
+		return;
+	}
+	socket.emit("PasswordResetResponse", "EmailSent");
 }
 
 /**
