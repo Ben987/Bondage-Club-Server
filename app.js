@@ -491,7 +491,7 @@ function AccountCreate(data, socket) {
 							LastLogin: CommonTime(),
 							Environment: AccountGetEnvironment(socket),
 							Lovership: [],
-							ItemPermission: 2,
+							AllowedInteractions: 2,
 							FriendList: [],
 							WhiteList: [],
 							BlackList: [],
@@ -538,7 +538,7 @@ function AccountGetEnvironment(socket) {
  */
 function AccountValidData(Account) {
 	if (Account != null) {
-		if ((Account.ItemPermission == null) || (typeof Account.ItemPermission !== "number")) Account.ItemPermission = 2;
+		if ((Account.AllowedInteractions == null) || (typeof Account.AllowedInteractions !== "number")) Account.AllowedInteractions = 2;
 		if ((Account.WhiteList == null) || !Array.isArray(Account.WhiteList)) Account.WhiteList = [];
 		if ((Account.BlackList == null) || !Array.isArray(Account.BlackList)) Account.BlackList = [];
 		if ((Account.FriendList == null) || !Array.isArray(Account.FriendList)) Account.FriendList = [];
@@ -764,7 +764,7 @@ function AccountUpdate(data, socket) {
 
 				// Some data is kept for future use
 				if (data.InventoryData != null) Acc.InventoryData = data.InventoryData;
-				if (data.ItemPermission != null) Acc.ItemPermission = data.ItemPermission;
+				if (data.AllowedInteractions != null) Acc.AllowedInteractions = data.AllowedInteractions;
 				if (data.ArousalSettings != null) Acc.ArousalSettings = data.ArousalSettings;
 				if (data.OnlineSharedSettings != null) Acc.OnlineSharedSettings = data.OnlineSharedSettings;
 				if (data.Game != null) Acc.Game = data.Game;
@@ -1218,8 +1218,6 @@ function ChatRoomSearchAddResult(Acc, room) {
 		Space: room.Space,
 		Visibility: room.Visibility,
 		Access: room.Access,
-		Locked: room.Locked,
-		Private: room.Private,
 		MapType: room?.MapData?.Type ?? "Never",
 		CanJoin: ChatRoomAccountHasAnyRole(Acc, room, room.Access),
 	}
@@ -1233,35 +1231,7 @@ function ChatRoomSearchAddResult(Acc, room) {
 function ChatRoomCreate(data, socket) {
 
 	// Make sure we have everything to create it
-	if ((data != null) && (typeof data === "object") && (data.Name != null) && (data.Description != null) && (data.Background != null) && (typeof data.Name === "string") && (typeof data.Description === "string") && (typeof data.Background === "string")) {
-		{ // BACKWARD-COMPATIBILITY BLOCK for Private/Locked Transition
-			// ! TODO: Remember to add the visibility & access validity checks to the above if statement when removing this block
-			const hasVisibility = data.Visibility != null && Array.isArray(data.Visibility);
-			const hasPrivate = data.Private != null && typeof data.Private === "boolean";
-			if (hasVisibility == hasPrivate) { // new client: visibility, old client: private; both is unexpected; neither is missing data
-				socket.emit("ChatRoomCreateResponse", "InvalidRoomData");
-				return;
-			} else if (hasVisibility) { // Help new clients add Private for older clients | any visibility setting = private
-				data.Private = !data.Visibility.includes("All");
-			} else if (data.Private != null) { // Help old clients add Visibility for new clients | private = admin only
-				data.Visibility = data.Private ? ["Admin"] : ["All"];
-			}
-
-			const hasAccess = data.Access != null && Array.isArray(data.Access);
-			const hasLocked = data.Locked != null && typeof data.Locked === "boolean";
-			if (hasAccess && hasLocked) { // missing data
-				socket.emit("ChatRoomCreateResponse", "InvalidRoomData");
-				return;
-			} else if (hasAccess) { // Help new clients add Locked for older clients | any access setting = locked
-				data.Locked = !data.Access.includes("All");
-			} else if (hasLocked) { // Help old clients add Access if Locked is set | locked = admin + whitelist only
-				data.Access = data.Locked ? ["Admin", "Whitelist"] : ["All"];
-			} else { // Maintaining older backward-compatibility behaviour
-				data.Locked = false;
-				data.Access = ["All"];
-			}
-		}
-
+	if ((data != null) && (typeof data === "object") && (data.Name != null) && (data.Description != null) && (data.Background != null) && (typeof data.Name === "string") && (typeof data.Description === "string") && (typeof data.Background === "string") && (Array.isArray(data.Visibility)) && (Array.isArray(data.Access))) {
 		// Validates the room name
 		data.Name = data.Name.trim();
 		if (data.Name.match(ServerChatRoomNameRegex) && (data.Description.length <= ServerChatRoomDescriptionMaxLength) && (data.Background.length <= 100)) {
@@ -1308,8 +1278,6 @@ function ChatRoomCreate(data, socket) {
 				Limit: Limit,
 				Visibility: data.Visibility,
 				Access: data.Access,
-				Private: data.Private || false,
-				Locked : data.Locked || false,
 				MapData : data.MapData,
 				Environment: Acc.Environment,
 				Space: Space,
@@ -1529,7 +1497,7 @@ function ChatRoomSyncGetCharSharedData(Acc) {
 		Owner: Acc.Owner,
 		MemberNumber: Acc.MemberNumber,
 		LabelColor: Acc.LabelColor,
-		ItemPermission: Acc.ItemPermission,
+		AllowedInteractions: Acc.AllowedInteractions,
 		InventoryData: Acc.InventoryData,
 		Ownership: Acc.Ownership,
 		BlockItems: Acc.BlockItems,
@@ -1572,8 +1540,6 @@ function ChatRoomGetData(CR, SourceMemberNumber)
 		SourceMemberNumber,
 		Visibility: CR.Visibility,
 		Access: CR.Access,
-		Private: CR.Private,
-		Locked: CR.Locked,
 		MapData: CR.MapData,
 		BlockCategory: CR.BlockCategory,
 		Space: CR.Space,
@@ -1609,8 +1575,6 @@ function ChatRoomGetProperties(CR, SourceMemberNumber)
 		SourceMemberNumber,
 		Visibility: CR.Visibility,
 		Access: CR.Access,
-		Private: CR.Private,
-		Locked: CR.Locked,
 		MapData: CR.MapData,
 		BlockCategory: CR.BlockCategory,
 		Space: CR.Space,
@@ -1927,20 +1891,6 @@ function ChatRoomAdmin(data, socket) {
 								return;
 							}
 
-						{ // BACKWARD-COMPATIBILITY BLOCK for Private/Locked Transition
-							if (data.Room.Visibility != null && Array.isArray(data.Room.Visibility)) {
-								data.Room.Private = !data.Room.Visibility.includes("All"); // Help new clients add Private for older clients | any visibility setting = private
-							} else if (data.Room.Private != null && typeof data.Room.Private === "boolean") {
-								data.Room.Visibility = data.Room.Private ? ["Admin"] : ["All"]; // Help old clients add Visibility for new clients | private = admin only
-							}
-
-							if (data.Room.Access != null && Array.isArray(data.Room.Access)) { // Help new clients add Locked for older clients | any access setting = locked
-								data.Room.Locked = !data.Room.Access.includes("All");
-							} else if (data.Room.Locked != null && typeof data.Room.Locked === "boolean") { // Help old clients add Access for new clients | locked = admin + whitelist only
-								data.Room.Access = data.Room.Locked ? ["Admin", "Whitelist"] : ["All"];
-							}
-						}
-
 						Acc.ChatRoom.Name = data.Room.Name;
 						Acc.ChatRoom.Language = data.Room.Language;
 						Acc.ChatRoom.Background = data.Room.Background;
@@ -1960,8 +1910,6 @@ function ChatRoomAdmin(data, socket) {
 						Acc.ChatRoom.Limit = Limit;
 						if ((data.Room.Visibility != null) && (Array.isArray(data.Room.Visibility))) Acc.ChatRoom.Visibility = data.Room.Visibility;
 						if ((data.Room.Access != null) && (Array.isArray(data.Room.Access))) Acc.ChatRoom.Access = data.Room.Access;
-						if ((data.Room.Private != null) && (typeof data.Room.Private === "boolean")) Acc.ChatRoom.Private = data.Room.Private;
-						if ((data.Room.Locked != null) && (typeof data.Room.Locked === "boolean")) Acc.ChatRoom.Locked = data.Room.Locked;
 						Acc.ChatRoom.MapData = data.Room.MapData;
 						socket.emit("ChatRoomUpdateResponse", "Updated");
 						if ((Acc != null) && (Acc.ChatRoom != null)) {
@@ -2147,7 +2095,7 @@ function ChatRoomDominantValue(Account) {
  * @returns {boolean}
  */
 function AccountShouldSendBlackList(Acc) {
-	return Acc.ItemPermission === 1 || Acc.ItemPermission === 2;
+	return Acc.AllowedInteractions === 1 || Acc.AllowedInteractions === 2;
 }
 
 /**
@@ -2163,23 +2111,23 @@ function ChatRoomGetAllowItem(Source, Target) {
 	AccountValidData(Target);
 
 	// At zero permission level or if target is source or if owner, we allow it
-	if ((Target.ItemPermission <= 0) || (Source.MemberNumber == Target.MemberNumber) || ((Target.Ownership != null) && (Target.Ownership.MemberNumber != null) && (Target.Ownership.MemberNumber == Source.MemberNumber))) return true;
+	if ((Target.AllowedInteractions <= 0) || (Source.MemberNumber == Target.MemberNumber) || ((Target.Ownership != null) && (Target.Ownership.MemberNumber != null) && (Target.Ownership.MemberNumber == Source.MemberNumber))) return true;
 
 	// At one, we allow if the source isn't on the blacklist
-	if ((Target.ItemPermission == 1) && (Target.BlackList.indexOf(Source.MemberNumber) < 0)) return true;
+	if ((Target.AllowedInteractions == 1) && (Target.BlackList.indexOf(Source.MemberNumber) < 0)) return true;
 
 	var LoversNumbers = [];
 	for (const Lover of Target.Lovership) {
 		if (Lover.MemberNumber != null) { LoversNumbers.push(Lover.MemberNumber); }
 	}
 	// At two, we allow if the source is Dominant compared to the Target (25 points allowed) or on whitelist or a lover
-	if ((Target.ItemPermission == 2) && (Target.BlackList.indexOf(Source.MemberNumber) < 0) && ((ChatRoomDominantValue(Source) + 25 >= ChatRoomDominantValue(Target)) || (Target.WhiteList.indexOf(Source.MemberNumber) >= 0) || (LoversNumbers.indexOf(Source.MemberNumber) >= 0))) return true;
+	if ((Target.AllowedInteractions == 2) && (Target.BlackList.indexOf(Source.MemberNumber) < 0) && ((ChatRoomDominantValue(Source) + 25 >= ChatRoomDominantValue(Target)) || (Target.WhiteList.indexOf(Source.MemberNumber) >= 0) || (LoversNumbers.indexOf(Source.MemberNumber) >= 0))) return true;
 
 	// At three, we allow if the source is on the whitelist of the Target or a lover
-	if ((Target.ItemPermission == 3) && ((Target.WhiteList.indexOf(Source.MemberNumber) >= 0) || (LoversNumbers.indexOf(Source.MemberNumber) >= 0))) return true;
+	if ((Target.AllowedInteractions == 3) && ((Target.WhiteList.indexOf(Source.MemberNumber) >= 0) || (LoversNumbers.indexOf(Source.MemberNumber) >= 0))) return true;
 
 	// At four, we allow if the source is a lover
-	if ((Target.ItemPermission == 4) && (LoversNumbers.indexOf(Source.MemberNumber) >= 0)) return true;
+	if ((Target.AllowedInteractions == 4) && (LoversNumbers.indexOf(Source.MemberNumber) >= 0)) return true;
 
 	// No valid combo, we don't allow the item
 	return false;

@@ -25,6 +25,8 @@ interface ServerAccountImmutableData {
 	Pose?: readonly AssetPoseName[];
 }
 
+type AllowedInteractions = 0 | 1 | 2 | 3 | 4 | 5;
+
 interface ServerAccountData extends ServerAccountImmutableData {
 	Owner?: string;
 	/**
@@ -37,7 +39,7 @@ interface ServerAccountData extends ServerAccountImmutableData {
 	BlackList: MemberNumber[];
 	FriendList: MemberNumber[];
 	WhiteList: MemberNumber[];
-	ItemPermission: 0 | 1 | 2 | 3 | 4 | 5;
+	AllowedInteractions: AllowedInteractions;
 	Skill?: Skill[];
 	Reputation?: { Type: ReputationType, Value: number }[];
 	Wardrobe?: string;
@@ -73,7 +75,9 @@ interface ServerAccountData extends ServerAccountImmutableData {
 	SavedExpressions?: ({ Group: ExpressionGroupName, CurrentExpression?: ExpressionName }[] | null)[];
 	ConfiscatedItems?: { Group: AssetGroupName, Name: string }[];
 	RoomCreateLanguage?: ServerChatRoomLanguage;
+	/** @deprecated */
 	RoomSearchLanguage?: "" | ServerChatRoomLanguage;
+	ChatSearchSettings?: ChatRoomSearchSettings;
 	LastMapData?: null | ChatRoomMapData;
 	// Unfortunately can't @deprecated individual union members
 	/** String-based values have been deprecated and are superseded by {@link ServerChatRoomSettings} objects */
@@ -223,7 +227,7 @@ type ServerChatRoomRole = "All" | "Admin" | "Whitelist";
 type ServerChatRoomGame = "" | "ClubCard" | "LARP" | "MagicBattle" | "GGTS" | "Prison";
 type ServerChatRoomBlockCategory =
 	/** Those are known as AssetCategory to the client */
-	"Medical" | "Extreme" | "Pony" | "SciFi" | "ABDL" | "Fantasy" |
+	"Medical" | "Extreme" | "Pony" | "SciFi" | "ABDL" | "Fantasy" | "Smoking" |
 	/** Those are room features */
 	"Leashing" | "Photos" | "Arousal";
 
@@ -244,14 +248,6 @@ type ServerChatRoomData = {
 	Game: ServerChatRoomGame;
 	Visibility: ServerChatRoomRole[];
 	Access: ServerChatRoomRole[];
-	/**
-	 * @deprecated Use {@link ServerChatRoomData.Visibility} instead, this is temporarily maintained for backwards compatibility
-	 */
-	Private: boolean; // TODO: Remove following completion of migration
-	/**
-	 * @deprecated Use {@link ServerChatRoomData.Access} instead, this is temporarily maintained for backwards compatibility
-	 */
-	Locked: boolean; // TODO: Remove following completion of migration
 	BlockCategory: ServerChatRoomBlockCategory[];
 	Language: ServerChatRoomLanguage;
 	Space: ServerChatRoomSpace;
@@ -462,6 +458,17 @@ interface ServerChatRoomSearchRequest {
 	ShowLocked?: boolean;
     MapTypes?: string[];
 }
+type ChatRoomSearchSettings = {
+	Language: "" | ServerChatRoomLanguage;
+	Space: ServerChatRoomSpace;
+	Game: ServerChatRoomGame;
+	FullRooms: boolean;
+	ShowLocked: boolean;
+	SearchDescriptions: boolean;
+	MapTypes: string;
+	RoomMinSize: number;
+	RoomMaxSize: number;
+}
 
 interface ServerChatRoomSearchData {
     Name: string;
@@ -478,14 +485,6 @@ interface ServerChatRoomSearchData {
     Space: ServerChatRoomSpace;
     Visibility: ServerChatRoomRole[];
 	Access: ServerChatRoomRole[];
-	/**
-	 * @deprecated Use {@link ServerChatRoomData.Visibility} instead, this is maintained for backwards compatibility
-	 */
-	Private?: boolean;
-	/**
-	 * @deprecated Use {@link ServerChatRoomData.Access} instead, this is maintained for backwards compatibility
-	 */
-	Locked?: boolean;
 	CanJoin: boolean;
     MapType: string;
 }
@@ -593,6 +592,7 @@ interface CharacterReferenceDictionaryEntry extends TaggedDictionaryEntry {
  */
 interface SourceCharacterDictionaryEntry {
 	SourceCharacter: number;
+	HasSuperPowers?: true;
 }
 
 /**
@@ -794,6 +794,17 @@ interface MapViewTeleportEventDictionaryEntry {
 }
 
 /**
+ * A dictionary entry for change key events
+ */
+interface MapViewChangeKeyEventDictionaryEntry {
+	Tag: "MapViewChangeKey";
+	/** The key to give or take. */
+	Key: "gold" | "silver" | "bronze";
+	/** Whether to give (true) or take the key (false) */
+	Bool: boolean;
+}
+
+/**
  * A dictionary entry with metadata about the chat message transmitted.
  *
  * Send with Chat and Whisper-type messages to inform the other side about the
@@ -823,7 +834,8 @@ type ChatMessageDictionaryEntry =
 	| MessageEffectEntry
 	| MsgIdDictionaryEntry
 	| ReplyIdDictionaryEntry
-	| MapViewTeleportEventDictionaryEntry;
+	| MapViewTeleportEventDictionaryEntry
+	| MapViewChangeKeyEventDictionaryEntry;
 
 
 type ChatMessageDictionary = ChatMessageDictionaryEntry[];
