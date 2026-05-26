@@ -919,6 +919,7 @@ function AccountQueryGetFriendInfo(type, account) {
 		Type: type,
 		MemberNumber: account.MemberNumber,
 		MemberName: account.Name,
+		MemberNickname: account.Nickname,
 	};
 	chatRoom: if (account.ChatRoom) {
 		if (ChatRoomRoleListIsRestrictive(account.ChatRoom.Visibility)) {
