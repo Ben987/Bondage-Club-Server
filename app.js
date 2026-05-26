@@ -908,6 +908,36 @@ function AccountUpdateEmail(data, socket) {
 }
 
 /**
+ * Construct the friend info associated with the passed account
+ * @param {"Submissive" | "Lover" | "Friend"} type The type of friend
+ * @param {Account} account The friend account
+ * @returns {ServerFriendInfo} The `OnlineFriends` query friend info
+ */
+function AccountQueryGetFriendInfo(type, account) {
+	/** @type {ServerFriendInfo} */
+	const friendInfo = {
+		Type: type,
+		MemberNumber: account.MemberNumber,
+		MemberName: account.Name,
+		MemberNickname: account.Nickname,
+	};
+	chatRoom: if (account.ChatRoom) {
+		if (ChatRoomRoleListIsRestrictive(account.ChatRoom.Visibility)) {
+			friendInfo.Private = true;
+			if (type === "Friend") {
+				// Do not show any further private room info for normal friends; only do so for lovers and submissives
+				break chatRoom;
+			}
+		}
+		friendInfo.ChatRoomSpace = account.ChatRoom.Space;
+		friendInfo.ChatRoomName = account.ChatRoom.Name;
+		friendInfo.ChatRoomMemberCount = account.ChatRoom.Account.length;
+		friendInfo.ChatRoomLimit = account.ChatRoom.Limit;
+	}
+	return friendInfo;
+}
+
+/**
  * When the client account sends a query to the server
  * @param {ServerAccountQueryRequest} data
  * @param {ServerSocket} socket
@@ -935,7 +965,7 @@ function AccountQuery(data, socket) {
 						var IsOwned = (OtherAcc.Ownership != null) && (OtherAcc.Ownership.MemberNumber != null) && (OtherAcc.Ownership.MemberNumber == Acc.MemberNumber);
 						var IsLover = LoversNumbers.indexOf(Acc.MemberNumber) >= 0;
 						if (IsOwned || IsLover) {
-							Friends.push({ Type: IsOwned ? "Submissive" : "Lover", MemberNumber: OtherAcc.MemberNumber, MemberName: OtherAcc.Name, ChatRoomSpace: (OtherAcc.ChatRoom == null) ? null : OtherAcc.ChatRoom.Space, ChatRoomName: (OtherAcc.ChatRoom == null) ? null : OtherAcc.ChatRoom.Name, Private: (OtherAcc.ChatRoom && ChatRoomRoleListIsRestrictive(OtherAcc.ChatRoom.Visibility)) ? true : undefined });
+							Friends.push(AccountQueryGetFriendInfo(IsOwned ? "Submissive" : "Lover", OtherAcc));
 							Index.push(OtherAcc.MemberNumber);
 						}
 					}
@@ -948,7 +978,7 @@ function AccountQuery(data, socket) {
 							for (const OtherAcc of Account)
 								if (OtherAcc.MemberNumber == Acc.FriendList[F]) {
 									if ((OtherAcc.Environment == Acc.Environment) && (OtherAcc.FriendList != null) && (OtherAcc.FriendList.indexOf(Acc.MemberNumber) >= 0))
-										Friends.push({ Type: "Friend", MemberNumber: OtherAcc.MemberNumber, MemberName: OtherAcc.Name, ChatRoomSpace: ((OtherAcc.ChatRoom != null) && !ChatRoomRoleListIsRestrictive(OtherAcc.ChatRoom.Visibility)) ? OtherAcc.ChatRoom.Space : null, ChatRoomName: (OtherAcc.ChatRoom == null) ? null : (ChatRoomRoleListIsRestrictive(OtherAcc.ChatRoom.Visibility)) ? null : OtherAcc.ChatRoom.Name, Private: (OtherAcc.ChatRoom && ChatRoomRoleListIsRestrictive(OtherAcc.ChatRoom.Visibility)) ? true : undefined });
+										Friends.push(AccountQueryGetFriendInfo("Friend", OtherAcc));
 									break;
 								}
 

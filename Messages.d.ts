@@ -340,8 +340,11 @@ interface ServerFriendInfo {
     Type: "Friend" | "Submissive" | "Lover";
     MemberNumber: number;
     MemberName: string;
+	MemberNickname?: string;
     ChatRoomSpace?: ServerChatRoomSpace | null;
     ChatRoomName?: string | null;
+    ChatRoomLimit?: number;
+    ChatRoomMemberCount?: number;
     Private?: true | undefined;
 }
 
