@@ -721,6 +721,7 @@ async function AccountLoginProcess(socket, AccountName, Password) {
  * @returns {boolean}
  */
 function ObjectEmpty(obj) {
+	if ((obj == null) || typeof obj != "object") return true;
 	for(var key in obj)
 		if (obj.hasOwnProperty(key))
 			return false;
