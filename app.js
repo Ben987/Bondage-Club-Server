@@ -846,7 +846,7 @@ function AccountUpdate(data, socket) {
 				if ((Acc != null) && !ObjectEmpty(data)) {
 					Database.collection(AccountCollection).updateOne({ AccountName : Acc.AccountName }, { $set: data }, 
 						function(err, doc) {
-							console.log("Error while updating account: " + Acc.AccountName + " with message: " + err.message);
+							if (err) console.log("Error while updating account: " + Acc.AccountName + " with message: " + err.message);
 						});
 				}
 				break;
