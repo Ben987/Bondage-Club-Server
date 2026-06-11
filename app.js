@@ -843,7 +843,13 @@ function AccountUpdate(data, socket) {
 				delete data.MapData;
 
 				// If we have data to push
-				if ((Acc != null) && !ObjectEmpty(data)) Database.collection(AccountCollection).updateOne({ AccountName : Acc.AccountName }, { $set: data }, function(err, res) { if (err) throw err; });
+				if ((Acc != null) && !ObjectEmpty(data)) {
+					try {
+						Database.collection(AccountCollection).updateOne({ AccountName : Acc.AccountName }, { $set: data }, function(err, res) { if (err) throw err; });
+					} catch(error) {
+						console.log("Error while updating account: " + Acc.AccountName + " with message: " + error.message);
+					}
+				}
 				break;
 
 			}
