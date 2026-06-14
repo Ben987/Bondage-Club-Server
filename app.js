@@ -965,7 +965,7 @@ function AccountQuery(data, socket) {
 				for (const OtherAcc of Account) {
 					var LoversNumbers = [];
 					for (var L = 0; L < OtherAcc.Lovership.length; L++) {
-						if (OtherAcc.Lovership[L].MemberNumber != null) { LoversNumbers.push(OtherAcc.Lovership[L].MemberNumber); }
+						if ((OtherAcc.Lovership[L] != null) && (OtherAcc.Lovership[L].MemberNumber != null)) { LoversNumbers.push(OtherAcc.Lovership[L].MemberNumber); }
 					}
 					if (OtherAcc.Environment == Acc.Environment) {
 						var IsOwned = (OtherAcc.Ownership != null) && (OtherAcc.Ownership.MemberNumber != null) && (OtherAcc.Ownership.MemberNumber == Acc.MemberNumber);
