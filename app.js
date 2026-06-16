@@ -89,7 +89,8 @@ const ROOM_LIMIT_MINIMUM = 2; // The minimum number of players in an online chat
 const ROOM_LIMIT_MAXIMUM = 20; // The maximum number of players in an online chat room
 
 // Limits the number of accounts created on each hour & day
-var AccountCreationIP = [];
+/** @type {{ Address: string, Time: number }[]} */
+const AccountCreationIP = [];
 const MAX_IP_ACCOUNT_PER_DAY = parseInt(process.env.MAX_IP_ACCOUNT_PER_DAY, 10) || 12;
 const MAX_IP_ACCOUNT_PER_HOUR = parseInt(process.env.MAX_IP_ACCOUNT_PER_HOUR, 10) || 4;
 
@@ -176,7 +177,7 @@ const IPConnections = new Map();
 // These regex must be kept in sync with the client
 const ServerAccountEmailRegex = /^[a-zA-Z0-9@.!#$%&'*+/=?^_`{|}~-]{5,100}$/;
 const ServerAccountNameRegex = /^[a-zA-Z0-9]{1,20}$/;
-const ServerAccountPasswordRegex = /^[a-zA-Z0-9]{1,20}$/;
+const ServerAccountPasswordRegex = /^[a-zA-Z0-9`~!@#$%^&*()_\-+={}|[\]:";'<>?,.]{1,100}$/;
 const ServerAccountResetNumberRegex = /^[0-9]{1,20}$/;
 const ServerCharacterNameRegex = /^[a-zA-Z ]{1,20}$/;
 const ServerCharacterNicknameRegex = /^[\p{L}\p{Nd}\p{Z}'-]+$/u;
@@ -417,107 +418,104 @@ function CommonParseInt(thing, defaultValue = 0, base = 10) {
  * @param {ServerSocket} socket
  */
 function AccountCreate(data, socket) {
-
 	// Makes sure the account comes with a name and a password
-	if ((data != null) && (typeof data === "object") && (data.Name != null) && (data.AccountName != null) && (data.Password != null) && (data.Email != null) && (typeof data.Name === "string") && (typeof data.AccountName === "string") && (typeof data.Password === "string") && (typeof data.Email === "string")) {
+	if (!CommonIsObject(data) || typeof data.Name !== "string" || typeof data.AccountName !== "string" || typeof data.Email !== "string" || typeof data.Password !== "string") {
+		socket.emit("CreationResponse", "Invalid account information");
+		return;
+	}
 
-		// Makes sure the data is valid
-		if (data.Name.match(ServerCharacterNameRegex) && data.AccountName.match(ServerAccountNameRegex) && data.Password.match(ServerAccountPasswordRegex) && (CommonEmailIsValid(data.Email) || data.Email == "") && (data.Email.length <= 100)) {
+	// Makes sure the data is valid
+	if (!data.Name.match(ServerCharacterNameRegex)
+		|| !data.AccountName.match(ServerAccountNameRegex)
+		|| !data.Password.match(ServerAccountPasswordRegex)
+		|| data.Email !== "" && !CommonEmailIsValid(data.Email)) {
+			socket.emit("CreationResponse", "Invalid account information");
+			return;
+	}
 
-			// Gets the current IP Address that's creating the account
-			/** @type {string} */
-			let CurrentIP = socket.conn.remoteAddress;
-			if (IP_CONNECTION_PROXY_HEADER && typeof socket.handshake.headers[IP_CONNECTION_PROXY_HEADER] === "string") {
-				const hops = /** @type {string} */ (socket.handshake.headers[IP_CONNECTION_PROXY_HEADER]).split(",");
-				CurrentIP = hops[hops.length-1].trim();
+	// Gets the current IP Address that's creating the account
+	/** @type {string} */
+	let CurrentIP = socket.conn.remoteAddress;
+	if (IP_CONNECTION_PROXY_HEADER && typeof socket.handshake.headers[IP_CONNECTION_PROXY_HEADER] === "string") {
+		const hops = /** @type {string} */ (socket.handshake.headers[IP_CONNECTION_PROXY_HEADER]).split(",");
+		CurrentIP = hops[hops.length-1].trim();
+	}
+
+	// If the IP is valid
+	if ((CurrentIP != null) && (CurrentIP != "")) {
+		// Checks the number of account created in total and in the last hour by this IP
+		let CurrentTime = CommonTime();
+		let TotalCount = 0;
+		let HourCount = 0;
+		for (let IP of AccountCreationIP)
+			if (IP.Address === CurrentIP) {
+				TotalCount++;
+				if (IP.Time >= CurrentTime - 3600000) HourCount++;
 			}
 
-			// If the IP is valid
-			if ((CurrentIP != null) && (CurrentIP != "")) {
+		/*var mailOptions = {
+			from: "donotreply@bondageprojects.com",
+			to: process.env.EMAIL_ADMIN || "",
+			subject: "Bondage Club Server Info",
+			html: "IP: " + CurrentIP + " is creating account: " + data.AccountName + " at time: " + CommonTime().toString() + "<br />TotalCount: " + TotalCount.toString() + "<br />MAX_IP_ACCOUNT_PER_DAY: " + MAX_IP_ACCOUNT_PER_DAY.toString() + "<br />HourCount: " + HourCount.toString() + "<br />MAX_IP_ACCOUNT_PER_HOUR: " + MAX_IP_ACCOUNT_PER_HOUR.toString()
+		};
+		MailTransporter.sendMail(mailOptions, function (err, info) {});*/
 
-				// Checks the number of account created in total and in the last hour by this IP
-				let CurrentTime = CommonTime();
-				let TotalCount = 0;
-				let HourCount = 0;
-				for (let IP of AccountCreationIP)
-					if (IP.Address === CurrentIP) {
-						TotalCount++;
-						if (IP.Time >= CurrentTime - 3600000) HourCount++;
-					}
-
-				/*var mailOptions = {
-					from: "donotreply@bondageprojects.com",
-					to: process.env.EMAIL_ADMIN || "",
-					subject: "Bondage Club Server Info",
-					html: "IP: " + CurrentIP + " is creating account: " + data.AccountName + " at time: " + CommonTime().toString() + "<br />TotalCount: " + TotalCount.toString() + "<br />MAX_IP_ACCOUNT_PER_DAY: " + MAX_IP_ACCOUNT_PER_DAY.toString() + "<br />HourCount: " + HourCount.toString() + "<br />MAX_IP_ACCOUNT_PER_HOUR: " + MAX_IP_ACCOUNT_PER_HOUR.toString()
-				};
-				MailTransporter.sendMail(mailOptions, function (err, info) {});*/
-
-				// Exits if we reached the limit
-				if ((TotalCount >= MAX_IP_ACCOUNT_PER_DAY) || (HourCount >= MAX_IP_ACCOUNT_PER_HOUR)) {
-					socket.emit("CreationResponse", "New accounts per day exceeded");
-					return;
-				}
-
-				// Keeps the IP in memory for the next run
-				AccountCreationIP.push({ Address: CurrentIP, Time: CurrentTime });
-
-			}
-
-			// Checks if the account already exists
-			data.AccountName = data.AccountName.toUpperCase();
-			Database.collection(AccountCollection).findOne({ AccountName : data.AccountName }, function(err, result) {
-
-				// Makes sure the result is null so the account doesn't already exists
-				if (err) throw err;
-				if (result != null) {
-					socket.emit("CreationResponse", "Account already exists");
-				} else {
-
-					// Creates a hashed password and saves it with the account info
-					BCrypt.hash(data.Password.toUpperCase(), 10, function( err, hash ) {
-						if (err) throw err;
-						let account = /** @type {Account} */ ({
-							// ID and Socket are special; they're used at runtime but cannot be
-							// persisted to the database so they're set after that happens.
-							AccountName: data.AccountName,
-							Email: data.Email,
-							Password: hash,
-							// Use the next member number and bump it
-							MemberNumber: NextMemberNumber++,
-							Name: data.Name,
-							Money: 100,
-							Creation: CommonTime(),
-							LastLogin: CommonTime(),
-							Environment: AccountGetEnvironment(socket),
-							Lovership: [],
-							ItemPermission: 2,
-							FriendList: [],
-							WhiteList: [],
-							BlackList: [],
-						});
-						Database.collection(AccountCollection).insertOne(account, function(err, res) {
-							if (err) throw err;
-							account.ID = socket.id;
-							account.Socket = socket;
-							console.log("Creating new account: " + account.AccountName + " ID: " + socket.id + " " + account.Environment);
-							AccountValidData(account);
-							Account.push(account);
-							OnLogin(socket);
-							socket.emit("CreationResponse", { ServerAnswer: "AccountCreated", OnlineID: account.ID, MemberNumber: account.MemberNumber } );
-							AccountSendServerInfo(socket);
-							AccountPurgeInfo(data);
-						});
-					});
-
-				}
-
-			});
-
+		// Exits if we reached the limit
+		if ((TotalCount >= MAX_IP_ACCOUNT_PER_DAY) || (HourCount >= MAX_IP_ACCOUNT_PER_HOUR)) {
+			socket.emit("CreationResponse", "New accounts per day exceeded");
+			return;
 		}
 
-	} else socket.emit("CreationResponse", "Invalid account information");
+		// Keeps the IP in memory for the next run
+		AccountCreationIP.push({ Address: CurrentIP, Time: CurrentTime });
+	}
 
+	// Checks if the account already exists
+	data.AccountName = data.AccountName.toUpperCase();
+	Database.collection(AccountCollection).findOne({ AccountName: data.AccountName }, async function(err, result) {
+
+		// Makes sure the result is null so the account doesn't already exists
+		if (err) throw err;
+		if (result != null) {
+			socket.emit("CreationResponse", "Account already exists");
+			return;
+		}
+
+		// Creates a hashed password and saves it with the account info
+		const hash = await BCrypt.hash(data.Password, 10);
+		let account = /** @type {Account} */ ({
+			// ID and Socket are special; they're used at runtime but cannot be
+			// persisted to the database so they're set after that happens.
+			AccountName: data.AccountName,
+			Email: data.Email,
+			Password: hash,
+			// Use the next member number and bump it
+			MemberNumber: NextMemberNumber++,
+			Name: data.Name,
+			Money: 100,
+			Creation: CommonTime(),
+			LastLogin: CommonTime(),
+			Environment: AccountGetEnvironment(socket),
+			Lovership: [],
+			ItemPermission: 2,
+			FriendList: [],
+			WhiteList: [],
+			BlackList: [],
+		});
+		Database.collection(AccountCollection).insertOne(account, function(err, res) {
+			if (err) throw err;
+			account.ID = socket.id;
+			account.Socket = socket;
+			console.log("Creating new account: " + account.AccountName + " ID: " + socket.id + " " + account.Environment);
+			AccountValidData(account);
+			Account.push(account);
+			OnLogin(socket);
+			socket.emit("CreationResponse", { ServerAnswer: "AccountCreated", OnlineID: account.ID, MemberNumber: account.MemberNumber } );
+			AccountSendServerInfo(socket);
+			AccountPurgeInfo(data);
+		});
+	});
 }
 
 /**
@@ -654,6 +652,8 @@ function AccountRemoveFromChatRoom(MemberNumber) {
  * @param {string} Password
  */
 async function AccountLoginProcess(socket, AccountName, Password) {
+	if (!socket.connected) return;
+
 	// Checks if there's an account that matches the name
 	/** @type {Account|null} */
 	const result = await Database.collection(AccountCollection).findOne({ AccountName });
@@ -664,14 +664,22 @@ async function AccountLoginProcess(socket, AccountName, Password) {
 		return;
 	}
 
-	// Compare the password to its hashed version
-	const res = await BCrypt.compare(Password.toUpperCase(), result.Password);
-
-	if (!socket.connected) return;
-	if (!res) {
+	// All of the password checking
+	if (await BCrypt.compare(Password, result.Password)) {
+		// All good
+	} else if (await BCrypt.compare(Password.toUpperCase(), result.Password)) {
+		if (Password !== result.Password) {
+			// casing is different, upgrade stored version **assuming** this is the casing people use generally
+			result.Password = await BCrypt.hash(Password, 10);
+			await Database.collection(AccountCollection).update({ AccountName }, { $set: { Password: result.Password } });
+		}
+	} else {
+		if (!socket.connected) return;
 		socket.emit("LoginResponse", "InvalidNamePassword");
 		return;
 	}
+
+	if (!socket.connected) return;
 
 	// Disconnect duplicated logged accounts
 	for (const Acc of Account) {
@@ -2261,54 +2269,62 @@ function PasswordResetSetNumber(AccountName, ResetNumber) {
  * @param {ServerPasswordResetRequest} data
  * @param {ServerSocket} socket
  */
-function PasswordReset(data, socket) {
-	if ((data != null) && (typeof data === "string") && (data != "") && CommonEmailIsValid(data)) {
-
-		// One email reset password per 5 seconds to prevent flooding
-		if (NextPasswordReset > CommonTime()) return socket.emit("PasswordResetResponse", "RetryLater");
-		NextPasswordReset = CommonTime() + 5000;
-
-		// Gets all accounts that matches the email
-		Database.collection(AccountCollection).find({ Email : data }).toArray(function(err, result) {
-
-			// If we found accounts with that email
-			if (err) throw err;
-			if ((result != null) && (typeof result === "object") && (result.length > 0)) {
-
-				// Builds a reset number for each account found and creates the email body
-				var EmailBody = "To reset your account password, enter your account name and the reset number included in this email.  You need to put these in the Bondage Club password reset screen, with your new password.<br /><br />";
-				for (const res of result) {
-					var ResetNumber = (Math.round(Math.random() * 1000000000000)).toString();
-					PasswordResetSetNumber(res.AccountName, ResetNumber);
-					EmailBody = EmailBody + "Account Name: " + res.AccountName + "<br />";
-					EmailBody = EmailBody + "Reset Number: " + ResetNumber + "<br /><br />";
-				}
-
-				// Prepares the email to be sent
-				var mailOptions = {
-					from: "donotreply@bondageprojects.com",
-					to: result[0].Email,
-					subject: "Bondage Club Password Reset",
-					html: EmailBody
-				};
-
-				// Sends the email and logs the result
-				MailTransporter.sendMail(mailOptions, function (err, info) {
-					if (err) {
-						console.log("Error while sending password reset email: " + err);
-						socket.emit("PasswordResetResponse", "EmailSentError");
-					}
-					else {
-						console.log("Password reset email send to: " + result[0].Email);
-						socket.emit("PasswordResetResponse", "EmailSent");
-					}
-				});
-
-			} else socket.emit("PasswordResetResponse", "NoAccountOnEmail");
-
-		});
-
+async function PasswordReset(data, socket) {
+	if (typeof data !== "string" || !CommonEmailIsValid(data)) {
+		// socket.emit("PasswordResetResponse", "InvalidEmail");
+		return;
 	}
+
+	// One email reset password per 5 seconds to prevent flooding
+	if (NextPasswordReset > CommonTime()) {
+		socket.emit("PasswordResetResponse", "RetryLater");
+		return;
+	}
+	NextPasswordReset = CommonTime() + 5000;
+
+	function escapeRegex(string) {
+		return string.replace(/[/\-\\^$*+?.()|[\]{}]/g, '\\$&');
+	}
+
+	let count = 0;
+	let didError = false;
+	// Gets all accounts that matches the email
+	let emailRegex = new RegExp(`^${escapeRegex(data)}$`, "i");
+	const cursor = await Database.collection(AccountCollection).find({ Email: emailRegex }, { projection: { AccountName: 1, Email: 1 } });
+	for (const account of await cursor.toArray()) {
+		try {
+			count++;
+
+			// Generate a reset number for each account found and creates the email body
+			const resetNumber = base64id.generateId();
+
+			// Sends the email and logs the result
+			await MailTransporter.sendMail({
+				from: "donotreply@bondageprojects.com",
+				to: account.Email,
+				subject: "Bondage Club Password Reset",
+				html: `To reset your account password, enter your account name and the reset number included in this email. `
+				+ `You need to put these in the Bondage Club password reset screen, with your new password.<br /><br />`
+				+ `Account Name: ${account.AccountName}<br />`
+				+ `Reset Number: ${resetNumber}<br /><br />`,
+			});
+			console.log(`Password reset email send to: ${account.Email}`);
+			PasswordResetSetNumber(account.AccountName, resetNumber);
+		} catch (err) {
+			console.log("Error while sending password reset email: ", err);
+			didError = true;
+		}
+	}
+
+	if (count === 0) {
+		socket.emit("PasswordResetResponse", "NoAccountOnEmail");
+		return;
+	}
+	if (didError) {
+		socket.emit("PasswordResetResponse", "EmailSentError");
+		return;
+	}
+	socket.emit("PasswordResetResponse", "EmailSent");
 }
 
 /**
@@ -2317,31 +2333,32 @@ function PasswordReset(data, socket) {
  * @param {ServerSocket} socket
  */
 function PasswordResetProcess(data, socket) {
-	if ((data != null) && (typeof data === "object") && (data.AccountName != null) && (typeof data.AccountName === "string") && (data.ResetNumber != null) && (typeof data.ResetNumber === "string") && (data.NewPassword != null) && (typeof data.NewPassword === "string")) {
+	if (!CommonIsObject(data) || typeof data.AccountName !== "string" || typeof data.ResetNumber !== "string" || typeof data.NewPassword !== "string") {
+		socket.emit("PasswordResetResponse", "InvalidPasswordResetInfo");
+		return;
+	}
 
-		// Makes sure the data is valid
-		if (data.AccountName.match(ServerAccountNameRegex) && data.NewPassword.match(ServerAccountPasswordRegex)) {
+	// Makes sure the data is valid
+	if (!data.AccountName.match(ServerAccountNameRegex) || !data.NewPassword.match(ServerAccountPasswordRegex)) {
+		socket.emit("PasswordResetResponse", "InvalidPasswordResetInfo");
+		return;
+	}
 
-			// Checks if the reset number matches
-			for (const PasswordReset of PasswordResetProgress)
-				if ((PasswordReset.AccountName == data.AccountName) && (PasswordReset.ResetNumber == data.ResetNumber)) {
+	// Find the request for that account and number
+	const resetRequest = PasswordResetProgress.find(req => req.AccountName === data.AccountName && req.ResetNumber === data.ResetNumber);
+	if (!resetRequest) {
+		// Sends a fail message to the client
+		socket.emit("PasswordResetResponse", "InvalidPasswordResetInfo");
+		return;
+	}
 
-					// Creates a hashed password and updates the account with it
-					BCrypt.hash(data.NewPassword.toUpperCase(), 10, function( err, hash ) {
-						if (err) throw err;
-						console.log("Updating password for account: " + data.AccountName);
-						Database.collection(AccountCollection).updateOne({ AccountName : data.AccountName }, { $set: { Password: hash } }, function(err, res) { if (err) throw err; });
-						socket.emit("PasswordResetResponse", "PasswordResetSuccessful");
-					});
-					return;
-				}
-
-			// Sends a fail message to the client
-			socket.emit("PasswordResetResponse", "InvalidPasswordResetInfo");
-
-		} else socket.emit("PasswordResetResponse", "InvalidPasswordResetInfo");
-
-	} else socket.emit("PasswordResetResponse", "InvalidPasswordResetInfo");
+	// Creates a hashed password and updates the account with it
+	BCrypt.hash(data.NewPassword, 10, function(err, hash) {
+		if (err) throw err;
+		console.log("Updating password for account: " + data.AccountName);
+		Database.collection(AccountCollection).updateOne({ AccountName: data.AccountName }, { $set: { Password: hash } }, function(err, res) { if (err) throw err; });
+		socket.emit("PasswordResetResponse", "PasswordResetSuccessful");
+	});
 }
 
 /**
