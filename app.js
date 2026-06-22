@@ -1,6 +1,7 @@
 "use strict";
 require('newrelic');
 const base64id = require("base64id");
+const crypto = require('crypto');
 
 // Reads the SSL key and certificate, if there's no file available, we switch to regular http
 /*var SyncRequest = require("sync-request");
@@ -2278,7 +2279,7 @@ function PasswordReset(data, socket) {
 				// Builds a reset number for each account found and creates the email body
 				var EmailBody = "To reset your account password, enter your account name and the reset number included in this email.  You need to put these in the Bondage Club password reset screen, with your new password.<br /><br />";
 				for (const res of result) {
-					var ResetNumber = (Math.round(Math.random() * 1000000000000)).toString();
+					var ResetNumber = (crypto.randomBytes(6).readUIntBE(0, 6) % 1000000000000).toString();
 					PasswordResetSetNumber(res.AccountName, ResetNumber);
 					EmailBody = EmailBody + "Account Name: " + res.AccountName + "<br />";
 					EmailBody = EmailBody + "Reset Number: " + ResetNumber + "<br /><br />";
