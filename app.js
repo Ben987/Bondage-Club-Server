@@ -180,7 +180,7 @@ const ServerAccountNameRegex = /^[a-zA-Z0-9]{1,20}$/;
 const ServerAccountPasswordRegex = /^[a-zA-Z0-9]{1,20}$/;
 const ServerAccountResetNumberRegex = /^[0-9]{1,20}$/;
 const ServerCharacterNameRegex = /^[a-zA-Z ]{1,20}$/;
-const ServerCharacterNicknameRegex = /^[\p{L}\p{Nd}\p{Z}'-]+$/u;
+const ServerCharacterNicknameRegex = /^[\p{L}\p{Nd}\p{Z}'\-]{1,20}$/u;
 const ServerChatRoomNameRegex = /^[\x20-\x7E]{1,20}$/;
 const ServerChatMessageMaxLength = 2000;
 const ServerChatRoomDescriptionMaxLength = 300;
@@ -805,7 +805,11 @@ function AccountUpdate(data, socket) {
 					delete data.Lover;
 				}
 				if ((data.Title != null)) Acc.Title = data.Title;
-				if ((data.Nickname != null)) Acc.Nickname = data.Nickname;
+				if (data.Nickname === null) {
+					Acc.Nickname = null;
+				} else if (typeof data.Nickname === "string" && data.Nickname.match(ServerCharacterNicknameRegex)) {
+					Acc.Nickname = data.Nickname;
+				}
 				if ((data.Crafting != null)) Acc.Crafting = data.Crafting;
 
 				// Some changes should be synched to other players in chatroom
