@@ -809,6 +809,8 @@ function AccountUpdate(data, socket) {
 					Acc.Nickname = null;
 				} else if (typeof data.Nickname === "string" && data.Nickname.match(ServerCharacterNicknameRegex)) {
 					Acc.Nickname = data.Nickname;
+				} else {
+					delete data.Nickname;
 				}
 				if ((data.Crafting != null)) Acc.Crafting = data.Crafting;
 
