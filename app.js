@@ -180,7 +180,7 @@ const ServerAccountNameRegex = /^[a-zA-Z0-9]{1,20}$/;
 const ServerAccountPasswordRegex = /^[a-zA-Z0-9]{1,20}$/;
 const ServerAccountResetNumberRegex = /^[0-9]{1,20}$/;
 const ServerCharacterNameRegex = /^[a-zA-Z ]{1,20}$/;
-const ServerCharacterNicknameRegex = /^[\p{L}\p{Nd}\p{Z}'-]+$/u;
+const ServerCharacterNicknameRegex = /^[\p{L}\p{Nd}\p{Z}'\-]{1,20}$/u;
 const ServerChatRoomNameRegex = /^[\x20-\x7E]{1,20}$/;
 const ServerChatMessageMaxLength = 2000;
 const ServerChatRoomDescriptionMaxLength = 300;
@@ -825,11 +825,18 @@ function AccountUpdate(data, socket) {
 					delete data.Lover;
 				}
 				if ((data.Title != null)) Acc.Title = data.Title;
-				if ((data.Nickname != null)) Acc.Nickname = data.Nickname;
+				if (data.Nickname === null) {
+					Acc.Nickname = null;
+				} else if (typeof data.Nickname === "string" && data.Nickname.match(ServerCharacterNicknameRegex)) {
+					Acc.Nickname = data.Nickname;
+				} else {
+					delete data.Nickname;
+				}
 				if ((data.Crafting != null)) Acc.Crafting = data.Crafting;
 
 				// Some changes should be synched to other players in chatroom
-				if ((Acc != null) && Acc.ChatRoom && /** @type {(keyof Account)[]} */ (["MapData", "Title", "Nickname", "Crafting", "Reputation", "Description", "LabelColor", "ItemPermission", "InventoryData", "BlockItems", "LimitedItems", "FavoriteItems", "OnlineSharedSettings", "WhiteList", "BlackList"]).some(k => data[k] != null))
+				const shouldSync = /** @type {(keyof Account)[]} */ (["MapData", "Title", "Nickname", "Crafting", "Reputation", "Description", "LabelColor", "ItemPermission", "InventoryData", "BlockItems", "LimitedItems", "FavoriteItems", "OnlineSharedSettings", "WhiteList", "BlackList"]).some(k => k in data);
+				if ((Acc != null) && Acc.ChatRoom && shouldSync)
 					ChatRoomSyncCharacter(Acc.ChatRoom, Acc.MemberNumber, Acc.MemberNumber);
 
 				// If only the appearance is updated, we keep the change in memory and do not update the database right away
