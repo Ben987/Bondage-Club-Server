@@ -730,6 +730,23 @@ function ObjectEmpty(obj) {
 }
 
 /**
+ * Deep search for all properties starting with `$` (reserved by mongo) and delete them.
+ * @param {unknown} obj 
+ */
+function SanitizeNames(obj) {
+    if (obj === null || typeof obj !== "object") {
+        return;
+    }
+    for (const [k, v] of Object.entries(obj)) {
+        if (k.startsWith("$")) {
+            delete obj[k];
+        } else {
+            SanitizeNames(v);
+        }
+    }
+}
+
+/**
  * Updates any account data except the basic ones that cannot change
  * @param {Partial<Account>} data
  * @param {ServerSocket} socket
@@ -763,6 +780,9 @@ function AccountUpdate(data, socket) {
 				delete data.DelayedAppearanceUpdate;
 				delete data.DelayedSkillUpdate;
 				delete data.DelayedGameUpdate;
+
+				// Make sure the object doesn't have any property that starts with a $, to prevent a MongoDB crash
+				SanitizeNames(data);
 
 				// Some data is kept for future use
 				if (data.InventoryData != null) Acc.InventoryData = data.InventoryData;
