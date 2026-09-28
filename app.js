@@ -35,12 +35,17 @@ const socketio = require("socket.io");
 /** @type {Partial<import("socket.io").ServerOptions>} */
 var Options = {
 	maxHttpBufferSize: 180000,
-	pingTimeout: 30000,
-	pingInterval: 50000,
+	pingTimeout: 60000,
+	pingInterval: 25000,
 	upgradeTimeout: 30000,
 	serveClient: false,
 	httpCompression: true,
-	perMessageDeflate: true,
+	perMessageDeflate: {
+		threshold: 4096,
+		serverNoContextTakeover: true,
+		clientNoContextTakeover: true,
+		zlibDeflateOptions: { level: 1, memLevel: 7 }
+	},
 	allowEIO3: false,
 	secure: UseSecure
 };
