@@ -21,7 +21,7 @@
     "bcrypt": "^6.0.0",
     "mongodb": "^3.7.4",
     "newrelic": "^14.1.0",
-    "nodemailer": "^9.0.1",
+    "nodemailer": "^10.0.9",
     "socket.io": "^4.8.0"
   },
   "devDependencies": {
