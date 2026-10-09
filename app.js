@@ -2539,7 +2539,7 @@ function AccountOwnership(data, socket) {
 				) {
 					if (data.Action === "Accept") {
 						Acc.Owner = TargetAcc.Name;
-						Acc.Ownership = { MemberNumber: data.MemberNumber, Name: TargetAcc.Name, Start: CommonTime(), Stage: 1 };
+						Acc.Ownership = { MemberNumber: data.MemberNumber, Name: TargetAcc.Name, Start: Acc.Ownership?.Start ?? CommonTime(), Stage: 1 };
 						let O = { Ownership: Acc.Ownership, Owner: Acc.Owner };
 						Database.collection(AccountCollection).updateOne({ AccountName : Acc.AccountName }, { $set: O }, function(err, res) { if (err) throw err; });
 						socket.emit("AccountOwnership", O);
