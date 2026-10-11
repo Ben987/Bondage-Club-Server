@@ -92,8 +92,6 @@ const IP_CONNECTION_PROXY_HEADER = "x-forwarded-for"; // Header with real IP, if
 const ROOM_LIMIT_DEFAULT = 10; // The default number of players in an online chat room
 const ROOM_LIMIT_MINIMUM = 2; // The minimum number of players in an online chat room
 const ROOM_LIMIT_MAXIMUM = 20; // The maximum number of players in an online chat room
-const ROOM_BOT_SLOTS_DEFAULT = 0; // By default rooms have no reserved bot slots
-const ROOM_BOT_SLOTS_MAXIMUM = 10; // Maximum number of bot slots a room can reserve
 
 // Limits the number of accounts created on each hour & day
 var AccountCreationIP = [];
@@ -589,7 +587,7 @@ function AccountLogin(data, socket) {
 	if (pendingLogins.has(socket)) return;
 
 	const shouldRun = loginQueue.length === 0;
-	loginQueue.push([socket, data.AccountName.toUpperCase(), data.Password]);
+	loginQueue.push([socket, data.AccountName.toUpperCase(), data.Password, data.IsBot === true]);
 	pendingLogins.add(socket);
 
 	if (loginQueue.length > 16) {
@@ -660,7 +658,7 @@ function AccountRemoveFromChatRoom(MemberNumber) {
  * @param {string} AccountName The username the user is trying to log in with
  * @param {string} Password
  */
-async function AccountLoginProcess(socket, AccountName, Password) {
+async function AccountLoginProcess(socket, AccountName, Password, IsBot) {
 	// Checks if there's an account that matches the name
 	/** @type {Account|null} */
 	const result = await Database.collection(AccountCollection).findOne({ AccountName });
@@ -708,6 +706,7 @@ async function AccountLoginProcess(socket, AccountName, Password) {
 	// Logs the account
 	result.ID = socket.id;
 	result.Environment = AccountGetEnvironment(socket);
+	result.IsBot = IsBot;
 	//console.log("Login account: " + result.AccountName + " ID: " + socket.id + " " + result.Environment);
 	AccountValidData(result);
 	AccountRemoveFromChatRoom(result.MemberNumber);
@@ -971,7 +970,7 @@ function AccountQueryGetFriendInfo(type, account) {
 		}
 		friendInfo.ChatRoomSpace = account.ChatRoom.Space;
 		friendInfo.ChatRoomName = account.ChatRoom.Name;
-		friendInfo.ChatRoomMemberCount = account.ChatRoom.Account.filter(A => !A.OnlineSharedSettings?.IsBot).length;
+		friendInfo.ChatRoomMemberCount = account.ChatRoom.Account.filter(A => !A.IsBot).length;
 		friendInfo.ChatRoomLimit = account.ChatRoom.Limit;
 	}
 	return friendInfo;
@@ -1205,7 +1204,7 @@ function ChatRoomSearch(data, socket) {
 		if (Game !== "" && room.Game !== Game) continue;
 
 		// The room is full and we don't want those, skip
-		const roomHumanCount = room.Account.filter(A => !A.OnlineSharedSettings?.IsBot).length;
+		const roomHumanCount = room.Account.filter(A => !A.IsBot).length;
 		if (roomHumanCount >= room.Limit && !FullRooms) continue;
 
 		// Room isn't in the correct space, skip
@@ -1280,10 +1279,8 @@ function ChatRoomSearchAddResult(Acc, room) {
 		Creator: room.Creator,
 		CreatorMemberNumber: room.CreatorMemberNumber,
 		Creation: room.Creation,
-		MemberCount: room.Account.filter(A => !A.OnlineSharedSettings?.IsBot).length,
+		MemberCount: room.Account.filter(A => !A.IsBot).length,
 		MemberLimit: room.Limit,
-		BotCount: room.Account.filter(A => A.OnlineSharedSettings?.IsBot).length,
-		BotLimit: room.BotSlots ?? 0,
 		Description: room.Description,
 		BlockCategory: room.BlockCategory,
 		Game: room.Game,
@@ -1368,10 +1365,6 @@ function ChatRoomCreate(data, socket) {
 			let Limit = CommonParseInt(data.Limit, ROOM_LIMIT_DEFAULT);
 			if (Limit < ROOM_LIMIT_MINIMUM || Limit > ROOM_LIMIT_MAXIMUM) Limit = ROOM_LIMIT_DEFAULT;
 
-			// Makes sure the bot slots value is valid
-			let BotSlots = CommonParseInt(data.BotSlots, ROOM_BOT_SLOTS_DEFAULT);
-			if (BotSlots < 0 || BotSlots > ROOM_BOT_SLOTS_MAXIMUM) BotSlots = ROOM_BOT_SLOTS_DEFAULT;
-
 			// Prepares the room object
 			ChatRoomRemove(Acc, "ServerLeave", []);
 			/** @type {Chatroom} */
@@ -1383,7 +1376,6 @@ function ChatRoomCreate(data, socket) {
 				Background: data.Background,
 				Custom: data.Custom,
 				Limit: Limit,
-				BotSlots: BotSlots,
 				Visibility: data.Visibility,
 				Access: data.Access,
 				Private: data.Private || false,
@@ -1433,11 +1425,8 @@ function ChatRoomJoin(data, socket) {
 			for (const Room of ChatRoom)
 				if (Room.Name.toUpperCase().trim() == data.Name.toUpperCase().trim())
 					if (Acc.Environment == Room.Environment) {
-						const joinerIsBot = Acc.OnlineSharedSettings?.IsBot === true;
-						const humanCount = Room.Account.filter(A => !A.OnlineSharedSettings?.IsBot).length;
-						const botCount   = Room.Account.filter(A =>  A.OnlineSharedSettings?.IsBot).length;
-						const botSlots   = Room.BotSlots ?? 0;
-						const canJoin    = joinerIsBot ? botCount < botSlots : humanCount < Room.Limit;
+						const humanCount = Room.Account.filter(A => !A.IsBot).length;
+						const canJoin    = Acc.IsBot || humanCount < Room.Limit;
 						if (canJoin) {
 							if (Room.Ban.indexOf(Acc.MemberNumber) < 0) {
 
@@ -2042,9 +2031,6 @@ function ChatRoomAdmin(data, socket) {
 						let Limit = CommonParseInt(data.Room.Limit, ROOM_LIMIT_DEFAULT);
 						if (Limit < ROOM_LIMIT_MINIMUM || Limit > ROOM_LIMIT_MAXIMUM) Limit = ROOM_LIMIT_DEFAULT;
 						Acc.ChatRoom.Limit = Limit;
-						let BotSlots = CommonParseInt(data.Room.BotSlots, ROOM_BOT_SLOTS_DEFAULT);
-						if (BotSlots < 0 || BotSlots > ROOM_BOT_SLOTS_MAXIMUM) BotSlots = ROOM_BOT_SLOTS_DEFAULT;
-						Acc.ChatRoom.BotSlots = BotSlots;
 						if ((data.Room.Visibility != null) && (Array.isArray(data.Room.Visibility))) Acc.ChatRoom.Visibility = data.Room.Visibility;
 						if ((data.Room.Access != null) && (Array.isArray(data.Room.Access))) Acc.ChatRoom.Access = data.Room.Access;
 						if ((data.Room.Private != null) && (typeof data.Room.Private === "boolean")) Acc.ChatRoom.Private = data.Room.Private;
