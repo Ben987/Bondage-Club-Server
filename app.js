@@ -587,7 +587,7 @@ function AccountLogin(data, socket) {
 	if (pendingLogins.has(socket)) return;
 
 	const shouldRun = loginQueue.length === 0;
-	loginQueue.push([socket, data.AccountName.toUpperCase(), data.Password]);
+	loginQueue.push([socket, data.AccountName.toUpperCase(), data.Password, data.IsBot === true]);
 	pendingLogins.add(socket);
 
 	if (loginQueue.length > 16) {
@@ -658,7 +658,7 @@ function AccountRemoveFromChatRoom(MemberNumber) {
  * @param {string} AccountName The username the user is trying to log in with
  * @param {string} Password
  */
-async function AccountLoginProcess(socket, AccountName, Password) {
+async function AccountLoginProcess(socket, AccountName, Password, IsBot) {
 	// Checks if there's an account that matches the name
 	/** @type {Account|null} */
 	const result = await Database.collection(AccountCollection).findOne({ AccountName });
@@ -706,6 +706,7 @@ async function AccountLoginProcess(socket, AccountName, Password) {
 	// Logs the account
 	result.ID = socket.id;
 	result.Environment = AccountGetEnvironment(socket);
+	result.IsBot = IsBot;
 	//console.log("Login account: " + result.AccountName + " ID: " + socket.id + " " + result.Environment);
 	AccountValidData(result);
 	AccountRemoveFromChatRoom(result.MemberNumber);
@@ -969,7 +970,7 @@ function AccountQueryGetFriendInfo(type, account) {
 		}
 		friendInfo.ChatRoomSpace = account.ChatRoom.Space;
 		friendInfo.ChatRoomName = account.ChatRoom.Name;
-		friendInfo.ChatRoomMemberCount = account.ChatRoom.Account.length;
+		friendInfo.ChatRoomMemberCount = account.ChatRoom.Account.filter(A => !A.IsBot).length;
 		friendInfo.ChatRoomLimit = account.ChatRoom.Limit;
 	}
 	return friendInfo;
@@ -1203,7 +1204,8 @@ function ChatRoomSearch(data, socket) {
 		if (Game !== "" && room.Game !== Game) continue;
 
 		// The room is full and we don't want those, skip
-		if (room.Account.length >= room.Limit && !FullRooms) continue;
+		const roomHumanCount = room.Account.filter(A => !A.IsBot).length;
+		if (roomHumanCount >= room.Limit && !FullRooms) continue;
 
 		// Room isn't in the correct space, skip
 		if (!Spaces.includes(room.Space)) continue;
@@ -1277,7 +1279,7 @@ function ChatRoomSearchAddResult(Acc, room) {
 		Creator: room.Creator,
 		CreatorMemberNumber: room.CreatorMemberNumber,
 		Creation: room.Creation,
-		MemberCount: room.Account.length,
+		MemberCount: room.Account.filter(A => !A.IsBot).length,
 		MemberLimit: room.Limit,
 		Description: room.Description,
 		BlockCategory: room.BlockCategory,
@@ -1422,8 +1424,10 @@ function ChatRoomJoin(data, socket) {
 			// Finds the room and join it
 			for (const Room of ChatRoom)
 				if (Room.Name.toUpperCase().trim() == data.Name.toUpperCase().trim())
-					if (Acc.Environment == Room.Environment)
-						if (Room.Account.length < Room.Limit) {
+					if (Acc.Environment == Room.Environment) {
+						const humanCount = Room.Account.filter(A => !A.IsBot).length;
+						const canJoin    = Acc.IsBot || humanCount < Room.Limit;
+						if (canJoin) {
 							if (Room.Ban.indexOf(Acc.MemberNumber) < 0) {
 
 								// If the player is on the access list, we allow them inside
@@ -1457,6 +1461,7 @@ function ChatRoomJoin(data, socket) {
 							socket.emit("ChatRoomSearchResponse", "RoomFull");
 							return;
 						}
+					}
 
 			// Since we didn't found the room to join
 			socket.emit("ChatRoomSearchResponse", "CannotFindRoom");

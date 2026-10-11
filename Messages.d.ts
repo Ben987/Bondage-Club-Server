@@ -295,6 +295,8 @@ type ServerLoginQueueResponse = number;
 interface ServerAccountLoginRequest {
 	AccountName: string;
 	Password: string;
+	/** Set to true when logging in as an automated bot; bots do not count against a room's player limit. */
+	IsBot?: boolean;
 }
 
 interface ServerAccountCreateRequest {
@@ -472,6 +474,7 @@ interface ServerChatRoomSearchData {
     Creator: string;
     CreatorMemberNumber: number;
 	Creation: number;
+    /** Number of non-bot players currently in the room */
     MemberCount: number;
     MemberLimit: number;
     Description: string;
