@@ -241,6 +241,8 @@ type ServerChatRoomData = {
 	Background: string;
 	/* FIXME: server actually expects a string there, but we cheat to make the typing simpler */
 	Limit: number;
+	/** Number of extra slots reserved for bot characters (IsBot=true). Bots filling these slots do not count toward Limit. */
+	BotSlots?: number;
 	Game: ServerChatRoomGame;
 	Visibility: ServerChatRoomRole[];
 	Access: ServerChatRoomRole[];
@@ -472,8 +474,13 @@ interface ServerChatRoomSearchData {
     Creator: string;
     CreatorMemberNumber: number;
 	Creation: number;
+    /** Number of non-bot players currently in the room */
     MemberCount: number;
     MemberLimit: number;
+    /** Number of bot players (IsBot=true) currently in the room */
+    BotCount: number;
+    /** Maximum number of bot slots configured for the room */
+    BotLimit: number;
     Description: string;
     BlockCategory: AssetCategory[];
     Game: ServerChatRoomGame;
