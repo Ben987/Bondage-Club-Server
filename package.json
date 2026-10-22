@@ -17,6 +17,7 @@
     "docker:logs": "docker-compose logs -f app db"
   },
   "dependencies": {
+    "argon2": "^0.45.1",
     "base64id": "^2.0.0",
     "bcrypt": "^6.0.0",
     "mongodb": "^3.7.4",
