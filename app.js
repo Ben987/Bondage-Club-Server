@@ -40,7 +40,13 @@ var Options = {
 	upgradeTimeout: 30000,
 	serveClient: false,
 	httpCompression: true,
-	perMessageDeflate: true,
+	perMessageDeflate: {
+		threshold: 1024,
+		serverMaxWindowBits: 13,
+		zlibDeflateOptions: { level: 4, memLevel: 7 },
+		serverNoContextTakeover: true,
+		clientNoContextTakeover: true
+	},
 	allowEIO3: false,
 	secure: UseSecure
 };
@@ -92,6 +98,7 @@ const IP_CONNECTION_PROXY_HEADER = "x-forwarded-for"; // Header with real IP, if
 const ROOM_LIMIT_DEFAULT = 10; // The default number of players in an online chat room
 const ROOM_LIMIT_MINIMUM = 2; // The minimum number of players in an online chat room
 const ROOM_LIMIT_MAXIMUM = 20; // The maximum number of players in an online chat room
+const LOGIN_CONCURRENCY = parseInt(process.env.LOGIN_CONCURRENCY, 10) || 4; // The number of logins processed at the same time
 
 // Limits the number of accounts created on each hour & day
 var AccountCreationIP = [];
@@ -586,7 +593,6 @@ function AccountLogin(data, socket) {
 	// If connection already has login queued, ignore it
 	if (pendingLogins.has(socket)) return;
 
-	const shouldRun = loginQueue.length === 0;
 	loginQueue.push([socket, data.AccountName.toUpperCase(), data.Password]);
 	pendingLogins.add(socket);
 
@@ -594,10 +600,7 @@ function AccountLogin(data, socket) {
 		socket.emit("LoginQueue", loginQueue.length);
 	}
 
-	// If there are no logins being processed, start the processing of the queue
-	if (shouldRun) {
-		AccountLoginRun();
-	}
+	AccountLoginRun();
 }
 
 /**
@@ -613,29 +616,34 @@ const loginQueue = [];
 const pendingLogins = new WeakSet();
 
 /**
- * Runs the next login in queue, waiting for it to finish before running next one
+ * The number of logins being processed right now
+ */
+var loginRunning = 0;
+
+/**
+ * Runs the next logins in queue, up to LOGIN_CONCURRENCY at the same time
  */
 function AccountLoginRun() {
-	// Get next waiting login
-	if (loginQueue.length === 0) return;
-	let nx = loginQueue[0];
+	while ((loginRunning < LOGIN_CONCURRENCY) && (loginQueue.length > 0)) {
 
-	// If client disconnected during wait, ignore it
-	while (!nx[0].connected) {
-		pendingLogins.delete(nx[0]);
-		loginQueue.shift();
-		if (loginQueue.length === 0) return;
-		nx = loginQueue[0];
-	}
-
-	// Process the login and after it queue the next one
-	AccountLoginProcess(...nx).then(() => {
-		pendingLogins.delete(nx[0]);
-		loginQueue.shift();
-		if (loginQueue.length > 0) {
-			setTimeout(AccountLoginRun, 50);
+		// Get next waiting login, if client disconnected during wait, ignore it
+		const nx = /** @type {[ServerSocket, string, string]} */ (loginQueue.shift());
+		if (!nx[0].connected) {
+			pendingLogins.delete(nx[0]);
+			continue;
 		}
-	}, err => { throw err; });
+
+		// Process the login and after it run the next one
+		loginRunning++;
+		AccountLoginProcess(...nx).catch(err => {
+			console.log("Error while logging in account " + nx[1] + ": " + ((err && err.message) || err));
+			if (nx[0].connected) nx[0].emit("LoginResponse", "InvalidNamePassword");
+		}).then(() => {
+			loginRunning--;
+			pendingLogins.delete(nx[0]);
+			AccountLoginRun();
+		});
+	}
 }
 
 // Removes all instances of that character from all chat rooms
