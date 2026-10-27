@@ -1,34 +1,23 @@
 "use strict";
+
+// bcrypt and the websocket compression run on the libuv thread pool, it must be set before loading the modules
+if (!process.env.UV_THREADPOOL_SIZE) process.env.UV_THREADPOOL_SIZE = "16";
+
 require('newrelic');
 const base64id = require("base64id");
 const crypto = require('crypto');
-
-// Reads the SSL key and certificate, if there's no file available, we switch to regular http
-/*var SyncRequest = require("sync-request");
-var ServerKey = null;
-if ((process.env.SERVER_KEY0 != null) && (process.env.SERVER_KEY0 != "")) { try { ServerKey = SyncRequest("GET", process.env.SERVER_KEY0).getBody(); } catch(err) {} }
-if ((ServerKey == null) && (process.env.SERVER_KEY1 != null) && (process.env.SERVER_KEY1 != "")) { try { ServerKey = SyncRequest("GET", process.env.SERVER_KEY1).getBody(); } catch(err) {} }
-if ((ServerKey == null) && (process.env.SERVER_KEY2 != null) && (process.env.SERVER_KEY2 != "")) { try { ServerKey = SyncRequest("GET", process.env.SERVER_KEY2).getBody(); } catch(err) {} }
-var ServerCert = null;
-if ((process.env.SERVER_CERT0 != null) && (process.env.SERVER_CERT0 != "")) { try { ServerCert = SyncRequest("GET", process.env.SERVER_CERT0).getBody(); } catch(err) {} }
-if ((ServerCert == null) && (process.env.SERVER_CERT1 != null) && (process.env.SERVER_CERT1 != "")) { try { ServerCert = SyncRequest("GET", process.env.SERVER_CERT1).getBody(); } catch(err) {} }
-if ((ServerCert == null) && (process.env.SERVER_CERT2 != null) && (process.env.SERVER_CERT2 != "")) { try { ServerCert = SyncRequest("GET", process.env.SERVER_CERT2).getBody(); } catch(err) {} }
-console.log("Using Server Key: " + ServerKey);
-console.log("Using Server Certificate: " + ServerCert);*/
+const { performance, monitorEventLoopDelay } = require('perf_hooks');
+const net = require('net');
 
 // Enforce https with a certificate
 var App;
 var UseSecure;
 UseSecure = false;
 App = require("http").createServer();
-
-/*if ((ServerKey == null) || (ServerCert == null)) {
-	console.log("No key or certificate found, starting http server with origin " + process.env.CORS_ORIGIN0);
-} else {
-	console.log("Starting https server for certificate with origin " + process.env.CORS_ORIGIN0);
-	UseSecure = true;
-	App = require("https").createServer({ key: ServerKey, cert: ServerCert, requestCert: false, rejectUnauthorized: false });
-}*/
+App.on("error", function(err) {
+	if (!App.listening) throw err;
+	console.log("HTTP server error: " + err.message);
+});
 
 // Starts socket.io to accept incoming connections on specified origins
 const socketio = require("socket.io");
@@ -40,7 +29,13 @@ var Options = {
 	upgradeTimeout: 30000,
 	serveClient: false,
 	httpCompression: true,
-	perMessageDeflate: true,
+	perMessageDeflate: {
+		threshold: 1024,
+		serverMaxWindowBits: 13,
+		zlibDeflateOptions: { level: 4, memLevel: 7 },
+		serverNoContextTakeover: true,
+		clientNoContextTakeover: true
+	},
 	allowEIO3: false,
 	secure: UseSecure
 };
@@ -58,6 +53,12 @@ var MaxHeapUsage = parseInt(process.env.MAX_HEAP_USAGE, 10) || 16_000_000_000; /
 var AccountCollection = process.env.ACCOUNT_COLLECTION || "Accounts";
 /** @type {Account[]} */
 var Account = [];
+/** @type {Map<string, Account>} */
+const AccountByID = new Map();
+/** @type {Map<number, Account>} */
+const AccountByMemberNumber = new Map();
+/** @type {Map<string, Account>} */
+const AccountByName = new Map();
 /** @type {Chatroom[]} */
 var ChatRoom = [];
 var ChatRoomMessageType = ["Chat", "Action", "Activity", "Emote", "Whisper", "Hidden", "Status"];
@@ -81,22 +82,40 @@ var ChatRoomProduction = [
 	process.env.PRODUCTION16 || ""
 ];
 var NextMemberNumber = 1;
-var NextPasswordReset = 0;
 var OwnershipDelay = 604800000; // 7 days delay for ownership events
 var LovershipDelay = 604800000; // 7 days delay for lovership events
 var DifficultyDelay = 604800000; // 7 days to activate the higher difficulty tiers
 const IP_CONNECTION_LIMIT = parseInt(process.env.IP_CONNECTION_LIMIT, 10) || 64; // Limit of connections per IP address
 const IP_CONNECTION_RATE_LIMIT = parseInt(process.env.IP_CONNECTION_RATE_LIMIT, 10) || 2; // Limit of newly established connections per IP address within a second
+const IP_CONNECTION_BURST = parseInt(process.env.IP_CONNECTION_BURST, 10) || 10; // Number of connections an IP address can open at once
 const CLIENT_MESSAGE_RATE_LIMIT = parseInt(process.env.CLIENT_MESSAGE_RATE_LIMIT, 10) || 20; // Limit the number of messages received from a client within a second
-const IP_CONNECTION_PROXY_HEADER = "x-forwarded-for"; // Header with real IP, if set by trusted proxy (lowercase)
+const CLIENT_MESSAGE_BURST = parseInt(process.env.CLIENT_MESSAGE_BURST, 10) || CLIENT_MESSAGE_RATE_LIMIT * 3; // Number of messages a client can send at once
+// Rate limits of the expensive events [per second, burst]
+/** @type {Record<string, [number, number]>} */
+const EVENT_RATE_LIMITS = { ChatRoomSearch: [1, 10], AccountQuery: [2, 10] };
+const EVENT_RATE_LIMIT_SCALE = parseFloat(process.env.EVENT_RATE_LIMIT_SCALE) || 1; // Multiplies the limits above
+const BEEP_RATE_LIMIT = 2; // Beeps a player can send per second
+const BEEP_BURST = 20; // Beeps a player can send at once
+const MAX_PACKET_DEPTH = 100; // Maximum nesting of objects & arrays in a client packet
+const IP_CONNECTION_PROXY_HEADER = (process.env.IP_CONNECTION_PROXY_HEADER ?? "x-forwarded-for").toLowerCase(); // Header with real IP, if set by trusted proxy, empty when there is no proxy
 const ROOM_LIMIT_DEFAULT = 10; // The default number of players in an online chat room
 const ROOM_LIMIT_MINIMUM = 2; // The minimum number of players in an online chat room
 const ROOM_LIMIT_MAXIMUM = 20; // The maximum number of players in an online chat room
+const LOGIN_CONCURRENCY = parseInt(process.env.LOGIN_CONCURRENCY, 10) || 4; // The number of logins processed at the same time
+const SLOW_HANDLER_DELAY = 100; // A handler running longer than this (ms) is logged
 
 // Limits the number of accounts created on each hour & day
-var AccountCreationIP = [];
+/** @type {{ Address: string; Time: number; }[]} */
+const AccountCreationIP = [];
 const MAX_IP_ACCOUNT_PER_DAY = parseInt(process.env.MAX_IP_ACCOUNT_PER_DAY, 10) || 12;
 const MAX_IP_ACCOUNT_PER_HOUR = parseInt(process.env.MAX_IP_ACCOUNT_PER_HOUR, 10) || 4;
+
+// Limits the failed logins of each IP address, on any account and on the same account
+const LOGIN_FAILURE_LIMIT = parseInt(process.env.LOGIN_FAILURE_LIMIT, 10) || 50;
+const LOGIN_FAILURE_ACCOUNT_LIMIT = parseInt(process.env.LOGIN_FAILURE_ACCOUNT_LIMIT, 10) || 10;
+const LOGIN_FAILURE_DELAY = 900000; // 15 minutes
+/** @type {{ Address: string; AccountName: string; Time: number; }[]} */
+const LoginFailureIP = [];
 
 // DB Access
 /** @type { import("mongodb").Db } */
@@ -105,22 +124,30 @@ var DatabaseClient = require('mongodb').MongoClient;
 var DatabaseURL = process.env.DATABASE_URL || "mongodb://localhost:27017/BondageClubDatabase";
 var ServerPort = process.env.PORT || 4288;
 var DatabaseName = process.env.DATABASE_NAME || "BondageClubDatabase";
+var DatabasePoolSize = parseInt(process.env.DATABASE_POOL_SIZE, 10) || 50; // Maximum number of MongoDB connections
 
 /**
  * Email password reset
- * @type { { AccountName: string; ResetNumber: string; }[] }
+ * @type { { AccountName: string; ResetNumber: string; Time: number; Attempts: number; }[] }
  */
-var PasswordResetProgress = [];
+const PasswordResetProgress = [];
+const PasswordResetExpiry = 86400000; // A reset number is valid for 24 hours
+const PasswordResetMaxAttempts = 5; // A reset number is cancelled after that many wrong guesses
+const PasswordResetEmailDelay = 300000; // Only one reset email every 5 minutes for the same address
+const PasswordResetIPLimit = 5; // Maximum reset requests per IP address every hour
+/** @type { { Address: string; Email: string; Time: number; }[] } */
+const PasswordResetRequests = [];
 var NodeMailer = require("nodemailer");
 var MailTransporter = NodeMailer.createTransport({
 	host: "mail.bondageprojects.com",
-	Port: 465,
+	port: 465,
 	secure: true,
 	auth: {
 		user: "donotreply@bondageprojects.com",
 		pass: process.env.EMAIL_PASSWORD || ""
 	}
 });
+MailTransporter.on("error", err => console.log("Email transport error: " + err.message));
 
 // If the server received an unhandled error, we log it through console for future review, send an email and exit so the application can restart
 Error.stackTraceLimit = 100;
@@ -162,21 +189,28 @@ process.on('SIGTERM', function() {
 			Acc.Socket.emit("ServerMessage", "Server will reboot in 30 seconds." );
 });
 
-// When SIGKILL is received, we do the final updates
-/*process.on('SIGKILL', function() {
-	console.log("***********************");
-	console.log("HEROKU SIGKILL DETECTED");
-	console.log("***********************");
-	try {
-		AccountDelayedUpdate();
-	} catch (error) {
-		console.log("Error while doing delayed updates");
-	}
-	process.exit(2);
-});*/
-
-/** @type {Map<string, number[]>} */
+/** @type {Map<string, number>} */
 const IPConnections = new Map();
+
+/** @typedef {{ Rate: number; Burst: number; Tokens: number; Time: number; }} TokenBucket */
+
+/** @type {Map<string, TokenBucket>} */
+const IPConnectionBuckets = new Map();
+
+/** @type {WeakMap<ServerSocket, TokenBucket>} */
+const BeepBuckets = new WeakMap();
+
+const SERVER_EVENT_LOOP_RESOLUTION = 20;
+const ServerEventLoopDelay = monitorEventLoopDelay({ resolution: SERVER_EVENT_LOOP_RESOLUTION });
+
+/**
+ * Creates the counters of the health report
+ * @returns {{ Disconnects: Record<string, number>; Kicks: Record<string, number>; DroppedMessages: number; HandlerErrors: number; }}
+ */
+function ServerStatsCreate() {
+	return { Disconnects: {}, Kicks: {}, DroppedMessages: 0, HandlerErrors: 0 };
+}
+var ServerStats = ServerStatsCreate();
 
 // These regex must be kept in sync with the client
 const ServerAccountEmailRegex = /^[a-zA-Z0-9@.!#$%&'*+/=?^_`{|}~-]{5,100}$/;
@@ -214,11 +248,49 @@ function CommonEmailIsValid(Email) {
 	return true;
 }
 
+/**
+ * Logs a database error, the server keeps running
+ * @param {string} Context - What the server was doing
+ * @param {Error} err
+ */
+function DatabaseError(Context, err) {
+	console.log("Database error while " + Context + ": " + ((err && err.message) || err));
+}
+
+/**
+ * Callback logging the error of a database write
+ * @param {string} Context - What the server was doing
+ * @returns {(err: Error | null) => void}
+ */
+function DatabaseLogError(Context) {
+	return function(err) { if (err) DatabaseError(Context, err); };
+}
+
+/**
+ * Creates the indexes of the account queries, the errors are only logged
+ * @returns {Promise<void>}
+ */
+async function DatabaseCreateIndexes() {
+	const Collection = Database.collection(AccountCollection);
+	const LogError = (/** @type {string} */ Name) => (/** @type {Error} */ err) => console.log("Error while creating database index " + Name + ": " + err.message);
+	const AccountNameIndex = Collection.createIndex({ AccountName: 1 }, { unique: true }).catch(err => {
+		LogError("AccountName (unique)")(err);
+		return Collection.createIndex({ AccountName: 1 }).catch(LogError("AccountName"));
+	});
+	await Promise.all([
+		AccountNameIndex,
+		Collection.createIndex({ MemberNumber: 1 }).catch(LogError("MemberNumber")),
+		Collection.createIndex({ Email: 1 }).catch(LogError("Email"))
+	]);
+	console.log("Database indexes are ready");
+}
+
 // Connects to the Mongo Database
-DatabaseClient.connect(DatabaseURL, { useUnifiedTopology: true, useNewUrlParser: true, autoIndex: false }, function(err, db) {
+DatabaseClient.connect(DatabaseURL, { useUnifiedTopology: true, useNewUrlParser: true, poolSize: DatabasePoolSize }, function(err, db) {
 
 	// Keeps the database object
 	if (err) throw err;
+	db.on("error", (/** @type {Error} */ err) => DatabaseError("talking to the database", err));
 	Database = db.db(DatabaseName);
 	console.log("****************************************");
 	console.log("Database: " + DatabaseName + " connected");
@@ -229,6 +301,7 @@ DatabaseClient.connect(DatabaseURL, { useUnifiedTopology: true, useNewUrlParser:
 		// Shows the next member number
 		if ((result.length > 0) && (result[0].MemberNumber != null)) NextMemberNumber = result[0].MemberNumber + 1;
 		console.log("Next Member Number: " + NextMemberNumber);
+		if (process.env.DATABASE_CREATE_INDEXES === "true") DatabaseCreateIndexes();
 
 		// Listens for clients on port 4288 if local or a random port if online
 		App.listen(ServerPort, function () {
@@ -237,71 +310,70 @@ DatabaseClient.connect(DatabaseURL, { useUnifiedTopology: true, useNewUrlParser:
 			console.log("Bondage Club server is listening on " + (ServerPort).toString());
 			console.log("****************************************");
 			IO.on("connection", function ( /** @type {ServerSocket} */ socket) {
-				/** @type {string} */
-				let address = socket.conn.remoteAddress;
-
-				// If there is trusted forward header set by proxy, use that instead
-				// But only trust the last hop!
-				if (IP_CONNECTION_PROXY_HEADER && typeof socket.handshake.headers[IP_CONNECTION_PROXY_HEADER] === "string") {
-					const hops = /** @type {string} */ (socket.handshake.headers[IP_CONNECTION_PROXY_HEADER]).split(",");
-					address = hops[hops.length-1].trim();
-				}
-
-				const sameIPConnections = IPConnections.get(address) || [];
-
-				// True, if there has already been IP_CONNECTION_RATE_LIMIT number of connections in the last second
-				const ipOverRateLimit = sameIPConnections.length >= IP_CONNECTION_RATE_LIMIT && Date.now() - sameIPConnections[sameIPConnections.length - IP_CONNECTION_RATE_LIMIT] <= 1000;
+				const address = AccountGetIP(socket);
+				socket.on("disconnect", reason => CommonCount(ServerStats.Disconnects, reason));
 
 				// Reject connection if over limits (rate & concurrency)
-				if (sameIPConnections.length >= IP_CONNECTION_LIMIT || ipOverRateLimit) {
-					console.log("Rejecting connection (IP connection limit reached) from", address);
-					socket.emit("ForceDisconnect", "ErrorRateLimited");
-					socket.disconnect(true);
+				const sameIPConnections = IPConnections.get(address) || 0;
+				if (!IPConnectionBuckets.has(address)) IPConnectionBuckets.set(address, CommonTokenBucket(IP_CONNECTION_RATE_LIMIT, IP_CONNECTION_BURST));
+				if ((sameIPConnections >= IP_CONNECTION_LIMIT) || !CommonTokenBucketTake(/** @type {TokenBucket} */ (IPConnectionBuckets.get(address)), false)) {
+					ServerKick(socket, "ConnectionLimit", "Rejecting connection (IP connection limit reached) from " + address);
 					return;
 				}
 
 				// Connection accepted, count it
-				sameIPConnections.push(Date.now());
-				IPConnections.set(address, sameIPConnections);
+				IPConnections.set(address, sameIPConnections + 1);
 				socket.once("disconnect", () => {
-					const sameIPConnectionsDisconnect = IPConnections.get(address) || [];
-					if (sameIPConnectionsDisconnect.length <= 1) {
-						IPConnections.delete(address);
-					} else {
-						sameIPConnectionsDisconnect.shift(); // Delete first (oldest) from array
-						IPConnections.set(address, sameIPConnectionsDisconnect);
-					}
+					const Count = (IPConnections.get(address) || 1) - 1;
+					if (Count <= 0) IPConnections.delete(address);
+					else IPConnections.set(address, Count);
 				});
 
-				// Rate limit all messages and kill the connection, if limits exceeded.
-				const messageBucket = [];
-				for (let i = 0; i < CLIENT_MESSAGE_RATE_LIMIT; i++) {
-					messageBucket.push(0);
-				}
-				socket.onAny(() => {
-					const lastMessageTime = messageBucket.shift();
-					messageBucket.push(Date.now());
-
-					// More than CLIENT_MESSAGE_RATE_LIMIT number of messages in the last second
-					if (Date.now() - lastMessageTime <= 1000) {
-						// Disconnect and close connection
-						socket.emit("ForceDisconnect", "ErrorRateLimited");
-						socket.disconnect(true);
+				// Rate limit all messages, drop the extra ones and kill the connection if the client keeps flooding
+				const MessageBucket = CommonTokenBucket(CLIENT_MESSAGE_RATE_LIMIT, CLIENT_MESSAGE_BURST);
+				/** @type {Map<string, TokenBucket>} */
+				const EventBuckets = new Map();
+				socket.use((packet, next) => {
+					if (!CommonTokenBucketTake(MessageBucket, true)) {
+						ServerStats.DroppedMessages++;
+						if (MessageBucket.Tokens < -CLIENT_MESSAGE_BURST) ServerKick(socket, "RateLimited", "Disconnecting (message rate limit) " + address);
+						return;
 					}
+					const Event = String(packet[0]);
+					if (Object.prototype.hasOwnProperty.call(EVENT_RATE_LIMITS, Event)) {
+						if (!EventBuckets.has(Event)) EventBuckets.set(Event, CommonTokenBucket(EVENT_RATE_LIMITS[Event][0] * EVENT_RATE_LIMIT_SCALE, EVENT_RATE_LIMITS[Event][1] * EVENT_RATE_LIMIT_SCALE));
+						if (!CommonTokenBucketTake(/** @type {TokenBucket} */ (EventBuckets.get(Event)), false)) {
+							ServerStats.DroppedMessages++;
+							return;
+						}
+					}
+					next();
 				});
 
-				socket.on("AccountCreate", function (data) { AccountCreate(data, socket); });
-				socket.on("AccountLogin", function (data) { AccountLogin(data, socket); });
-				socket.on("PasswordReset", function(data) { PasswordReset(data, socket); });
-				socket.on("PasswordResetProcess", function(data) { PasswordResetProcess(data, socket); });
+				// Refuses the packets that would overflow the stack of the recursive code, and binary data that no handler expects
+				socket.use((packet, next) => {
+					if (CommonIsInvalidPacket(packet, MAX_PACKET_DEPTH)) {
+						ServerKick(socket, "InvalidPacket", "Rejecting invalid packet from " + address);
+						return;
+					}
+					next();
+				});
+
+				ServerOn(socket, "AccountCreate", data => AccountCreate(data, socket));
+				ServerOn(socket, "AccountLogin", data => AccountLogin(data, socket));
+				ServerOn(socket, "PasswordReset", data => PasswordReset(data, socket));
+				ServerOn(socket, "PasswordResetProcess", data => PasswordResetProcess(data, socket));
 				AccountSendServerInfo(socket);
 			});
 
+			ServerEventLoopDelay.enable();
+
 			// Refreshes the server information to clients each 60 seconds
-			setInterval(AccountSendServerInfo, 60000);
+			ServerInterval(() => AccountSendServerInfo(), 60000);
+			ServerInterval(ServerHealthReport, 60000);
 
 			// Updates the database appearance & skills every 300 seconds
-			setInterval(AccountDelayedUpdate, 300000);
+			ServerInterval(AccountDelayedUpdate, 300000);
 
 		});
 	});
@@ -316,29 +388,108 @@ function OnLogin(socket) {
 	socket.removeAllListeners("AccountLogin");
 	socket.removeAllListeners("PasswordReset");
 	socket.removeAllListeners("PasswordResetProcess");
-	socket.on("AccountUpdate", function(data) { AccountUpdate(data, socket); });
-	socket.on("AccountUpdateEmail", function(data) { AccountUpdateEmail(data, socket); });
-	socket.on("AccountQuery", function(data) { AccountQuery(data, socket); });
-	socket.on("AccountBeep", function(data) { AccountBeep(data, socket); });
-	socket.on("AccountOwnership", function(data) { AccountOwnership(data, socket); });
-	socket.on("AccountLovership", function(data) { AccountLovership(data, socket); });
-	socket.on("AccountDifficulty", function(data) { AccountDifficulty(data, socket); });
-	socket.on("AccountDisconnect", function() { AccountRemove(socket.id); });
-	socket.on("disconnect", function() { AccountRemove(socket.id); });
-	socket.on("ChatRoomSearch", function(data) { ChatRoomSearch(data, socket); });
-	socket.on("ChatRoomCreate", function(data) { ChatRoomCreate(data, socket); });
-	socket.on("ChatRoomJoin", function(data) { ChatRoomJoin(data, socket); });
-	socket.on("ChatRoomLeave", function() { ChatRoomLeave(socket); });
-	socket.on("ChatRoomChat", function(data) { ChatRoomChat(data, socket); });
-	socket.on("ChatRoomCharacterUpdate", function(data) { ChatRoomCharacterUpdate(data, socket); });
-	socket.on("ChatRoomCharacterExpressionUpdate", function(data) { ChatRoomCharacterExpressionUpdate(data, socket); });
-	socket.on("ChatRoomCharacterMapDataUpdate", function(data) { ChatRoomCharacterMapDataUpdate(data, socket); });
-	socket.on("ChatRoomCharacterPoseUpdate", function(data) { ChatRoomCharacterPoseUpdate(data, socket); });
-	socket.on("ChatRoomCharacterArousalUpdate", function(data) { ChatRoomCharacterArousalUpdate(data, socket); });
-	socket.on("ChatRoomCharacterItemUpdate", function(data) { ChatRoomCharacterItemUpdate(data, socket); });
-	socket.on("ChatRoomAdmin", function(data) { ChatRoomAdmin(data, socket); });
-	socket.on("ChatRoomAllowItem", function(data) { ChatRoomAllowItem(data, socket); });
-	socket.on("ChatRoomGame", function(data) { ChatRoomGame(data, socket); });
+	ServerOn(socket, "AccountUpdate", data => AccountUpdate(data, socket));
+	ServerOn(socket, "AccountUpdateEmail", data => AccountUpdateEmail(data, socket));
+	ServerOn(socket, "AccountQuery", data => AccountQuery(data, socket));
+	ServerOn(socket, "AccountBeep", data => AccountBeep(data, socket));
+	ServerOn(socket, "AccountOwnership", data => AccountOwnership(data, socket));
+	ServerOn(socket, "AccountLovership", data => AccountLovership(data, socket));
+	ServerOn(socket, "AccountDifficulty", data => AccountDifficulty(data, socket));
+	ServerOn(socket, "AccountDisconnect", () => AccountRemove(socket.id));
+	ServerOn(socket, "disconnect", () => AccountRemove(socket.id));
+	ServerOn(socket, "ChatRoomSearch", data => ChatRoomSearch(data, socket));
+	ServerOn(socket, "ChatRoomCreate", data => ChatRoomCreate(data, socket));
+	ServerOn(socket, "ChatRoomJoin", data => ChatRoomJoin(data, socket));
+	ServerOn(socket, "ChatRoomLeave", () => ChatRoomLeave(socket));
+	ServerOn(socket, "ChatRoomChat", data => ChatRoomChat(data, socket));
+	ServerOn(socket, "ChatRoomCharacterUpdate", data => ChatRoomCharacterUpdate(data, socket));
+	ServerOn(socket, "ChatRoomCharacterExpressionUpdate", data => ChatRoomCharacterExpressionUpdate(data, socket));
+	ServerOn(socket, "ChatRoomCharacterMapDataUpdate", data => ChatRoomCharacterMapDataUpdate(data, socket));
+	ServerOn(socket, "ChatRoomCharacterPoseUpdate", data => ChatRoomCharacterPoseUpdate(data, socket));
+	ServerOn(socket, "ChatRoomCharacterArousalUpdate", data => ChatRoomCharacterArousalUpdate(data, socket));
+	ServerOn(socket, "ChatRoomCharacterItemUpdate", data => ChatRoomCharacterItemUpdate(data, socket));
+	ServerOn(socket, "ChatRoomAdmin", data => ChatRoomAdmin(data, socket));
+	ServerOn(socket, "ChatRoomAllowItem", data => ChatRoomAllowItem(data, socket));
+	ServerOn(socket, "ChatRoomGame", data => ChatRoomGame(data, socket));
+}
+
+/**
+ * Registers an event handler, its errors and slow runs are logged instead of crashing the server
+ * @param {ServerSocket} socket
+ * @param {string} Event
+ * @param {(data: any) => void} Handler
+ */
+function ServerOn(socket, Event, Handler) {
+	socket.on(/** @type {any} */ (Event), function(/** @type {any} */ data) {
+		const Start = performance.now();
+		try {
+			Handler(data);
+		} catch (error) {
+			ServerStats.HandlerErrors++;
+			console.log("Error while handling " + Event + " from " + ServerSocketName(socket) + ": " + ((error && error.stack) || error));
+		}
+		const Duration = performance.now() - Start;
+		if (Duration > SLOW_HANDLER_DELAY) console.log("Slow handler: " + Event + " took " + Math.round(Duration) + "ms for " + ServerSocketName(socket));
+	});
+}
+
+/**
+ * Returns the account name and the socket ID, for the logs
+ * @param {ServerSocket} socket
+ * @returns {string}
+ */
+function ServerSocketName(socket) {
+	const Acc = AccountGet(socket.id);
+	return (Acc != null) ? Acc.AccountName + " (" + socket.id + ")" : socket.id;
+}
+
+/**
+ * Disconnects a client, the reason is counted for the health report
+ * @param {ServerSocket} socket
+ * @param {string} Reason
+ * @param {string} [Message] - Logged message
+ */
+function ServerKick(socket, Reason, Message) {
+	if (!socket.connected) return;
+	CommonCount(ServerStats.Kicks, Reason);
+	if (Message) console.log(Message);
+	socket.emit("ForceDisconnect", "ErrorRateLimited");
+	socket.disconnect(true);
+}
+
+/**
+ * Logs the server health, called every minute
+ */
+function ServerHealthReport() {
+	const Delay = (/** @type {number} */ ns) => Math.max(0, Math.round(ns / 1000000) - SERVER_EVENT_LOOP_RESOLUTION) + "ms";
+	let Report = "Server health - Online: " + Account.length + ", Rooms: " + ChatRoom.length
+		+ ", Event loop delay p50/p99/max: " + Delay(ServerEventLoopDelay.percentile(50)) + "/" + Delay(ServerEventLoopDelay.percentile(99)) + "/" + Delay(ServerEventLoopDelay.max)
+		+ ", Heap: " + Math.round(process.memoryUsage().heapUsed / 1048576) + "MB";
+	if (Object.keys(ServerStats.Disconnects).length > 0) Report += ", Disconnects: " + JSON.stringify(ServerStats.Disconnects);
+	if (Object.keys(ServerStats.Kicks).length > 0) Report += ", Kicks: " + JSON.stringify(ServerStats.Kicks);
+	if (ServerStats.DroppedMessages > 0) Report += ", Dropped messages: " + ServerStats.DroppedMessages;
+	if (ServerStats.HandlerErrors > 0) Report += ", Handler errors: " + ServerStats.HandlerErrors;
+	console.log(Report);
+	ServerEventLoopDelay.reset();
+	ServerStats = ServerStatsCreate();
+	for (const [Address, Bucket] of IPConnectionBuckets)
+		if (Bucket.Tokens + (CommonTime() - Bucket.Time) * Bucket.Rate / 1000 >= Bucket.Burst)
+			IPConnectionBuckets.delete(Address);
+}
+
+/**
+ * Runs a task periodically, its errors are logged instead of crashing the server
+ * @param {() => void} Task
+ * @param {number} Delay
+ */
+function ServerInterval(Task, Delay) {
+	setInterval(() => {
+		try {
+			Task();
+		} catch (error) {
+			console.log("Error in a periodic task: " + ((error && error.stack) || error));
+		}
+	}, Delay);
 }
 
 /**
@@ -417,6 +568,65 @@ function CommonParseInt(thing, defaultValue = 0, base = 10) {
 }
 
 /**
+ * Returns TRUE if the data is nested deeper than allowed or contains binary data, without using recursion
+ * @param {unknown} data
+ * @param {number} MaxDepth
+ * @returns {boolean}
+ */
+function CommonIsInvalidPacket(data, MaxDepth) {
+	const Values = [data];
+	const Depths = [1];
+	while (Values.length > 0) {
+		const Value = Values.pop();
+		const Depth = /** @type {number} */ (Depths.pop());
+		if ((Value == null) || (typeof Value !== "object")) continue;
+		if ((Depth > MaxDepth) || ArrayBuffer.isView(Value) || (Value instanceof ArrayBuffer)) return true;
+		for (const Child of Object.values(Value)) {
+			Values.push(Child);
+			Depths.push(Depth + 1);
+		}
+	}
+	return false;
+}
+
+/**
+ * Adds one to a counter of a record
+ * @param {Record<string, number>} Counters
+ * @param {string} Key
+ */
+function CommonCount(Counters, Key) {
+	Counters[Key] = (Counters[Key] || 0) + 1;
+}
+
+/**
+ * Creates a token bucket: it holds up to Burst tokens and gains Rate tokens per second
+ * @param {number} Rate
+ * @param {number} Burst
+ * @returns {TokenBucket}
+ */
+function CommonTokenBucket(Rate, Burst) {
+	return { Rate: Rate, Burst: Burst, Tokens: Burst, Time: CommonTime() };
+}
+
+/**
+ * Takes a token from a bucket, returns FALSE if there was none left
+ * @param {TokenBucket} Bucket
+ * @param {boolean} AllowDebt - When TRUE, a refused request still takes a token
+ * @returns {boolean}
+ */
+function CommonTokenBucketTake(Bucket, AllowDebt) {
+	const Now = CommonTime();
+	Bucket.Tokens = Math.min(Bucket.Burst, Bucket.Tokens + (Now - Bucket.Time) * Bucket.Rate / 1000);
+	Bucket.Time = Now;
+	if (Bucket.Tokens >= 1) {
+		Bucket.Tokens--;
+		return true;
+	}
+	if (AllowDebt) Bucket.Tokens--;
+	return false;
+}
+
+/**
  * Creates a new account by creating its file
  * @param {ServerAccountCreateRequest} data
  * @param {ServerSocket} socket
@@ -429,19 +639,18 @@ function AccountCreate(data, socket) {
 		// Makes sure the data is valid
 		if (data.Name.match(ServerCharacterNameRegex) && data.AccountName.match(ServerAccountNameRegex) && data.Password.match(ServerAccountPasswordRegex) && (CommonEmailIsValid(data.Email) || data.Email == "") && (data.Email.length <= 100)) {
 
+			// If connection already has a login or an account creation pending, ignore it
+			if (pendingLogins.has(socket)) return;
+
 			// Gets the current IP Address that's creating the account
-			/** @type {string} */
-			let CurrentIP = socket.conn.remoteAddress;
-			if (IP_CONNECTION_PROXY_HEADER && typeof socket.handshake.headers[IP_CONNECTION_PROXY_HEADER] === "string") {
-				const hops = /** @type {string} */ (socket.handshake.headers[IP_CONNECTION_PROXY_HEADER]).split(",");
-				CurrentIP = hops[hops.length-1].trim();
-			}
+			let CurrentIP = AccountGetIP(socket);
 
 			// If the IP is valid
 			if ((CurrentIP != null) && (CurrentIP != "")) {
 
-				// Checks the number of account created in total and in the last hour by this IP
+				// Checks the number of account created in the last day and in the last hour by this IP
 				let CurrentTime = CommonTime();
+				CommonRemoveExpired(AccountCreationIP, CurrentTime - 86400000);
 				let TotalCount = 0;
 				let HourCount = 0;
 				for (let IP of AccountCreationIP)
@@ -449,14 +658,6 @@ function AccountCreate(data, socket) {
 						TotalCount++;
 						if (IP.Time >= CurrentTime - 3600000) HourCount++;
 					}
-
-				/*var mailOptions = {
-					from: "donotreply@bondageprojects.com",
-					to: process.env.EMAIL_ADMIN || "",
-					subject: "Bondage Club Server Info",
-					html: "IP: " + CurrentIP + " is creating account: " + data.AccountName + " at time: " + CommonTime().toString() + "<br />TotalCount: " + TotalCount.toString() + "<br />MAX_IP_ACCOUNT_PER_DAY: " + MAX_IP_ACCOUNT_PER_DAY.toString() + "<br />HourCount: " + HourCount.toString() + "<br />MAX_IP_ACCOUNT_PER_HOUR: " + MAX_IP_ACCOUNT_PER_HOUR.toString()
-				};
-				MailTransporter.sendMail(mailOptions, function (err, info) {});*/
 
 				// Exits if we reached the limit
 				if ((TotalCount >= MAX_IP_ACCOUNT_PER_DAY) || (HourCount >= MAX_IP_ACCOUNT_PER_HOUR)) {
@@ -471,17 +672,19 @@ function AccountCreate(data, socket) {
 
 			// Checks if the account already exists
 			data.AccountName = data.AccountName.toUpperCase();
+			pendingLogins.add(socket);
 			Database.collection(AccountCollection).findOne({ AccountName : data.AccountName }, function(err, result) {
 
 				// Makes sure the result is null so the account doesn't already exists
-				if (err) throw err;
+				if (err) return AccountCreateFailed(socket, "checking if account " + data.AccountName + " exists", err);
 				if (result != null) {
+					pendingLogins.delete(socket);
 					socket.emit("CreationResponse", "Account already exists");
 				} else {
 
 					// Creates a hashed password and saves it with the account info
 					BCrypt.hash(data.Password.toUpperCase(), 10, function( err, hash ) {
-						if (err) throw err;
+						if (err) return AccountCreateFailed(socket, "hashing the password of account " + data.AccountName, err);
 						let account = /** @type {Account} */ ({
 							// ID and Socket are special; they're used at runtime but cannot be
 							// persisted to the database so they're set after that happens.
@@ -502,16 +705,25 @@ function AccountCreate(data, socket) {
 							BlackList: [],
 						});
 						Database.collection(AccountCollection).insertOne(account, function(err, res) {
-							if (err) throw err;
+							pendingLogins.delete(socket);
+
+							// The unique index refused an account name created in the meantime
+							if (err && (err.code === 11000)) {
+								socket.emit("CreationResponse", "Account already exists");
+								return;
+							}
+							if (err) return AccountCreateFailed(socket, "creating account " + account.AccountName, err);
+							if (!socket.connected) return;
+
 							account.ID = socket.id;
 							account.Socket = socket;
 							console.log("Creating new account: " + account.AccountName + " ID: " + socket.id + " " + account.Environment);
 							AccountValidData(account);
-							Account.push(account);
+							AccountAdd(account);
 							OnLogin(socket);
 							socket.emit("CreationResponse", { ServerAnswer: "AccountCreated", OnlineID: account.ID, MemberNumber: account.MemberNumber } );
 							AccountSendServerInfo(socket);
-							AccountPurgeInfo(data);
+							AccountPurgeInfo(account);
 						});
 					});
 
@@ -523,6 +735,18 @@ function AccountCreate(data, socket) {
 
 	} else socket.emit("CreationResponse", "Invalid account information");
 
+}
+
+/**
+ * Answers an account creation that failed because of the server
+ * @param {ServerSocket} socket
+ * @param {string} Context - What the server was doing
+ * @param {Error} err
+ */
+function AccountCreateFailed(socket, Context, err) {
+	pendingLogins.delete(socket);
+	DatabaseError(Context, err);
+	socket.emit("CreationResponse", "Invalid account information");
 }
 
 /**
@@ -586,7 +810,13 @@ function AccountLogin(data, socket) {
 	// If connection already has login queued, ignore it
 	if (pendingLogins.has(socket)) return;
 
-	const shouldRun = loginQueue.length === 0;
+	// Too many failed logins from that IP address
+	if (AccountLoginFailedTooOften(AccountGetIP(socket), data.AccountName.toUpperCase())) {
+		socket.emit("ForceDisconnect", "ErrorRateLimited");
+		socket.disconnect(true);
+		return;
+	}
+
 	loginQueue.push([socket, data.AccountName.toUpperCase(), data.Password]);
 	pendingLogins.add(socket);
 
@@ -594,10 +824,7 @@ function AccountLogin(data, socket) {
 		socket.emit("LoginQueue", loginQueue.length);
 	}
 
-	// If there are no logins being processed, start the processing of the queue
-	if (shouldRun) {
-		AccountLoginRun();
-	}
+	AccountLoginRun();
 }
 
 /**
@@ -607,49 +834,127 @@ function AccountLogin(data, socket) {
 const loginQueue = [];
 
 /**
- * List of sockets, for which there already is a pending login - to prevent duplicate logins during wait time
+ * List of sockets, for which there already is a pending login or account creation - to prevent duplicate logins during wait time
  * @type {WeakSet.<ServerSocket>}
  */
 const pendingLogins = new WeakSet();
 
 /**
- * Runs the next login in queue, waiting for it to finish before running next one
+ * The number of logins being processed right now
+ */
+var loginRunning = 0;
+
+/**
+ * Runs the next logins in queue, up to LOGIN_CONCURRENCY at the same time
  */
 function AccountLoginRun() {
-	// Get next waiting login
-	if (loginQueue.length === 0) return;
-	let nx = loginQueue[0];
+	while ((loginRunning < LOGIN_CONCURRENCY) && (loginQueue.length > 0)) {
 
-	// If client disconnected during wait, ignore it
-	while (!nx[0].connected) {
-		pendingLogins.delete(nx[0]);
-		loginQueue.shift();
-		if (loginQueue.length === 0) return;
-		nx = loginQueue[0];
-	}
-
-	// Process the login and after it queue the next one
-	AccountLoginProcess(...nx).then(() => {
-		pendingLogins.delete(nx[0]);
-		loginQueue.shift();
-		if (loginQueue.length > 0) {
-			setTimeout(AccountLoginRun, 50);
+		// Get next waiting login, if client disconnected during wait, ignore it
+		const nx = /** @type {[ServerSocket, string, string]} */ (loginQueue.shift());
+		if (!nx[0].connected) {
+			pendingLogins.delete(nx[0]);
+			continue;
 		}
-	}, err => { throw err; });
+
+		// Process the login and after it run the next one
+		loginRunning++;
+		AccountLoginProcess(...nx).catch(err => {
+			console.log("Error while logging in account " + nx[1] + ": " + ((err && err.message) || err));
+			if (nx[0].connected) nx[0].emit("LoginResponse", "InvalidNamePassword");
+		}).then(() => {
+			loginRunning--;
+			pendingLogins.delete(nx[0]);
+			AccountLoginRun();
+		});
+	}
 }
 
 // Removes all instances of that character from all chat rooms
 function AccountRemoveFromChatRoom(MemberNumber) {
 	if ((MemberNumber == null) || (Account == null) || (Account.length == 0) || (ChatRoom == null) || (ChatRoom.length == 0)) return;
-	for (let C = 0; C < ChatRoom.length; C++) {
+	for (let C = ChatRoom.length - 1; C >= 0; C--) {
 		if ((ChatRoom[C] != null) && (ChatRoom[C].Account != null) && (ChatRoom[C].Account.length > 0)) {
-			for (let A = 0; A < ChatRoom[C].Account.length; A++)
+			for (let A = ChatRoom[C].Account.length - 1; A >= 0; A--)
 				if ((ChatRoom[C].Account[A] != null) && (ChatRoom[C].Account[A].MemberNumber != null) && (ChatRoom[C].Account[A].MemberNumber == MemberNumber))
 					ChatRoom[C].Account.splice(A, 1);
 			if (ChatRoom[C].Account.length == 0)
 				ChatRoom.splice(C, 1);
 		}
 	}
+}
+
+/**
+ * Gets the IP address of a socket. If there is trusted forward header set by proxy, use that instead, but only trust the last hop!
+ * @param {ServerSocket} socket
+ * @returns {string}
+ */
+function AccountGetIP(socket) {
+	/** @type {string} */
+	let address = socket.conn.remoteAddress;
+	if (IP_CONNECTION_PROXY_HEADER && typeof socket.handshake.headers[IP_CONNECTION_PROXY_HEADER] === "string") {
+		const hops = /** @type {string} */ (socket.handshake.headers[IP_CONNECTION_PROXY_HEADER]).split(",");
+		address = hops[hops.length-1].trim();
+	}
+	return CommonIPGroup(address);
+}
+
+/**
+ * Returns the key used by the limits for an IP address, IPv6 addresses are grouped by /64
+ * @param {string} Address
+ * @returns {string}
+ */
+function CommonIPGroup(Address) {
+	if (typeof Address !== "string") return "";
+	Address = Address.split("%")[0];
+	if (Address.toLowerCase().startsWith("::ffff:") && net.isIPv4(Address.slice(7))) return Address.slice(7);
+	if (!net.isIPv6(Address)) return Address;
+	const Halves = Address.toLowerCase().split("::");
+	const Head = Halves[0] ? Halves[0].split(":") : [];
+	const Tail = (Halves.length > 1 && Halves[1]) ? Halves[1].split(":") : [];
+	const Groups = (Halves.length > 1) ? [...Head, ...new Array(Math.max(0, 8 - Head.length - Tail.length)).fill("0"), ...Tail] : Head;
+	return Groups.slice(0, 4).map(Group => parseInt(Group, 16).toString(16)).join(":") + "::/64";
+}
+
+/**
+ * Removes, in place, the entries of a list that are older than a given time
+ * @param {{ Time: number; }[]} List
+ * @param {number} MinTime
+ */
+function CommonRemoveExpired(List, MinTime) {
+	let Keep = 0;
+	for (const Entry of List)
+		if (Entry.Time >= MinTime)
+			List[Keep++] = Entry;
+	List.length = Keep;
+}
+
+/**
+ * Returns TRUE if that IP address failed to log in too many times recently, on that account or on any account
+ * @param {string} Address
+ * @param {string} AccountName
+ * @returns {boolean}
+ */
+function AccountLoginFailedTooOften(Address, AccountName) {
+	CommonRemoveExpired(LoginFailureIP, CommonTime() - LOGIN_FAILURE_DELAY);
+	let Count = 0;
+	let AccountCount = 0;
+	for (const Failure of LoginFailureIP)
+		if (Failure.Address === Address) {
+			Count++;
+			if (Failure.AccountName === AccountName) AccountCount++;
+		}
+	return (Count >= LOGIN_FAILURE_LIMIT) || (AccountCount >= LOGIN_FAILURE_ACCOUNT_LIMIT);
+}
+
+/**
+ * Answers a failed login and remembers it
+ * @param {ServerSocket} socket
+ * @param {string} AccountName
+ */
+function AccountLoginFailed(socket, AccountName) {
+	LoginFailureIP.push({ Address: AccountGetIP(socket), AccountName: AccountName, Time: CommonTime() });
+	socket.emit("LoginResponse", "InvalidNamePassword");
 }
 
 /**
@@ -665,7 +970,7 @@ async function AccountLoginProcess(socket, AccountName, Password) {
 
 	if (!socket.connected) return;
 	if (result === null) {
-		socket.emit("LoginResponse", "InvalidNamePassword");
+		AccountLoginFailed(socket, AccountName);
 		return;
 	}
 
@@ -674,18 +979,16 @@ async function AccountLoginProcess(socket, AccountName, Password) {
 
 	if (!socket.connected) return;
 	if (!res) {
-		socket.emit("LoginResponse", "InvalidNamePassword");
+		AccountLoginFailed(socket, AccountName);
 		return;
 	}
 
 	// Disconnect duplicated logged accounts
-	for (const Acc of Account) {
-		if (Acc != null && Acc.AccountName === result.AccountName) {
-			Acc.Socket.emit("ForceDisconnect", "ErrorDuplicatedLogin");
-			Acc.Socket.disconnect(true);
-			AccountRemove(Acc.ID);
-			break;
-		}
+	const DuplicateAcc = AccountByName.get(result.AccountName);
+	if (DuplicateAcc != null) {
+		DuplicateAcc.Socket.emit("ForceDisconnect", "ErrorDuplicatedLogin");
+		DuplicateAcc.Socket.disconnect(true);
+		AccountRemove(DuplicateAcc.ID);
 	}
 
 	// Assigns a member number if there's none
@@ -693,23 +996,24 @@ async function AccountLoginProcess(socket, AccountName, Password) {
 		result.MemberNumber = NextMemberNumber;
 		NextMemberNumber++;
 		console.log("Assigning missing member number: " + result.MemberNumber + " for account: " + result.AccountName);
-		Database.collection(AccountCollection).updateOne({ AccountName : result.AccountName }, { $set: { MemberNumber: result.MemberNumber } }, function(err, res) { if (err) throw err; });
+		Database.collection(AccountCollection).updateOne({ AccountName : result.AccountName }, { $set: { MemberNumber: result.MemberNumber } }, DatabaseLogError("updating an account"));
 	}
 
 	// Updates lovership to an array if needed for conversion
 	if (!Array.isArray(result.Lovership)) result.Lovership = (result.Lovership != undefined) ? [result.Lovership] : [];
+	result.Lovership = result.Lovership.filter(Lover => (Lover != null) && (typeof Lover === "object"));
+	AccountSanitizeRelationships(result);
 
 	// Sets the last login date
 	result.LastLogin = CommonTime();
-	Database.collection(AccountCollection).updateOne({ AccountName : result.AccountName }, { $set: { LastLogin: result.LastLogin } }, function(err, res) { if (err) throw err; });
+	Database.collection(AccountCollection).updateOne({ AccountName : result.AccountName }, { $set: { LastLogin: result.LastLogin } }, DatabaseLogError("updating an account"));
 
 	// Logs the account
 	result.ID = socket.id;
 	result.Environment = AccountGetEnvironment(socket);
-	//console.log("Login account: " + result.AccountName + " ID: " + socket.id + " " + result.Environment);
 	AccountValidData(result);
 	AccountRemoveFromChatRoom(result.MemberNumber);
-	Account.push(result);
+	AccountAdd(result);
 	OnLogin(socket);
 	delete result.Password;
 	delete result.Email;
@@ -718,6 +1022,25 @@ async function AccountLoginProcess(socket, AccountName, Password) {
 	AccountSendServerInfo(socket);
 	AccountPurgeInfo(result);
 
+}
+
+/**
+ * Removes the objects found in the relationship fields where a number, a string or a boolean is expected
+ * @param {Partial<Account>} Acc
+ */
+function AccountSanitizeRelationships(Acc) {
+	const IsPrimitive = (/** @type {unknown} */ Value) => (Value == null) || (typeof Value !== "object");
+	const Clean = (/** @type {Record<string, unknown>} */ Obj) => {
+		for (const Key of Object.keys(Obj))
+			if (!IsPrimitive(Obj[Key]) && (Key !== "Notes"))
+				delete Obj[Key];
+	};
+	if (!IsPrimitive(Acc.Owner)) Acc.Owner = "";
+	if ((Acc.Ownership != null) && !CommonIsObject(Acc.Ownership)) Acc.Ownership = null;
+	if (Acc.Ownership != null) Clean(/** @type {any} */ (Acc.Ownership));
+	if (Array.isArray(Acc.Lovership)) for (const Lover of Acc.Lovership) Clean(/** @type {any} */ (Lover));
+	if ((Acc.Difficulty != null) && !CommonIsObject(Acc.Difficulty)) delete Acc.Difficulty;
+	if (Acc.Difficulty != null) Clean(/** @type {any} */ (Acc.Difficulty));
 }
 
 /**
@@ -788,6 +1111,12 @@ function AccountUpdate(data, socket) {
 				// Make sure the object doesn't have any property that starts with a $, to prevent a MongoDB crash
 				SanitizeNames(data);
 
+				// Keys with a dot are MongoDB paths, only the add-on settings use them
+				for (const Key of Object.keys(data))
+					if (Key.includes(".") && !/^ExtensionSettings\.[^.$]+$/.test(Key))
+						delete data[Key];
+				if ((data.Owner != null) && (typeof data.Owner !== "string")) delete data.Owner;
+
 				// Some data is kept for future use
 				if (data.InventoryData != null) Acc.InventoryData = data.InventoryData;
 				if (data.ItemPermission != null) Acc.ItemPermission = data.ItemPermission;
@@ -846,21 +1175,18 @@ function AccountUpdate(data, socket) {
 				// If only the appearance is updated, we keep the change in memory and do not update the database right away
 				if ((Acc != null) && !ObjectEmpty(data) && (Object.keys(data).length == 1) && (data.Appearance != null)) {
 					Acc.DelayedAppearanceUpdate = data.Appearance;
-					//console.log("TO REMOVE - Keeping Appearance in memory for account: " + Acc.AccountName);
 					return;
 				}
 
 				// If only the skill is updated, we keep the change in memory and do not update the database right away
 				if ((Acc != null) && !ObjectEmpty(data) && (Object.keys(data).length == 1) && (data.Skill != null)) {
 					Acc.DelayedSkillUpdate = data.Skill;
-					//console.log("TO REMOVE - Keeping Skill in memory for account: " + Acc.AccountName);
 					return;
 				}
 
 				// If only the game is updated, we keep the change in memory and do not update the database right away
 				if ((Acc != null) && !ObjectEmpty(data) && (Object.keys(data).length == 1) && (data.Game != null)) {
 					Acc.DelayedGameUpdate = data.Game;
-					//console.log("TO REMOVE - Keeping Game in memory for account: " + Acc.AccountName);
 					return;
 				}
 
@@ -925,8 +1251,12 @@ function AccountUpdateEmail(data, socket) {
 		( err, result ) => {
 
 			// If the account already had an email, we validate the old email supplied vs the current in the database
-			if (err) throw err;
-			if (result.Email && data.EmailOld.trim().toLowerCase() !== result.Email.trim().toLowerCase()) {
+			if (err) DatabaseError("reading the email of account " + Acc.AccountName, err);
+			if (err || (result == null)) {
+				socket.emit("AccountQueryResult", { Query: "EmailUpdate", Result: false });
+				return;
+			}
+			if (result.Email && data.EmailOld.trim().toLowerCase() !== String(result.Email).trim().toLowerCase()) {
 				socket.emit("AccountQueryResult", { Query: "EmailUpdate", Result: false });
 				return;
 			}
@@ -936,7 +1266,11 @@ function AccountUpdateEmail(data, socket) {
 				{ AccountName : Acc.AccountName },
 				{ $set: { Email: data.EmailNew } },
 				function(err, res) {
-					if (err) throw err;
+					if (err) {
+						DatabaseError("updating the email of account " + Acc.AccountName, err);
+						socket.emit("AccountQueryResult", { Query: "EmailUpdate", Result: false });
+						return;
+					}
 					console.log("Account " + Acc.AccountName + " updated email from " + data.EmailOld + " to " + data.EmailNew);
 					socket.emit("AccountQueryResult", { Query: "EmailUpdate", Result: true });
 				}
@@ -993,32 +1327,32 @@ function AccountQuery(data, socket) {
 				// Add all submissives owned by the player and all lovers of the players to the list
 				/** @type {ServerFriendInfo[]} */
 				var Friends = [];
-				var Index = [];
+				/** @type {Set<number>} */
+				var Index = new Set();
 				for (const OtherAcc of Account) {
-					var LoversNumbers = [];
-					for (var L = 0; L < OtherAcc.Lovership.length; L++) {
-						if ((OtherAcc.Lovership[L] != null) && (OtherAcc.Lovership[L].MemberNumber != null)) { LoversNumbers.push(OtherAcc.Lovership[L].MemberNumber); }
-					}
 					if (OtherAcc.Environment == Acc.Environment) {
 						var IsOwned = (OtherAcc.Ownership != null) && (OtherAcc.Ownership.MemberNumber != null) && (OtherAcc.Ownership.MemberNumber == Acc.MemberNumber);
-						var IsLover = LoversNumbers.indexOf(Acc.MemberNumber) >= 0;
+						var IsLover = false;
+						for (const Lover of OtherAcc.Lovership)
+							if ((Lover != null) && (Lover.MemberNumber != null) && (Lover.MemberNumber === Acc.MemberNumber)) {
+								IsLover = true;
+								break;
+							}
 						if (IsOwned || IsLover) {
 							Friends.push(AccountQueryGetFriendInfo(IsOwned ? "Submissive" : "Lover", OtherAcc));
-							Index.push(OtherAcc.MemberNumber);
+							Index.add(OtherAcc.MemberNumber);
 						}
 					}
 				}
 
 				// Builds the online friend list, both players must be friends to find each other
-				for (var F = 0; F < Acc.FriendList.length; F++)
-					if ((Acc.FriendList[F] != null) && (typeof Acc.FriendList[F] === "number"))
-						if (Index.indexOf(Acc.FriendList[F]) < 0) // No need to search for the friend if she's owned
-							for (const OtherAcc of Account)
-								if (OtherAcc.MemberNumber == Acc.FriendList[F]) {
-									if ((OtherAcc.Environment == Acc.Environment) && (OtherAcc.FriendList != null) && (OtherAcc.FriendList.indexOf(Acc.MemberNumber) >= 0))
-										Friends.push(AccountQueryGetFriendInfo("Friend", OtherAcc));
-									break;
-								}
+				for (const FriendNumber of Acc.FriendList)
+					if ((FriendNumber != null) && (typeof FriendNumber === "number"))
+						if (!Index.has(FriendNumber)) { // No need to search for the friend if she's owned
+							const OtherAcc = AccountByMemberNumber.get(FriendNumber);
+							if ((OtherAcc != null) && (OtherAcc.Environment == Acc.Environment) && (OtherAcc.FriendList != null) && (OtherAcc.FriendList.indexOf(Acc.MemberNumber) >= 0))
+								Friends.push(AccountQueryGetFriendInfo("Friend", OtherAcc));
+						}
 
 				// Sends the query result to the client
 				socket.emit("AccountQueryResult", { Query: data.Query, Result: Friends });
@@ -1027,10 +1361,10 @@ function AccountQuery(data, socket) {
 
 			// EmailStatus query - returns true if an email is linked to the account
 			if (data.Query == "EmailStatus") {
-				Database.collection(AccountCollection).find({ AccountName : Acc.AccountName }).toArray(function(err, result) {
-					if (err) throw err;
-					if ((result != null) && (typeof result === "object") && (result.length > 0)) {
-						socket.emit("AccountQueryResult", /** @type {ServerAccountQueryEmailStatus} */ ({ Query: data.Query, Result: ((result[0].Email != null) && (result[0].Email != "")) }));
+				Database.collection(AccountCollection).findOne({ AccountName : Acc.AccountName }, { projection: { Email: 1, _id: 0 } }, function(err, result) {
+					if (err) return DatabaseError("reading an email status", err);
+					if ((result != null) && (typeof result === "object")) {
+						socket.emit("AccountQueryResult", /** @type {ServerAccountQueryEmailStatus} */ ({ Query: data.Query, Result: ((result.Email != null) && (result.Email != "")) }));
 					}
 				});
 			}
@@ -1049,21 +1383,26 @@ function AccountBeep(data, socket) {
 
 		// Make sure both accounts are online, friends and sends the beep to the friend
 		var Acc = AccountGet(socket.id);
-		if (Acc != null)
-			for (const OtherAcc of Account)
-				if (OtherAcc.MemberNumber == data.MemberNumber)
-					if ((OtherAcc.Environment == Acc.Environment) && (((OtherAcc.FriendList != null) && (OtherAcc.FriendList.indexOf(Acc.MemberNumber) >= 0)) || ((OtherAcc.Ownership != null) && (OtherAcc.Ownership.MemberNumber != null) && (OtherAcc.Ownership.MemberNumber == Acc.MemberNumber)) || ((data.BeepType != null) && (typeof data.BeepType === "string") && (data.BeepType == "Leash")))) {
-						OtherAcc.Socket.emit("AccountBeep", {
-							MemberNumber: Acc.MemberNumber,
-							MemberName: Acc.Name,
-							ChatRoomSpace: (Acc.ChatRoom == null || data.IsSecret) ? null : Acc.ChatRoom.Space,
-							ChatRoomName: (Acc.ChatRoom == null || data.IsSecret) ? null : Acc.ChatRoom.Name,
-							Private: (Acc.ChatRoom == null || data.IsSecret) ? null : ChatRoomRoleListIsRestrictive(Acc.ChatRoom.Visibility),
-							BeepType: (data.BeepType) ? data.BeepType : null,
-							Message: data.Message
-						});
-						break;
-					}
+		var OtherAcc = AccountByMemberNumber.get(data.MemberNumber);
+		if ((Acc != null) && (OtherAcc != null) && (OtherAcc.Environment == Acc.Environment)) {
+			const IsFriend = (OtherAcc.FriendList != null) && (OtherAcc.FriendList.indexOf(Acc.MemberNumber) >= 0);
+			const IsOwner = (OtherAcc.Ownership != null) && (OtherAcc.Ownership.MemberNumber != null) && (OtherAcc.Ownership.MemberNumber == Acc.MemberNumber);
+			const IsLeash = (data.BeepType != null) && (typeof data.BeepType === "string") && (data.BeepType == "Leash") && Array.isArray(OtherAcc.BlackList) && (OtherAcc.BlackList.indexOf(Acc.MemberNumber) < 0);
+			if (!IsFriend && !IsOwner && !IsLeash) return;
+
+			if (!BeepBuckets.has(socket)) BeepBuckets.set(socket, CommonTokenBucket(BEEP_RATE_LIMIT, BEEP_BURST));
+			if (!CommonTokenBucketTake(/** @type {TokenBucket} */ (BeepBuckets.get(socket)), false)) return;
+
+			OtherAcc.Socket.emit("AccountBeep", {
+				MemberNumber: Acc.MemberNumber,
+				MemberName: Acc.Name,
+				ChatRoomSpace: (Acc.ChatRoom == null || data.IsSecret) ? null : Acc.ChatRoom.Space,
+				ChatRoomName: (Acc.ChatRoom == null || data.IsSecret) ? null : Acc.ChatRoom.Name,
+				Private: (Acc.ChatRoom == null || data.IsSecret) ? null : ChatRoomRoleListIsRestrictive(Acc.ChatRoom.Visibility),
+				BeepType: (data.BeepType) ? data.BeepType : null,
+				Message: data.Message
+			});
+		}
 
 	}
 }
@@ -1071,17 +1410,15 @@ function AccountBeep(data, socket) {
 // Updates an account appearance if needed
 function AccountDelayedUpdateOne(AccountName, NewAppearance, NewSkill, NewGame) {
 	if ((AccountName == null) || ((NewAppearance == null) && (NewSkill == null) && (NewGame == null))) return;
-	//console.log("TO REMOVE - Updating Appearance, Skill or Game in database for account: " + AccountName);
 	let UpdateObj = {};
 	if (NewAppearance != null) UpdateObj.Appearance = NewAppearance;
 	if (NewSkill != null) UpdateObj.Skill = NewSkill;
 	if (NewGame != null) UpdateObj.Game = NewGame;
-	Database.collection(AccountCollection).updateOne({ AccountName: AccountName }, { $set: UpdateObj }, function(err, res) { if (err) throw err; });
+	Database.collection(AccountCollection).updateOne({ AccountName: AccountName }, { $set: UpdateObj }, DatabaseLogError("updating an account"));
 }
 
 // Called every X seconds to update the database with appearance updates
 function AccountDelayedUpdate() {
-	//console.log("TO REMOVE - Scanning for account delayed updates");
 	for (const Acc of Account) {
 		if (Acc != null) {
 			AccountDelayedUpdateOne(Acc.AccountName, Acc.DelayedAppearanceUpdate, Acc.DelayedSkillUpdate, Acc.DelayedGameUpdate);
@@ -1092,27 +1429,37 @@ function AccountDelayedUpdate() {
 	}
 }
 
-// Removes the account from the buffer
+/**
+ * Adds a logged account to the buffer
+ * @param {Account} Acc
+ */
+function AccountAdd(Acc) {
+	Account.push(Acc);
+	AccountByID.set(Acc.ID, Acc);
+	AccountByMemberNumber.set(Acc.MemberNumber, Acc);
+	AccountByName.set(Acc.AccountName, Acc);
+}
+
 /**
  * Removes the account from the buffer
  * @param {string} ID
  */
 function AccountRemove(ID) {
-	if (ID != null)
-		for (const Acc of Account)
-			if (Acc.ID == ID) {
-				let AccName = Acc.AccountName;
-				let AccDelayedAppearanceUpdate = Acc.DelayedAppearanceUpdate;
-				let AccDelayedSkillUpdate = Acc.DelayedSkillUpdate;
-				let AccDelayedGameUpdate = Acc.DelayedGameUpdate;
-				//console.log("Disconnecting account: " + Acc.AccountName + " ID: " + ID);
-				ChatRoomRemove(Acc, "ServerDisconnect", []);
-				const index = Account.indexOf(Acc);
-				if (index >= 0)
-					Account.splice(index, 1);
-				AccountDelayedUpdateOne(AccName, AccDelayedAppearanceUpdate, AccDelayedSkillUpdate, AccDelayedGameUpdate);
-				break;
-			}
+	if (ID == null) return;
+	const Acc = AccountByID.get(ID);
+	if (Acc == null) return;
+	let AccName = Acc.AccountName;
+	let AccDelayedAppearanceUpdate = Acc.DelayedAppearanceUpdate;
+	let AccDelayedSkillUpdate = Acc.DelayedSkillUpdate;
+	let AccDelayedGameUpdate = Acc.DelayedGameUpdate;
+	ChatRoomRemove(Acc, "ServerDisconnect", []);
+	AccountByID.delete(ID);
+	if (AccountByMemberNumber.get(Acc.MemberNumber) === Acc) AccountByMemberNumber.delete(Acc.MemberNumber);
+	if (AccountByName.get(Acc.AccountName) === Acc) AccountByName.delete(Acc.AccountName);
+	const index = Account.indexOf(Acc);
+	if (index >= 0)
+		Account.splice(index, 1);
+	AccountDelayedUpdateOne(AccName, AccDelayedAppearanceUpdate, AccDelayedSkillUpdate, AccDelayedGameUpdate);
 }
 
 /**
@@ -1121,10 +1468,7 @@ function AccountRemove(ID) {
  * @returns {Account|null}
  */
 function AccountGet(ID) {
-	for (const Acc of Account)
-		if (Acc.ID == ID)
-			return Acc;
-	return null;
+	return AccountByID.get(ID) || null;
 }
 
 /**
@@ -1164,10 +1508,11 @@ function ChatRoomSearch(data, socket) {
 	const FullRooms = typeof data.FullRooms === "boolean" ? data.FullRooms : false;
 
 	// Checks if the user opted to ignore certain rooms
-	let IgnoredRooms = [];
+	/** @type {Set<string>} */
+	let IgnoredRooms = new Set();
 	if (Array.isArray(data.Ignore)) {
 		// Validate array, only strings are valid.
-		IgnoredRooms = data.Ignore.filter(R => typeof R === "string" && R.match(ServerChatRoomNameRegex)).map(r => r.toUpperCase());
+		IgnoredRooms = new Set(data.Ignore.filter(R => typeof R === "string" && R.match(ServerChatRoomNameRegex)).map(r => r.toUpperCase()));
 	}
 
 	// Grab the search language
@@ -1177,21 +1522,23 @@ function ChatRoomSearch(data, socket) {
 	} else if (Array.isArray(data.Language)) {
 		Languages = Languages.concat(data.Language);
 	}
+	const LanguageSet = new Set(Languages);
+	const SpaceSet = new Set(Spaces);
 
 	// Whether we also search the room descriptions
 	const SearchDescs = typeof data.SearchDescs === "boolean" ? data.SearchDescs : false;
 
 	// Check if we have a map type filter
-	let MapTypes = [];
+	/** @type {Set<string>} */
+	let MapTypes = new Set();
 	if (Array.isArray(data.MapTypes)) {
-		MapTypes = data.MapTypes.filter(t => typeof t === "string" && t.length < 20);
+		MapTypes = new Set(data.MapTypes.filter(t => typeof t === "string" && t.length < 20));
 	}
 
 	// Builds a list of all public rooms, the last rooms created are shown first
-	const rooms = [...ChatRoom].reverse();
-
 	const CR = [];
-	for (const room of rooms) {
+	for (let R = ChatRoom.length - 1; R >= 0; R--) {
+		const room = ChatRoom[R];
 		if (!room) continue;
 
 		const roomName = room.Name.toUpperCase();
@@ -1206,13 +1553,13 @@ function ChatRoomSearch(data, socket) {
 		if (room.Account.length >= room.Limit && !FullRooms) continue;
 
 		// Room isn't in the correct space, skip
-		if (!Spaces.includes(room.Space)) continue;
+		if (!SpaceSet.has(room.Space)) continue;
 
 		// Player is banned from the room, skip
 		if (room.Ban.includes(Acc.MemberNumber)) continue;
 
 		// Room is for a different language than requested, skip
-		if (Languages.length !== 0 && !Languages.includes(room.Language)) continue;
+		if (LanguageSet.size !== 0 && !LanguageSet.has(room.Language)) continue;
 
 		// We have a search query
 		if (Query !== "") {
@@ -1232,10 +1579,10 @@ function ChatRoomSearch(data, socket) {
 		if (!data.ShowLocked && !ChatRoomAccountHasAnyRole(Acc, room, room.Access)) continue;
 
 		// Room is in our ignore list, skip
-		if (IgnoredRooms.includes(roomName)) continue;
+		if (IgnoredRooms.has(roomName)) continue;
 
 		// Only allow requested map types
-		if (MapTypes.length > 0 && !MapTypes.includes(room.MapData?.Type)) continue;
+		if (MapTypes.size > 0 && !MapTypes.has(room.MapData?.Type)) continue;
 
 		const result = ChatRoomSearchAddResult(Acc, room);
 		if (!result) continue;
@@ -1341,8 +1688,9 @@ function ChatRoomCreate(data, socket) {
 			}
 
 			// Check if the same name already exists and quits if that's the case
+			const RoomName = data.Name.toUpperCase().trim();
 			for (const Room of ChatRoom)
-				if (Room.Name.toUpperCase().trim() == data.Name.toUpperCase().trim()) {
+				if (Room.Name.toUpperCase().trim() == RoomName) {
 					socket.emit("ChatRoomCreateResponse", "RoomAlreadyExist");
 					return;
 				}
@@ -1394,7 +1742,6 @@ function ChatRoomCreate(data, socket) {
 			ChatRoom.push(NewRoom);
 			Acc.ChatRoom = NewRoom;
 			NewRoom.Account.push(Acc);
-			//console.log("Chat room (" + ChatRoom.length.toString() + ") " + data.Name + " created by account " + Acc.AccountName + ", ID: " + socket.id);
 			socket.join("chatroom-" + NewRoom.ID);
 			socket.emit("ChatRoomCreateResponse", "ChatRoomCreated");
 			ChatRoomSync(NewRoom, Acc.MemberNumber);
@@ -1420,8 +1767,9 @@ function ChatRoomJoin(data, socket) {
 		if (Acc != null) {
 
 			// Finds the room and join it
+			const RoomName = data.Name.toUpperCase().trim();
 			for (const Room of ChatRoom)
-				if (Room.Name.toUpperCase().trim() == data.Name.toUpperCase().trim())
+				if (Room.Name.toUpperCase().trim() == RoomName)
 					if (Acc.Environment == Room.Environment)
 						if (Room.Account.length < Room.Limit) {
 							if (Room.Ban.indexOf(Acc.MemberNumber) < 0) {
@@ -1431,7 +1779,7 @@ function ChatRoomJoin(data, socket) {
 									if (Acc.ChatRoom == null || Acc.ChatRoom.ID !== Room.ID) {
 										ChatRoomRemove(Acc, "ServerLeave", []);
 										Acc.ChatRoom = Room;
-										if (Account.find(A => Acc.MemberNumber === A.MemberNumber)) {
+										if (AccountByMemberNumber.has(Acc.MemberNumber)) {
 											Room.Account.push(Acc);
 											socket.join("chatroom-" + Room.ID);
 											socket.emit("ChatRoomSearchResponse", "JoinedRoom");
@@ -1486,12 +1834,8 @@ function ChatRoomRemove(Acc, Reason, Dictionary) {
 
 		// Destroys the room if it's empty, warn other players if not
 		if (Acc.ChatRoom.Account.length == 0) {
-			for (var C = 0; C < ChatRoom.length; C++)
-				if (Acc.ChatRoom.Name == ChatRoom[C].Name) {
-					//console.log("Chat room " + Acc.ChatRoom.Name + " was destroyed. Rooms left: " + (ChatRoom.length - 1).toString());
-					ChatRoom.splice(C, 1);
-					break;
-				}
+			const C = ChatRoom.indexOf(Acc.ChatRoom);
+			if (C >= 0) ChatRoom.splice(C, 1);
 		} else {
 			if (!Dictionary || (Dictionary.length == 0)) Dictionary.push({Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber});
 			ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, Reason, "Action", null, Dictionary);
@@ -1848,11 +2192,10 @@ function ChatRoomCharacterUpdate(data, socket) {
 				for (const RoomAcc of Acc.ChatRoom.Account)
 					if ((RoomAcc.ID == data.ID) && ChatRoomGetAllowItem(Acc, RoomAcc))
 						if ((typeof data.Appearance === "object") && Array.isArray(data.Appearance)) {
-							// Database.collection(AccountCollection).updateOne({ AccountName: RoomAcc.AccountName }, { $set: { Appearance: data.Appearance } }, function(err, res) { if (err) throw err; });
-							//console.log("TO REMOVE - Keeping Appearance in memory for account: " + Acc.AccountName);
 							if (data.Appearance != null) RoomAcc.DelayedAppearanceUpdate = data.Appearance;
 							RoomAcc.Appearance = data.Appearance;
 							RoomAcc.ActivePose = data.ActivePose;
+							SanitizeNames(data.Appearance);
 							ChatRoomSyncSingle(RoomAcc, Acc.MemberNumber);
 						}
 	}
@@ -1989,8 +2332,9 @@ function ChatRoomAdmin(data, socket) {
 				if ((data.Room != null) && (typeof data.Room === "object") && (data.Room.Name != null) && (data.Room.Description != null) && (data.Room.Background != null) && (typeof data.Room.Name === "string") && (typeof data.Room.Description === "string") && (typeof data.Room.Background === "string") && (data.Room.Admin != null) && (Array.isArray(data.Room.Admin)) && (!data.Room.Admin.some(i => !Number.isInteger(i))) && (data.Room.Ban != null) && (Array.isArray(data.Room.Ban)) && (!data.Room.Ban.some(i => !Number.isInteger(i)))) {
 					data.Room.Name = data.Room.Name.trim();
 					if (data.Room.Name.match(ServerChatRoomNameRegex) && (data.Room.Description.length <= ServerChatRoomDescriptionMaxLength) && (data.Room.Background.length <= 100)) {
+						const RoomName = data.Room.Name.toUpperCase().trim();
 						for (const Room of ChatRoom)
-							if (Acc.ChatRoom && Acc.ChatRoom.Name != data.Room.Name && Room.Name.toUpperCase().trim() == data.Room.Name.toUpperCase().trim()) {
+							if (Acc.ChatRoom && Acc.ChatRoom.Name != data.Room.Name && Room.Name.toUpperCase().trim() == RoomName) {
 								socket.emit("ChatRoomUpdateResponse", "RoomAlreadyExist");
 								return;
 							}
@@ -2201,7 +2545,7 @@ function ChatRoomAccountHasAnyRole(Acc, room, roles) {
 function ChatRoomDominantValue(Account) {
 	if ((Account.Reputation != null) && (Array.isArray(Account.Reputation)))
 		for (const Rep of Account.Reputation)
-			if ((Rep.Type != null) && (Rep.Value != null) && (typeof Rep.Type === "string") && (typeof Rep.Value === "number") && (Rep.Type == "Dominant"))
+			if ((Rep != null) && (typeof Rep === "object") && (Rep.Type != null) && (Rep.Value != null) && (typeof Rep.Type === "string") && (typeof Rep.Value === "number") && (Rep.Type == "Dominant"))
 				return CommonParseInt(Rep.Value, 0);
 	return 0;
 }
@@ -2280,12 +2624,15 @@ function ChatRoomAllowItem(data, socket) {
  * @param {string} ResetNumber
  */
 function PasswordResetSetNumber(AccountName, ResetNumber) {
+	CommonRemoveExpired(PasswordResetProgress, CommonTime() - PasswordResetExpiry);
 	for (const PasswordReset of PasswordResetProgress)
 		if (PasswordReset.AccountName.trim() == AccountName.trim()) {
 			PasswordReset.ResetNumber = ResetNumber;
+			PasswordReset.Time = CommonTime();
+			PasswordReset.Attempts = 0;
 			return;
 		}
-	PasswordResetProgress.push({ AccountName: AccountName, ResetNumber: ResetNumber });
+	PasswordResetProgress.push({ AccountName: AccountName, ResetNumber: ResetNumber, Time: CommonTime(), Attempts: 0 });
 }
 
 /**
@@ -2296,15 +2643,28 @@ function PasswordResetSetNumber(AccountName, ResetNumber) {
 function PasswordReset(data, socket) {
 	if ((data != null) && (typeof data === "string") && (data != "") && CommonEmailIsValid(data)) {
 
-		// One email reset password per 5 seconds to prevent flooding
-		if (NextPasswordReset > CommonTime()) return socket.emit("PasswordResetResponse", "RetryLater");
-		NextPasswordReset = CommonTime() + 5000;
+		// Limits the reset emails per address and per IP to prevent flooding
+		const Address = AccountGetIP(socket);
+		const Email = data.trim().toLowerCase();
+		const CurrentTime = CommonTime();
+		CommonRemoveExpired(PasswordResetRequests, CurrentTime - 3600000);
+		let IPCount = 0;
+		for (const Request of PasswordResetRequests) {
+			if ((Request.Email === Email) && (Request.Time > CurrentTime - PasswordResetEmailDelay)) return socket.emit("PasswordResetResponse", "RetryLater");
+			if (Request.Address === Address) IPCount++;
+		}
+		if (IPCount >= PasswordResetIPLimit) return socket.emit("PasswordResetResponse", "RetryLater");
+		PasswordResetRequests.push({ Address: Address, Email: Email, Time: CurrentTime });
 
 		// Gets all accounts that matches the email
 		Database.collection(AccountCollection).find({ Email : data }).toArray(function(err, result) {
 
 			// If we found accounts with that email
-			if (err) throw err;
+			if (err) {
+				DatabaseError("finding the accounts of an email for a password reset", err);
+				socket.emit("PasswordResetResponse", "EmailSentError");
+				return;
+			}
 			if ((result != null) && (typeof result === "object") && (result.length > 0)) {
 
 				// Builds a reset number for each account found and creates the email body
@@ -2336,7 +2696,7 @@ function PasswordReset(data, socket) {
 					}
 				});
 
-			} else socket.emit("PasswordResetResponse", "NoAccountOnEmail");
+			} else socket.emit("PasswordResetResponse", "EmailSent");
 
 		});
 
@@ -2354,15 +2714,27 @@ function PasswordResetProcess(data, socket) {
 		// Makes sure the data is valid
 		if (data.AccountName.match(ServerAccountNameRegex) && data.NewPassword.match(ServerAccountPasswordRegex)) {
 
-			// Checks if the reset number matches
+			// Checks if the reset number matches, the reset is cancelled after too many wrong numbers
+			CommonRemoveExpired(PasswordResetProgress, CommonTime() - PasswordResetExpiry);
 			for (const PasswordReset of PasswordResetProgress)
-				if ((PasswordReset.AccountName == data.AccountName) && (PasswordReset.ResetNumber == data.ResetNumber)) {
+				if (PasswordReset.AccountName == data.AccountName) {
+					if (PasswordReset.ResetNumber != data.ResetNumber) {
+						PasswordReset.Attempts++;
+						if (PasswordReset.Attempts >= PasswordResetMaxAttempts)
+							PasswordResetProgress.splice(PasswordResetProgress.indexOf(PasswordReset), 1);
+						break;
+					}
+					PasswordResetProgress.splice(PasswordResetProgress.indexOf(PasswordReset), 1);
 
 					// Creates a hashed password and updates the account with it
 					BCrypt.hash(data.NewPassword.toUpperCase(), 10, function( err, hash ) {
-						if (err) throw err;
+						if (err) {
+							DatabaseError("hashing the new password of account " + data.AccountName, err);
+							socket.emit("PasswordResetResponse", "InvalidPasswordResetInfo");
+							return;
+						}
 						console.log("Updating password for account: " + data.AccountName);
-						Database.collection(AccountCollection).updateOne({ AccountName : data.AccountName }, { $set: { Password: hash } }, function(err, res) { if (err) throw err; });
+						Database.collection(AccountCollection).updateOne({ AccountName : data.AccountName }, { $set: { Password: hash } }, DatabaseLogError("updating an account"));
 						socket.emit("PasswordResetResponse", "PasswordResetSuccessful");
 					});
 					return;
@@ -2394,7 +2766,7 @@ function AccountOwnership(data, socket) {
 				Acc.Owner = "";
 				Acc.Ownership = null;
 				let O = { Ownership: Acc.Ownership, Owner: Acc.Owner };
-				Database.collection(AccountCollection).updateOne({ AccountName : Acc.AccountName }, { $set: O }, function(err, res) { if (err) throw err; });
+				Database.collection(AccountCollection).updateOne({ AccountName : Acc.AccountName }, { $set: O }, DatabaseLogError("updating an account"));
 				socket.emit("AccountOwnership", { ClearOwnership: true });
 				return;
 			}
@@ -2408,12 +2780,16 @@ function AccountOwnership(data, socket) {
 		if (!TargetAcc && (data.Action === "Release") && (Acc.MemberNumber != null) && (data.MemberNumber != null)) {
 
 			// Gets the account linked to that member number, make sure
-			Database.collection(AccountCollection).findOne({ MemberNumber : data.MemberNumber }, function(err, result) {
-				if (err) throw err;
+			Database.collection(AccountCollection).findOne({ MemberNumber : data.MemberNumber }, { projection: { AccountName: 1, MemberNumber: 1, Ownership: 1, _id: 0 } }, function(err, result) {
+				if (err) {
+					DatabaseError("finding the submissive to release", err);
+					ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "ReleaseFail", "ServerMessage", Acc.MemberNumber);
+					return;
+				}
 				if ((result != null) && (result.MemberNumber != null) && (result.MemberNumber === data.MemberNumber) && (result.Ownership != null) && (result.Ownership.MemberNumber === Acc.MemberNumber)) {
-					Database.collection(AccountCollection).updateOne({ AccountName : result.AccountName }, { $set: { Owner: "", Ownership: null } }, function(err, res) { if (err) throw err; });
+					Database.collection(AccountCollection).updateOne({ AccountName : result.AccountName }, { $set: { Owner: "", Ownership: null } }, DatabaseLogError("updating an account"));
 					ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "ReleaseSuccess", "ServerMessage", Acc.MemberNumber);
-					let Target = Account.find(A => A.MemberNumber === data.MemberNumber);
+					let Target = AccountByMemberNumber.get(data.MemberNumber);
 					if (!Target) return;
 					Target.Owner = "";
 					Target.Ownership = null;
@@ -2447,7 +2823,7 @@ function AccountOwnership(data, socket) {
 				{ AccountName: TargetAcc.AccountName },
 				{ $set: O },
 				function(err, _res) {
-					if (err) throw err;
+					if (err) DatabaseError("updating the ownership notes of account " + TargetAcc.AccountName, err);
 					TargetAcc.Socket.emit("AccountOwnership", O);
 					ChatRoomSyncCharacter(TargetAcc.ChatRoom, TargetAcc.MemberNumber, TargetAcc.MemberNumber);
 				});
@@ -2460,7 +2836,7 @@ function AccountOwnership(data, socket) {
 			TargetAcc.Owner = "";
 			TargetAcc.Ownership = null;
 			let O = { Ownership: TargetAcc.Ownership, Owner: TargetAcc.Owner };
-			Database.collection(AccountCollection).updateOne({ AccountName : TargetAcc.AccountName }, { $set: O }, function(err, res) { if (err) throw err; });
+			Database.collection(AccountCollection).updateOne({ AccountName : TargetAcc.AccountName }, { $set: O }, DatabaseLogError("updating an account"));
 			TargetAcc.Socket.emit("AccountOwnership", { ClearOwnership: true });
 			ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, isTrial ? "EndOwnershipTrial" : "EndOwnership", "ServerMessage", null, [
 				{ Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber },
@@ -2524,7 +2900,7 @@ function AccountOwnership(data, socket) {
 						Acc.Owner = "";
 						Acc.Ownership = { MemberNumber: data.MemberNumber, Name: TargetAcc.Name, Start: CommonTime(), Stage: 0 };
 						let O = { Ownership: Acc.Ownership, Owner: Acc.Owner };
-						Database.collection(AccountCollection).updateOne({ AccountName : Acc.AccountName }, { $set: O }, function(err, res) { if (err) throw err; });
+						Database.collection(AccountCollection).updateOne({ AccountName : Acc.AccountName }, { $set: O }, DatabaseLogError("updating an account"));
 						socket.emit("AccountOwnership", O);
 						ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "StartTrial", "ServerMessage", null, [{ Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber }]);
 						ChatRoomSyncCharacter(Acc.ChatRoom, Acc.MemberNumber, Acc.MemberNumber);
@@ -2541,7 +2917,7 @@ function AccountOwnership(data, socket) {
 						Acc.Owner = TargetAcc.Name;
 						Acc.Ownership = { MemberNumber: data.MemberNumber, Name: TargetAcc.Name, Start: CommonTime(), Stage: 1 };
 						let O = { Ownership: Acc.Ownership, Owner: Acc.Owner };
-						Database.collection(AccountCollection).updateOne({ AccountName : Acc.AccountName }, { $set: O }, function(err, res) { if (err) throw err; });
+						Database.collection(AccountCollection).updateOne({ AccountName : Acc.AccountName }, { $set: O }, DatabaseLogError("updating an account"));
 						socket.emit("AccountOwnership", O);
 						ChatRoomMessage(Acc.ChatRoom, Acc.MemberNumber, "EndTrial", "ServerMessage", null, [{ Tag: "SourceCharacter", Text: Acc.Name, MemberNumber: Acc.MemberNumber }]);
 						ChatRoomSyncCharacter(Acc.ChatRoom, Acc.MemberNumber, Acc.MemberNumber);
@@ -2581,7 +2957,7 @@ function AccountLovership(data, socket) {
 				}
 			}
 			const L = { Lovership: newLovership };
-			Database.collection(AccountCollection).updateOne({ MemberNumber : MemberNumber}, { $set: L }, function(err, res) { if (err) throw err; });
+			Database.collection(AccountCollection).updateOne({ MemberNumber : MemberNumber}, { $set: L }, DatabaseLogError("updating an account"));
 			if (Emit) CurrentSocket.emit("AccountLovership", L);
 		}
 
@@ -2603,15 +2979,15 @@ function AccountLovership(data, socket) {
 
 				// Update the other account if she's online, then update the database
 				var P = [];
-				Database.collection(AccountCollection).find({ MemberNumber : data.MemberNumber }).sort({MemberNumber: -1}).limit(1).toArray(function(err, result) {
-					if (err) throw err;
+				Database.collection(AccountCollection).find({ MemberNumber : data.MemberNumber }, { projection: { Lovership: 1, _id: 0 } }).sort({MemberNumber: -1}).limit(1).toArray(function(err, result) {
+					if (err) return DatabaseError("finding the lover to break up with", err);
 					if ((result != null) && (typeof result === "object") && (result.length > 0)) {
 						P = result[0].Lovership;
 
 						var TargetLoversNumbers = [];
 						if ((P != null) && Array.isArray(P))
 							for (const Lover of P)
-								TargetLoversNumbers.push(Lover.MemberNumber ? Lover.MemberNumber : -1);
+								TargetLoversNumbers.push((Lover != null) && Lover.MemberNumber ? Lover.MemberNumber : -1);
 
 						var TL = TargetLoversNumbers.indexOf(Acc.MemberNumber);
 						// Don't try to remove an already removed lover
@@ -2619,13 +2995,13 @@ function AccountLovership(data, socket) {
 							if (Array.isArray(P)) P.splice(TL, 1);
 							else P = [];
 
-							for (const OtherAcc of Account)
-								if (OtherAcc.MemberNumber == data.MemberNumber) {
-									OtherAcc.Lovership = P;
-									OtherAcc.Socket.emit("AccountLovership", { Lovership: OtherAcc.Lovership });
-									if (OtherAcc.ChatRoom != null)
-										ChatRoomSyncCharacter(OtherAcc.ChatRoom, OtherAcc.MemberNumber, OtherAcc.MemberNumber);
-								}
+							const OtherAcc = AccountByMemberNumber.get(data.MemberNumber);
+							if (OtherAcc != null) {
+								OtherAcc.Lovership = P;
+								OtherAcc.Socket.emit("AccountLovership", { Lovership: OtherAcc.Lovership });
+								if (OtherAcc.ChatRoom != null)
+									ChatRoomSyncCharacter(OtherAcc.ChatRoom, OtherAcc.MemberNumber, OtherAcc.MemberNumber);
+							}
 
 							AccountUpdateLovership(P, data.MemberNumber, null, false);
 						}
@@ -2644,7 +3020,9 @@ function AccountLovership(data, socket) {
 			}
 			// breaking with NPC
 			else if ((Acc.Lovership != null) && (data.MemberNumber < 0) && (data.Name != null)) {
-				Acc.Lovership.splice(AccLoversNumbers.indexOf(data.Name), 1);
+				const NPC = AccLoversNumbers.indexOf(data.Name);
+				if (NPC < 0) return;
+				Acc.Lovership.splice(NPC, 1);
 				AccountUpdateLovership(Acc.Lovership, Acc.MemberNumber);
 				return;
 			}
@@ -2807,8 +3185,7 @@ function AccountDifficulty(data, socket) {
 				// Updates the account and the database
 				var NewDifficulty = { Difficulty: { Level: /** @type {DifficultyLevel} */ (data), LastChange: CommonTime() } };
 				Acc.Difficulty = NewDifficulty.Difficulty;
-				//console.log("Updating account " + Acc.AccountName + " difficulty to " + NewDifficulty.Difficulty.Level);
-				Database.collection(AccountCollection).updateOne({ AccountName : Acc.AccountName }, { $set: NewDifficulty }, function(err, res) { if (err) throw err; });
+				Database.collection(AccountCollection).updateOne({ AccountName : Acc.AccountName }, { $set: NewDifficulty }, DatabaseLogError("updating an account"));
 
 			}
 
