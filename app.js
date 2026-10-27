@@ -3,32 +3,11 @@ require('newrelic');
 const base64id = require("base64id");
 const crypto = require('crypto');
 
-// Reads the SSL key and certificate, if there's no file available, we switch to regular http
-/*var SyncRequest = require("sync-request");
-var ServerKey = null;
-if ((process.env.SERVER_KEY0 != null) && (process.env.SERVER_KEY0 != "")) { try { ServerKey = SyncRequest("GET", process.env.SERVER_KEY0).getBody(); } catch(err) {} }
-if ((ServerKey == null) && (process.env.SERVER_KEY1 != null) && (process.env.SERVER_KEY1 != "")) { try { ServerKey = SyncRequest("GET", process.env.SERVER_KEY1).getBody(); } catch(err) {} }
-if ((ServerKey == null) && (process.env.SERVER_KEY2 != null) && (process.env.SERVER_KEY2 != "")) { try { ServerKey = SyncRequest("GET", process.env.SERVER_KEY2).getBody(); } catch(err) {} }
-var ServerCert = null;
-if ((process.env.SERVER_CERT0 != null) && (process.env.SERVER_CERT0 != "")) { try { ServerCert = SyncRequest("GET", process.env.SERVER_CERT0).getBody(); } catch(err) {} }
-if ((ServerCert == null) && (process.env.SERVER_CERT1 != null) && (process.env.SERVER_CERT1 != "")) { try { ServerCert = SyncRequest("GET", process.env.SERVER_CERT1).getBody(); } catch(err) {} }
-if ((ServerCert == null) && (process.env.SERVER_CERT2 != null) && (process.env.SERVER_CERT2 != "")) { try { ServerCert = SyncRequest("GET", process.env.SERVER_CERT2).getBody(); } catch(err) {} }
-console.log("Using Server Key: " + ServerKey);
-console.log("Using Server Certificate: " + ServerCert);*/
-
 // Enforce https with a certificate
 var App;
 var UseSecure;
 UseSecure = false;
 App = require("http").createServer();
-
-/*if ((ServerKey == null) || (ServerCert == null)) {
-	console.log("No key or certificate found, starting http server with origin " + process.env.CORS_ORIGIN0);
-} else {
-	console.log("Starting https server for certificate with origin " + process.env.CORS_ORIGIN0);
-	UseSecure = true;
-	App = require("https").createServer({ key: ServerKey, cert: ServerCert, requestCert: false, rejectUnauthorized: false });
-}*/
 
 // Starts socket.io to accept incoming connections on specified origins
 const socketio = require("socket.io");
@@ -161,19 +140,6 @@ process.on('SIGTERM', function() {
 		if ((Acc != null) && (Acc.Socket != null))
 			Acc.Socket.emit("ServerMessage", "Server will reboot in 30 seconds." );
 });
-
-// When SIGKILL is received, we do the final updates
-/*process.on('SIGKILL', function() {
-	console.log("***********************");
-	console.log("HEROKU SIGKILL DETECTED");
-	console.log("***********************");
-	try {
-		AccountDelayedUpdate();
-	} catch (error) {
-		console.log("Error while doing delayed updates");
-	}
-	process.exit(2);
-});*/
 
 /** @type {Map<string, number[]>} */
 const IPConnections = new Map();
@@ -450,14 +416,6 @@ function AccountCreate(data, socket) {
 						if (IP.Time >= CurrentTime - 3600000) HourCount++;
 					}
 
-				/*var mailOptions = {
-					from: "donotreply@bondageprojects.com",
-					to: process.env.EMAIL_ADMIN || "",
-					subject: "Bondage Club Server Info",
-					html: "IP: " + CurrentIP + " is creating account: " + data.AccountName + " at time: " + CommonTime().toString() + "<br />TotalCount: " + TotalCount.toString() + "<br />MAX_IP_ACCOUNT_PER_DAY: " + MAX_IP_ACCOUNT_PER_DAY.toString() + "<br />HourCount: " + HourCount.toString() + "<br />MAX_IP_ACCOUNT_PER_HOUR: " + MAX_IP_ACCOUNT_PER_HOUR.toString()
-				};
-				MailTransporter.sendMail(mailOptions, function (err, info) {});*/
-
 				// Exits if we reached the limit
 				if ((TotalCount >= MAX_IP_ACCOUNT_PER_DAY) || (HourCount >= MAX_IP_ACCOUNT_PER_HOUR)) {
 					socket.emit("CreationResponse", "New accounts per day exceeded");
@@ -706,7 +664,6 @@ async function AccountLoginProcess(socket, AccountName, Password) {
 	// Logs the account
 	result.ID = socket.id;
 	result.Environment = AccountGetEnvironment(socket);
-	//console.log("Login account: " + result.AccountName + " ID: " + socket.id + " " + result.Environment);
 	AccountValidData(result);
 	AccountRemoveFromChatRoom(result.MemberNumber);
 	Account.push(result);
@@ -846,21 +803,18 @@ function AccountUpdate(data, socket) {
 				// If only the appearance is updated, we keep the change in memory and do not update the database right away
 				if ((Acc != null) && !ObjectEmpty(data) && (Object.keys(data).length == 1) && (data.Appearance != null)) {
 					Acc.DelayedAppearanceUpdate = data.Appearance;
-					//console.log("TO REMOVE - Keeping Appearance in memory for account: " + Acc.AccountName);
 					return;
 				}
 
 				// If only the skill is updated, we keep the change in memory and do not update the database right away
 				if ((Acc != null) && !ObjectEmpty(data) && (Object.keys(data).length == 1) && (data.Skill != null)) {
 					Acc.DelayedSkillUpdate = data.Skill;
-					//console.log("TO REMOVE - Keeping Skill in memory for account: " + Acc.AccountName);
 					return;
 				}
 
 				// If only the game is updated, we keep the change in memory and do not update the database right away
 				if ((Acc != null) && !ObjectEmpty(data) && (Object.keys(data).length == 1) && (data.Game != null)) {
 					Acc.DelayedGameUpdate = data.Game;
-					//console.log("TO REMOVE - Keeping Game in memory for account: " + Acc.AccountName);
 					return;
 				}
 
@@ -1071,7 +1025,6 @@ function AccountBeep(data, socket) {
 // Updates an account appearance if needed
 function AccountDelayedUpdateOne(AccountName, NewAppearance, NewSkill, NewGame) {
 	if ((AccountName == null) || ((NewAppearance == null) && (NewSkill == null) && (NewGame == null))) return;
-	//console.log("TO REMOVE - Updating Appearance, Skill or Game in database for account: " + AccountName);
 	let UpdateObj = {};
 	if (NewAppearance != null) UpdateObj.Appearance = NewAppearance;
 	if (NewSkill != null) UpdateObj.Skill = NewSkill;
@@ -1081,7 +1034,6 @@ function AccountDelayedUpdateOne(AccountName, NewAppearance, NewSkill, NewGame) 
 
 // Called every X seconds to update the database with appearance updates
 function AccountDelayedUpdate() {
-	//console.log("TO REMOVE - Scanning for account delayed updates");
 	for (const Acc of Account) {
 		if (Acc != null) {
 			AccountDelayedUpdateOne(Acc.AccountName, Acc.DelayedAppearanceUpdate, Acc.DelayedSkillUpdate, Acc.DelayedGameUpdate);
@@ -1105,7 +1057,6 @@ function AccountRemove(ID) {
 				let AccDelayedAppearanceUpdate = Acc.DelayedAppearanceUpdate;
 				let AccDelayedSkillUpdate = Acc.DelayedSkillUpdate;
 				let AccDelayedGameUpdate = Acc.DelayedGameUpdate;
-				//console.log("Disconnecting account: " + Acc.AccountName + " ID: " + ID);
 				ChatRoomRemove(Acc, "ServerDisconnect", []);
 				const index = Account.indexOf(Acc);
 				if (index >= 0)
@@ -1394,7 +1345,6 @@ function ChatRoomCreate(data, socket) {
 			ChatRoom.push(NewRoom);
 			Acc.ChatRoom = NewRoom;
 			NewRoom.Account.push(Acc);
-			//console.log("Chat room (" + ChatRoom.length.toString() + ") " + data.Name + " created by account " + Acc.AccountName + ", ID: " + socket.id);
 			socket.join("chatroom-" + NewRoom.ID);
 			socket.emit("ChatRoomCreateResponse", "ChatRoomCreated");
 			ChatRoomSync(NewRoom, Acc.MemberNumber);
@@ -1488,7 +1438,6 @@ function ChatRoomRemove(Acc, Reason, Dictionary) {
 		if (Acc.ChatRoom.Account.length == 0) {
 			for (var C = 0; C < ChatRoom.length; C++)
 				if (Acc.ChatRoom.Name == ChatRoom[C].Name) {
-					//console.log("Chat room " + Acc.ChatRoom.Name + " was destroyed. Rooms left: " + (ChatRoom.length - 1).toString());
 					ChatRoom.splice(C, 1);
 					break;
 				}
@@ -1848,8 +1797,6 @@ function ChatRoomCharacterUpdate(data, socket) {
 				for (const RoomAcc of Acc.ChatRoom.Account)
 					if ((RoomAcc.ID == data.ID) && ChatRoomGetAllowItem(Acc, RoomAcc))
 						if ((typeof data.Appearance === "object") && Array.isArray(data.Appearance)) {
-							// Database.collection(AccountCollection).updateOne({ AccountName: RoomAcc.AccountName }, { $set: { Appearance: data.Appearance } }, function(err, res) { if (err) throw err; });
-							//console.log("TO REMOVE - Keeping Appearance in memory for account: " + Acc.AccountName);
 							if (data.Appearance != null) RoomAcc.DelayedAppearanceUpdate = data.Appearance;
 							RoomAcc.Appearance = data.Appearance;
 							RoomAcc.ActivePose = data.ActivePose;
