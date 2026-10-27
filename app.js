@@ -81,7 +81,6 @@ var ChatRoomProduction = [
 	process.env.PRODUCTION16 || ""
 ];
 var NextMemberNumber = 1;
-var NextPasswordReset = 0;
 var OwnershipDelay = 604800000; // 7 days delay for ownership events
 var LovershipDelay = 604800000; // 7 days delay for lovership events
 var DifficultyDelay = 604800000; // 7 days to activate the higher difficulty tiers
@@ -94,9 +93,17 @@ const ROOM_LIMIT_MINIMUM = 2; // The minimum number of players in an online chat
 const ROOM_LIMIT_MAXIMUM = 20; // The maximum number of players in an online chat room
 
 // Limits the number of accounts created on each hour & day
-var AccountCreationIP = [];
+/** @type {{ Address: string; Time: number; }[]} */
+const AccountCreationIP = [];
 const MAX_IP_ACCOUNT_PER_DAY = parseInt(process.env.MAX_IP_ACCOUNT_PER_DAY, 10) || 12;
 const MAX_IP_ACCOUNT_PER_HOUR = parseInt(process.env.MAX_IP_ACCOUNT_PER_HOUR, 10) || 4;
+
+// Limits the failed logins of each IP address, on any account and on the same account
+const LOGIN_FAILURE_LIMIT = parseInt(process.env.LOGIN_FAILURE_LIMIT, 10) || 50;
+const LOGIN_FAILURE_ACCOUNT_LIMIT = parseInt(process.env.LOGIN_FAILURE_ACCOUNT_LIMIT, 10) || 10;
+const LOGIN_FAILURE_DELAY = 900000; // 15 minutes
+/** @type {{ Address: string; AccountName: string; Time: number; }[]} */
+const LoginFailureIP = [];
 
 // DB Access
 /** @type { import("mongodb").Db } */
@@ -108,9 +115,15 @@ var DatabaseName = process.env.DATABASE_NAME || "BondageClubDatabase";
 
 /**
  * Email password reset
- * @type { { AccountName: string; ResetNumber: string; }[] }
+ * @type { { AccountName: string; ResetNumber: string; Time: number; Attempts: number; }[] }
  */
-var PasswordResetProgress = [];
+const PasswordResetProgress = [];
+const PasswordResetExpiry = 86400000; // A reset number is valid for 24 hours
+const PasswordResetMaxAttempts = 5; // A reset number is cancelled after that many wrong guesses
+const PasswordResetEmailDelay = 300000; // Only one reset email every 5 minutes for the same address
+const PasswordResetIPLimit = 5; // Maximum reset requests per IP address every hour
+/** @type { { Address: string; Email: string; Time: number; }[] } */
+const PasswordResetRequests = [];
 var NodeMailer = require("nodemailer");
 var MailTransporter = NodeMailer.createTransport({
 	host: "mail.bondageprojects.com",
@@ -237,15 +250,7 @@ DatabaseClient.connect(DatabaseURL, { useUnifiedTopology: true, useNewUrlParser:
 			console.log("Bondage Club server is listening on " + (ServerPort).toString());
 			console.log("****************************************");
 			IO.on("connection", function ( /** @type {ServerSocket} */ socket) {
-				/** @type {string} */
-				let address = socket.conn.remoteAddress;
-
-				// If there is trusted forward header set by proxy, use that instead
-				// But only trust the last hop!
-				if (IP_CONNECTION_PROXY_HEADER && typeof socket.handshake.headers[IP_CONNECTION_PROXY_HEADER] === "string") {
-					const hops = /** @type {string} */ (socket.handshake.headers[IP_CONNECTION_PROXY_HEADER]).split(",");
-					address = hops[hops.length-1].trim();
-				}
+				const address = AccountGetIP(socket);
 
 				const sameIPConnections = IPConnections.get(address) || [];
 
@@ -430,18 +435,14 @@ function AccountCreate(data, socket) {
 		if (data.Name.match(ServerCharacterNameRegex) && data.AccountName.match(ServerAccountNameRegex) && data.Password.match(ServerAccountPasswordRegex) && (CommonEmailIsValid(data.Email) || data.Email == "") && (data.Email.length <= 100)) {
 
 			// Gets the current IP Address that's creating the account
-			/** @type {string} */
-			let CurrentIP = socket.conn.remoteAddress;
-			if (IP_CONNECTION_PROXY_HEADER && typeof socket.handshake.headers[IP_CONNECTION_PROXY_HEADER] === "string") {
-				const hops = /** @type {string} */ (socket.handshake.headers[IP_CONNECTION_PROXY_HEADER]).split(",");
-				CurrentIP = hops[hops.length-1].trim();
-			}
+			let CurrentIP = AccountGetIP(socket);
 
 			// If the IP is valid
 			if ((CurrentIP != null) && (CurrentIP != "")) {
 
-				// Checks the number of account created in total and in the last hour by this IP
+				// Checks the number of account created in the last day and in the last hour by this IP
 				let CurrentTime = CommonTime();
+				CommonRemoveExpired(AccountCreationIP, CurrentTime - 86400000);
 				let TotalCount = 0;
 				let HourCount = 0;
 				for (let IP of AccountCreationIP)
@@ -583,6 +584,13 @@ function AccountLogin(data, socket) {
 		return;
 	}
 
+	// Too many failed logins from that IP address
+	if (AccountLoginFailedTooOften(AccountGetIP(socket), data.AccountName.toUpperCase())) {
+		socket.emit("ForceDisconnect", "ErrorRateLimited");
+		socket.disconnect(true);
+		return;
+	}
+
 	// If connection already has login queued, ignore it
 	if (pendingLogins.has(socket)) return;
 
@@ -653,6 +661,62 @@ function AccountRemoveFromChatRoom(MemberNumber) {
 }
 
 /**
+ * Gets the IP address of a socket. If there is trusted forward header set by proxy, use that instead, but only trust the last hop!
+ * @param {ServerSocket} socket
+ * @returns {string}
+ */
+function AccountGetIP(socket) {
+	/** @type {string} */
+	let address = socket.conn.remoteAddress;
+	if (IP_CONNECTION_PROXY_HEADER && typeof socket.handshake.headers[IP_CONNECTION_PROXY_HEADER] === "string") {
+		const hops = /** @type {string} */ (socket.handshake.headers[IP_CONNECTION_PROXY_HEADER]).split(",");
+		address = hops[hops.length-1].trim();
+	}
+	return address;
+}
+
+/**
+ * Removes, in place, the entries of a list that are older than a given time
+ * @param {{ Time: number; }[]} List
+ * @param {number} MinTime
+ */
+function CommonRemoveExpired(List, MinTime) {
+	let Keep = 0;
+	for (const Entry of List)
+		if (Entry.Time >= MinTime)
+			List[Keep++] = Entry;
+	List.length = Keep;
+}
+
+/**
+ * Returns TRUE if that IP address failed to log in too many times recently, on that account or on any account
+ * @param {string} Address
+ * @param {string} AccountName
+ * @returns {boolean}
+ */
+function AccountLoginFailedTooOften(Address, AccountName) {
+	CommonRemoveExpired(LoginFailureIP, CommonTime() - LOGIN_FAILURE_DELAY);
+	let Count = 0;
+	let AccountCount = 0;
+	for (const Failure of LoginFailureIP)
+		if (Failure.Address === Address) {
+			Count++;
+			if (Failure.AccountName === AccountName) AccountCount++;
+		}
+	return (Count >= LOGIN_FAILURE_LIMIT) || (AccountCount >= LOGIN_FAILURE_ACCOUNT_LIMIT);
+}
+
+/**
+ * Answers a failed login and remembers it
+ * @param {ServerSocket} socket
+ * @param {string} AccountName
+ */
+function AccountLoginFailed(socket, AccountName) {
+	LoginFailureIP.push({ Address: AccountGetIP(socket), AccountName: AccountName, Time: CommonTime() });
+	socket.emit("LoginResponse", "InvalidNamePassword");
+}
+
+/**
  * Processes a single login request
  * @param {ServerSocket} socket
  * @param {string} AccountName The username the user is trying to log in with
@@ -665,7 +729,7 @@ async function AccountLoginProcess(socket, AccountName, Password) {
 
 	if (!socket.connected) return;
 	if (result === null) {
-		socket.emit("LoginResponse", "InvalidNamePassword");
+		AccountLoginFailed(socket, AccountName);
 		return;
 	}
 
@@ -674,7 +738,7 @@ async function AccountLoginProcess(socket, AccountName, Password) {
 
 	if (!socket.connected) return;
 	if (!res) {
-		socket.emit("LoginResponse", "InvalidNamePassword");
+		AccountLoginFailed(socket, AccountName);
 		return;
 	}
 
@@ -2280,12 +2344,15 @@ function ChatRoomAllowItem(data, socket) {
  * @param {string} ResetNumber
  */
 function PasswordResetSetNumber(AccountName, ResetNumber) {
+	CommonRemoveExpired(PasswordResetProgress, CommonTime() - PasswordResetExpiry);
 	for (const PasswordReset of PasswordResetProgress)
 		if (PasswordReset.AccountName.trim() == AccountName.trim()) {
 			PasswordReset.ResetNumber = ResetNumber;
+			PasswordReset.Time = CommonTime();
+			PasswordReset.Attempts = 0;
 			return;
 		}
-	PasswordResetProgress.push({ AccountName: AccountName, ResetNumber: ResetNumber });
+	PasswordResetProgress.push({ AccountName: AccountName, ResetNumber: ResetNumber, Time: CommonTime(), Attempts: 0 });
 }
 
 /**
@@ -2296,9 +2363,18 @@ function PasswordResetSetNumber(AccountName, ResetNumber) {
 function PasswordReset(data, socket) {
 	if ((data != null) && (typeof data === "string") && (data != "") && CommonEmailIsValid(data)) {
 
-		// One email reset password per 5 seconds to prevent flooding
-		if (NextPasswordReset > CommonTime()) return socket.emit("PasswordResetResponse", "RetryLater");
-		NextPasswordReset = CommonTime() + 5000;
+		// Limits the reset emails per address and per IP to prevent flooding
+		const Address = AccountGetIP(socket);
+		const Email = data.trim().toLowerCase();
+		const CurrentTime = CommonTime();
+		CommonRemoveExpired(PasswordResetRequests, CurrentTime - 3600000);
+		let IPCount = 0;
+		for (const Request of PasswordResetRequests) {
+			if ((Request.Email === Email) && (Request.Time > CurrentTime - PasswordResetEmailDelay)) return socket.emit("PasswordResetResponse", "RetryLater");
+			if (Request.Address === Address) IPCount++;
+		}
+		if (IPCount >= PasswordResetIPLimit) return socket.emit("PasswordResetResponse", "RetryLater");
+		PasswordResetRequests.push({ Address: Address, Email: Email, Time: CurrentTime });
 
 		// Gets all accounts that matches the email
 		Database.collection(AccountCollection).find({ Email : data }).toArray(function(err, result) {
@@ -2336,7 +2412,7 @@ function PasswordReset(data, socket) {
 					}
 				});
 
-			} else socket.emit("PasswordResetResponse", "NoAccountOnEmail");
+			} else socket.emit("PasswordResetResponse", "EmailSent");
 
 		});
 
@@ -2354,9 +2430,17 @@ function PasswordResetProcess(data, socket) {
 		// Makes sure the data is valid
 		if (data.AccountName.match(ServerAccountNameRegex) && data.NewPassword.match(ServerAccountPasswordRegex)) {
 
-			// Checks if the reset number matches
+			// Checks if the reset number matches, the reset is cancelled after too many wrong numbers
+			CommonRemoveExpired(PasswordResetProgress, CommonTime() - PasswordResetExpiry);
 			for (const PasswordReset of PasswordResetProgress)
-				if ((PasswordReset.AccountName == data.AccountName) && (PasswordReset.ResetNumber == data.ResetNumber)) {
+				if (PasswordReset.AccountName == data.AccountName) {
+					if (PasswordReset.ResetNumber != data.ResetNumber) {
+						PasswordReset.Attempts++;
+						if (PasswordReset.Attempts >= PasswordResetMaxAttempts)
+							PasswordResetProgress.splice(PasswordResetProgress.indexOf(PasswordReset), 1);
+						break;
+					}
+					PasswordResetProgress.splice(PasswordResetProgress.indexOf(PasswordReset), 1);
 
 					// Creates a hashed password and updates the account with it
 					BCrypt.hash(data.NewPassword.toUpperCase(), 10, function( err, hash ) {
