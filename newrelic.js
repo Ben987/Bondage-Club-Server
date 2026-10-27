@@ -11,9 +11,11 @@ exports.config = {
 	 */
 	app_name: ['bondage-club-server'],
 	/**
-	 * Your New Relic license key.
+	 * Your New Relic license key, read from the environment so it isn't published with the code.
+	 *
+	 * @env NEW_RELIC_LICENSE_KEY
 	 */
-	license_key: '561e7371eabbe15892a784d5d8118a33d0d3NRAL',
+	license_key: process.env.NEW_RELIC_LICENSE_KEY || '',
 	/**
 	 * This setting controls distributed tracing.
 	 * Distributed tracing lets you see the path that a request takes through your
