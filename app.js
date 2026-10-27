@@ -88,6 +88,7 @@ var DifficultyDelay = 604800000; // 7 days to activate the higher difficulty tie
 const IP_CONNECTION_LIMIT = parseInt(process.env.IP_CONNECTION_LIMIT, 10) || 64; // Limit of connections per IP address
 const IP_CONNECTION_RATE_LIMIT = parseInt(process.env.IP_CONNECTION_RATE_LIMIT, 10) || 2; // Limit of newly established connections per IP address within a second
 const CLIENT_MESSAGE_RATE_LIMIT = parseInt(process.env.CLIENT_MESSAGE_RATE_LIMIT, 10) || 20; // Limit the number of messages received from a client within a second
+const MAX_PACKET_DEPTH = 100; // Maximum nesting of objects & arrays in a client packet
 const IP_CONNECTION_PROXY_HEADER = "x-forwarded-for"; // Header with real IP, if set by trusted proxy (lowercase)
 const ROOM_LIMIT_DEFAULT = 10; // The default number of players in an online chat room
 const ROOM_LIMIT_MINIMUM = 2; // The minimum number of players in an online chat room
@@ -290,10 +291,21 @@ DatabaseClient.connect(DatabaseURL, { useUnifiedTopology: true, useNewUrlParser:
 					}
 				});
 
-				socket.on("AccountCreate", function (data) { AccountCreate(data, socket); });
-				socket.on("AccountLogin", function (data) { AccountLogin(data, socket); });
-				socket.on("PasswordReset", function(data) { PasswordReset(data, socket); });
-				socket.on("PasswordResetProcess", function(data) { PasswordResetProcess(data, socket); });
+				// Refuses the packets that would overflow the stack of the recursive code, and binary data that no handler expects
+				socket.use((packet, next) => {
+					if (CommonIsInvalidPacket(packet, MAX_PACKET_DEPTH)) {
+						console.log("Rejecting invalid packet from " + address);
+						socket.emit("ForceDisconnect", "ErrorRateLimited");
+						socket.disconnect(true);
+						return;
+					}
+					next();
+				});
+
+				ServerOn(socket, "AccountCreate", data => AccountCreate(data, socket));
+				ServerOn(socket, "AccountLogin", data => AccountLogin(data, socket));
+				ServerOn(socket, "PasswordReset", data => PasswordReset(data, socket));
+				ServerOn(socket, "PasswordResetProcess", data => PasswordResetProcess(data, socket));
 				AccountSendServerInfo(socket);
 			});
 
@@ -316,29 +328,45 @@ function OnLogin(socket) {
 	socket.removeAllListeners("AccountLogin");
 	socket.removeAllListeners("PasswordReset");
 	socket.removeAllListeners("PasswordResetProcess");
-	socket.on("AccountUpdate", function(data) { AccountUpdate(data, socket); });
-	socket.on("AccountUpdateEmail", function(data) { AccountUpdateEmail(data, socket); });
-	socket.on("AccountQuery", function(data) { AccountQuery(data, socket); });
-	socket.on("AccountBeep", function(data) { AccountBeep(data, socket); });
-	socket.on("AccountOwnership", function(data) { AccountOwnership(data, socket); });
-	socket.on("AccountLovership", function(data) { AccountLovership(data, socket); });
-	socket.on("AccountDifficulty", function(data) { AccountDifficulty(data, socket); });
-	socket.on("AccountDisconnect", function() { AccountRemove(socket.id); });
-	socket.on("disconnect", function() { AccountRemove(socket.id); });
-	socket.on("ChatRoomSearch", function(data) { ChatRoomSearch(data, socket); });
-	socket.on("ChatRoomCreate", function(data) { ChatRoomCreate(data, socket); });
-	socket.on("ChatRoomJoin", function(data) { ChatRoomJoin(data, socket); });
-	socket.on("ChatRoomLeave", function() { ChatRoomLeave(socket); });
-	socket.on("ChatRoomChat", function(data) { ChatRoomChat(data, socket); });
-	socket.on("ChatRoomCharacterUpdate", function(data) { ChatRoomCharacterUpdate(data, socket); });
-	socket.on("ChatRoomCharacterExpressionUpdate", function(data) { ChatRoomCharacterExpressionUpdate(data, socket); });
-	socket.on("ChatRoomCharacterMapDataUpdate", function(data) { ChatRoomCharacterMapDataUpdate(data, socket); });
-	socket.on("ChatRoomCharacterPoseUpdate", function(data) { ChatRoomCharacterPoseUpdate(data, socket); });
-	socket.on("ChatRoomCharacterArousalUpdate", function(data) { ChatRoomCharacterArousalUpdate(data, socket); });
-	socket.on("ChatRoomCharacterItemUpdate", function(data) { ChatRoomCharacterItemUpdate(data, socket); });
-	socket.on("ChatRoomAdmin", function(data) { ChatRoomAdmin(data, socket); });
-	socket.on("ChatRoomAllowItem", function(data) { ChatRoomAllowItem(data, socket); });
-	socket.on("ChatRoomGame", function(data) { ChatRoomGame(data, socket); });
+	ServerOn(socket, "AccountUpdate", data => AccountUpdate(data, socket));
+	ServerOn(socket, "AccountUpdateEmail", data => AccountUpdateEmail(data, socket));
+	ServerOn(socket, "AccountQuery", data => AccountQuery(data, socket));
+	ServerOn(socket, "AccountBeep", data => AccountBeep(data, socket));
+	ServerOn(socket, "AccountOwnership", data => AccountOwnership(data, socket));
+	ServerOn(socket, "AccountLovership", data => AccountLovership(data, socket));
+	ServerOn(socket, "AccountDifficulty", data => AccountDifficulty(data, socket));
+	ServerOn(socket, "AccountDisconnect", () => AccountRemove(socket.id));
+	ServerOn(socket, "disconnect", () => AccountRemove(socket.id));
+	ServerOn(socket, "ChatRoomSearch", data => ChatRoomSearch(data, socket));
+	ServerOn(socket, "ChatRoomCreate", data => ChatRoomCreate(data, socket));
+	ServerOn(socket, "ChatRoomJoin", data => ChatRoomJoin(data, socket));
+	ServerOn(socket, "ChatRoomLeave", () => ChatRoomLeave(socket));
+	ServerOn(socket, "ChatRoomChat", data => ChatRoomChat(data, socket));
+	ServerOn(socket, "ChatRoomCharacterUpdate", data => ChatRoomCharacterUpdate(data, socket));
+	ServerOn(socket, "ChatRoomCharacterExpressionUpdate", data => ChatRoomCharacterExpressionUpdate(data, socket));
+	ServerOn(socket, "ChatRoomCharacterMapDataUpdate", data => ChatRoomCharacterMapDataUpdate(data, socket));
+	ServerOn(socket, "ChatRoomCharacterPoseUpdate", data => ChatRoomCharacterPoseUpdate(data, socket));
+	ServerOn(socket, "ChatRoomCharacterArousalUpdate", data => ChatRoomCharacterArousalUpdate(data, socket));
+	ServerOn(socket, "ChatRoomCharacterItemUpdate", data => ChatRoomCharacterItemUpdate(data, socket));
+	ServerOn(socket, "ChatRoomAdmin", data => ChatRoomAdmin(data, socket));
+	ServerOn(socket, "ChatRoomAllowItem", data => ChatRoomAllowItem(data, socket));
+	ServerOn(socket, "ChatRoomGame", data => ChatRoomGame(data, socket));
+}
+
+/**
+ * Registers an event handler, its errors are logged instead of crashing the server
+ * @param {ServerSocket} socket
+ * @param {string} Event
+ * @param {(data: any) => void} Handler
+ */
+function ServerOn(socket, Event, Handler) {
+	socket.on(/** @type {any} */ (Event), function(/** @type {any} */ data) {
+		try {
+			Handler(data);
+		} catch (error) {
+			console.log("Error while handling " + Event + " from " + socket.id + ": " + ((error && error.stack) || error));
+		}
+	});
 }
 
 /**
@@ -414,6 +442,28 @@ function CommonParseInt(thing, defaultValue = 0, base = 10) {
 	let int = parseInt(thing, base);
 	if (!Number.isInteger(int)) int = defaultValue;
 	return int;
+}
+
+/**
+ * Returns TRUE if the data is nested deeper than allowed or contains binary data, without using recursion
+ * @param {unknown} data
+ * @param {number} MaxDepth
+ * @returns {boolean}
+ */
+function CommonIsInvalidPacket(data, MaxDepth) {
+	const Values = [data];
+	const Depths = [1];
+	while (Values.length > 0) {
+		const Value = Values.pop();
+		const Depth = /** @type {number} */ (Depths.pop());
+		if ((Value == null) || (typeof Value !== "object")) continue;
+		if ((Depth > MaxDepth) || ArrayBuffer.isView(Value) || (Value instanceof ArrayBuffer)) return true;
+		for (const Child of Object.values(Value)) {
+			Values.push(Child);
+			Depths.push(Depth + 1);
+		}
+	}
+	return false;
 }
 
 /**
