@@ -114,7 +114,7 @@ var PasswordResetProgress = [];
 var NodeMailer = require("nodemailer");
 var MailTransporter = NodeMailer.createTransport({
 	host: "mail.bondageprojects.com",
-	Port: 465,
+	port: 465,
 	secure: true,
 	auth: {
 		user: "donotreply@bondageprojects.com",
@@ -511,7 +511,7 @@ function AccountCreate(data, socket) {
 							OnLogin(socket);
 							socket.emit("CreationResponse", { ServerAnswer: "AccountCreated", OnlineID: account.ID, MemberNumber: account.MemberNumber } );
 							AccountSendServerInfo(socket);
-							AccountPurgeInfo(data);
+							AccountPurgeInfo(account);
 						});
 					});
 
@@ -788,6 +788,12 @@ function AccountUpdate(data, socket) {
 				// Make sure the object doesn't have any property that starts with a $, to prevent a MongoDB crash
 				SanitizeNames(data);
 
+				// Keys with a dot are MongoDB paths, only the add-on settings use them
+				for (const Key of Object.keys(data))
+					if (Key.includes(".") && !/^ExtensionSettings\.[^.$]+$/.test(Key))
+						delete data[Key];
+				if ((data.Owner != null) && (typeof data.Owner !== "string")) delete data.Owner;
+
 				// Some data is kept for future use
 				if (data.InventoryData != null) Acc.InventoryData = data.InventoryData;
 				if (data.ItemPermission != null) Acc.ItemPermission = data.ItemPermission;
@@ -1052,7 +1058,7 @@ function AccountBeep(data, socket) {
 		if (Acc != null)
 			for (const OtherAcc of Account)
 				if (OtherAcc.MemberNumber == data.MemberNumber)
-					if ((OtherAcc.Environment == Acc.Environment) && (((OtherAcc.FriendList != null) && (OtherAcc.FriendList.indexOf(Acc.MemberNumber) >= 0)) || ((OtherAcc.Ownership != null) && (OtherAcc.Ownership.MemberNumber != null) && (OtherAcc.Ownership.MemberNumber == Acc.MemberNumber)) || ((data.BeepType != null) && (typeof data.BeepType === "string") && (data.BeepType == "Leash")))) {
+					if ((OtherAcc.Environment == Acc.Environment) && (((OtherAcc.FriendList != null) && (OtherAcc.FriendList.indexOf(Acc.MemberNumber) >= 0)) || ((OtherAcc.Ownership != null) && (OtherAcc.Ownership.MemberNumber != null) && (OtherAcc.Ownership.MemberNumber == Acc.MemberNumber)) || ((data.BeepType != null) && (typeof data.BeepType === "string") && (data.BeepType == "Leash") && Array.isArray(OtherAcc.BlackList) && (OtherAcc.BlackList.indexOf(Acc.MemberNumber) < 0)))) {
 						OtherAcc.Socket.emit("AccountBeep", {
 							MemberNumber: Acc.MemberNumber,
 							MemberName: Acc.Name,
@@ -1853,6 +1859,7 @@ function ChatRoomCharacterUpdate(data, socket) {
 							if (data.Appearance != null) RoomAcc.DelayedAppearanceUpdate = data.Appearance;
 							RoomAcc.Appearance = data.Appearance;
 							RoomAcc.ActivePose = data.ActivePose;
+							SanitizeNames(data.Appearance);
 							ChatRoomSyncSingle(RoomAcc, Acc.MemberNumber);
 						}
 	}
@@ -2644,7 +2651,9 @@ function AccountLovership(data, socket) {
 			}
 			// breaking with NPC
 			else if ((Acc.Lovership != null) && (data.MemberNumber < 0) && (data.Name != null)) {
-				Acc.Lovership.splice(AccLoversNumbers.indexOf(data.Name), 1);
+				const NPC = AccLoversNumbers.indexOf(data.Name);
+				if (NPC < 0) return;
+				Acc.Lovership.splice(NPC, 1);
 				AccountUpdateLovership(Acc.Lovership, Acc.MemberNumber);
 				return;
 			}
